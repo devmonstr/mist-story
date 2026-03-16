@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { truncateNpub } from "@/lib/nostr-utils"
-import { User, LogOut, PenSquare, BookOpen } from "lucide-react"
+import { User, LogOut, PenSquare, BookOpen, Bookmark, Clock, Bell, Settings } from "lucide-react"
 import Link from "next/link"
 
 interface AuthButtonProps {
@@ -108,6 +108,48 @@ export function AuthButton({ variant = "default", onAction }: AuthButtonProps) {
           <BookOpen className="h-4 w-4" />
           My Library
         </Link>
+        <Link
+          href={`/profile/${user.npub}`}
+          onClick={onAction}
+          className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <User className="h-4 w-4" />
+          My Profile
+        </Link>
+        <div className="border-t border-border my-2" />
+        <Link
+          href="/bookmarks"
+          onClick={onAction}
+          className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <Bookmark className="h-4 w-4" />
+          Bookmarks
+        </Link>
+        <Link
+          href="/history"
+          onClick={onAction}
+          className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <Clock className="h-4 w-4" />
+          Reading History
+        </Link>
+        <Link
+          href="/notifications"
+          onClick={onAction}
+          className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <Bell className="h-4 w-4" />
+          Notifications
+        </Link>
+        <div className="border-t border-border my-2" />
+        <Link
+          href="/settings"
+          onClick={onAction}
+          className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <Settings className="h-4 w-4" />
+          Settings
+        </Link>
         <button
           onClick={handleSignOut}
           className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground hover:text-foreground"
@@ -159,6 +201,38 @@ export function AuthButton({ variant = "default", onAction }: AuthButtonProps) {
           <Link href="/library" className="flex items-center gap-2">
             <BookOpen className="h-4 w-4" />
             My Library
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/profile/${user.npub}`} className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            My Profile
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/bookmarks" className="flex items-center gap-2">
+            <Bookmark className="h-4 w-4" />
+            Bookmarks
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/history" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Reading History
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/notifications" className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Notifications
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/settings" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Settings
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

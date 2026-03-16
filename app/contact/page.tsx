@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { Navbar } from "@/components/navbar"
+import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
 import { Mail, Phone, MapPin } from 'lucide-react'
 
@@ -25,7 +27,9 @@ export default function ContactPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col">
+      <Navbar />
+      <main className="flex-1 bg-background">
       {/* Header */}
       <div className="border-b border-border">
         <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
@@ -170,6 +174,8 @@ export default function ContactPage() {
           </div>
         </div>
       </div>
+      </main>
+      <Footer />
     </div>
   )
 }

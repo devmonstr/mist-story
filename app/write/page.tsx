@@ -54,7 +54,7 @@ export default function WritePage() {
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
               <Button size="lg" asChild>
-                <a href="/sign-up">Start Writing</a>
+                <a href="/sign-in">Start Writing</a>
               </Button>
               <Button size="lg" variant="outline" asChild>
                 <a href="/library">Read Stories First</a>
@@ -107,7 +107,7 @@ export default function WritePage() {
               Join thousands of writers who are already sharing their work on Mist Story. It takes less than a minute to get started.
             </p>
             <Button size="lg" className="mt-8" asChild>
-              <a href="/sign-up">Create Free Account</a>
+              <a href="/sign-in">Create Free Account</a>
             </Button>
           </div>
         </section>

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Menu } from "lucide-react"
+import { Menu, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -17,6 +17,7 @@ const navLinks = [
   { href: "/library", label: "Library" },
   { href: "/write", label: "Write" },
   { href: "/discover", label: "Discover" },
+  { href: "/search", label: "Search" },
   { href: "/about", label: "About" },
 ]
 

@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { Navbar } from "@/components/navbar"
+import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
 import { HelpCircle, MessageCircle, Mail, BookOpen } from 'lucide-react'
 import { useState } from 'react'
@@ -32,7 +34,7 @@ export default function SupportPage() {
     {
       id: '5',
       question: 'How do I report inappropriate content?',
-      answer: 'If you encounter content that violates our community guidelines, please use the report button on the content page or contact us at support@Mist Story.app with details.',
+      answer: 'If you encounter content that violates our community guidelines, please use the report button on the content page or contact us at support@miststory.app with details.',
     },
     {
       id: '6',
@@ -42,7 +44,9 @@ export default function SupportPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col">
+      <Navbar />
+      <main className="flex-1 bg-background">
       {/* Header */}
       <div className="border-b border-border">
         <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
@@ -110,6 +114,8 @@ export default function SupportPage() {
           </div>
         </div>
       </div>
+      </main>
+      <Footer />
     </div>
   )
 }

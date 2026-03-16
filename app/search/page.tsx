@@ -1,12 +1,36 @@
 'use client'
 
 import Link from 'next/link'
+import { Navbar } from "@/components/navbar"
+import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
 import { Search, Filter } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 
-export default function SearchPage() {
+interface NovelResult {
+  id: string
+  type: 'novel'
+  title: string
+  author: string
+  genre: string
+  description: string
+  reads: number
+  chapters: number
+}
+
+interface AuthorResult {
+  id: string
+  type: 'author'
+  name: string
+  bio: string
+  followers: number
+  novels: number
+}
+
+type SearchResult = NovelResult | AuthorResult
+
+function SearchContent() {
   const searchParams = useSearchParams()
   const queryParam = searchParams.get('q') || ''
   const [query, setQuery] = useState(queryParam)
@@ -15,7 +39,7 @@ export default function SearchPage() {
   const [sortBy, setSortBy] = useState('relevance')
 
   // Sample data
-  const allResults = [
+  const allResults: SearchResult[] = [
     {
       id: '1',
       type: 'novel',
@@ -115,7 +139,9 @@ export default function SearchPage() {
   }, [query, filterType, sortBy])
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col">
+      <Navbar />
+      <main className="flex-1 bg-background">
       {/* Search Header */}
       <div className="border-b border-border bg-card">
         <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
@@ -266,6 +292,31 @@ export default function SearchPage() {
           )}
         </div>
       </div>
+      </main>
+      <Footer />
+    </div>
+  )
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<SearchLoading />}>
+      <SearchContent />
+    </Suspense>
+  )
+}
+
+function SearchLoading() {
+  return (
+    <div className="flex min-h-screen flex-col">
+      <Navbar />
+      <main className="flex-1 bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Search className="mx-auto h-8 w-8 text-muted-foreground animate-pulse" />
+          <p className="mt-4 text-muted-foreground">Loading...</p>
+        </div>
+      </main>
+      <Footer />
     </div>
   )
 }

@@ -1,18 +1,22 @@
 'use client'
 
+import { use } from 'react'
 import Link from 'next/link'
+import { Navbar } from "@/components/navbar"
+import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Heart, Share2, BookOpen, Users } from 'lucide-react'
 import { useAuth } from '@/context/auth-context'
 
-export default function ProfilePage({ params }: { params: { npub: string } }) {
+export default function ProfilePage({ params }: { params: Promise<{ npub: string }> }) {
+  const { npub } = use(params)
   const { user } = useAuth()
-  const isOwnProfile = user?.npub === params.npub
+  const isOwnProfile = user?.npub === npub
 
   // Sample author data
   const author = {
-    npub: params.npub,
+    npub,
     name: 'Sarah Mitchell',
     bio: 'Storyteller exploring themes of identity, love, and transformation. Coffee enthusiast and night owl.',
     location: 'Portland, Oregon',
@@ -64,7 +68,9 @@ export default function ProfilePage({ params }: { params: { npub: string } }) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col">
+      <Navbar />
+      <main className="flex-1 bg-background">
       {/* Header Section */}
       <div className="border-b border-border">
         <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
@@ -182,6 +188,8 @@ export default function ProfilePage({ params }: { params: { npub: string } }) {
           ))}
         </div>
       </div>
+      </main>
+      <Footer />
     </div>
   )
 }
