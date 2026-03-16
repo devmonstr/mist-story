@@ -1,4 +1,5 @@
 import type { NostrEvent, NostrProfile, NostrUser } from "./nostr-types"
+import { schnorr } from "@noble/secp256k1"
 
 // Bech32 character set
 const BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
@@ -18,6 +19,38 @@ export function npubToHex(npub: string): string | null {
   } catch {
     return null
   }
+}
+
+// Convert nsec to hex (private key)
+export function nsecToHex(nsec: string): string | null {
+  try {
+    const decoded = bech32Decode(nsec)
+    if (decoded.prefix !== "nsec") return null
+    return bytesToHex(decoded.data)
+  } catch {
+    return null
+  }
+}
+
+// Derive public key from private key
+export function getPublicKeyFromPrivateKey(privateKeyHex: string): string | null {
+  try {
+    // Convert hex string to Uint8Array (required by @noble/secp256k1 v3)
+    const privateKeyBytes = hexToBytes(privateKeyHex)
+    // schnorr.getPublicKey returns 32-byte x-only public key directly
+    const pubkeyBytes = schnorr.getPublicKey(privateKeyBytes)
+    return bytesToHex(pubkeyBytes)
+  } catch (error) {
+    console.error("Error deriving public key:", error)
+    return null
+  }
+}
+
+// Validate nsec format
+export function isValidNsec(nsec: string): boolean {
+  if (!nsec.startsWith("nsec1")) return false
+  const hex = nsecToHex(nsec)
+  return hex !== null && hex.length === 64
 }
 
 function hexToBytes(hex: string): Uint8Array {

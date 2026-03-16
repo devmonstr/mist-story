@@ -13,6 +13,9 @@ import {
   isNostrExtensionAvailable,
   getPublicKey,
   createNostrUser,
+  nsecToHex,
+  getPublicKeyFromPrivateKey,
+  isValidNsec,
 } from "@/lib/nostr-utils"
 
 interface AuthContextType {
@@ -20,6 +23,7 @@ interface AuthContextType {
   isLoading: boolean
   isExtensionAvailable: boolean
   signIn: () => Promise<boolean>
+  signInWithNsec: (nsec: string) => Promise<{ success: boolean; error?: string }>
   signOut: () => void
   refreshProfile: () => Promise<void>
 }
@@ -27,6 +31,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const STORAGE_KEY = "Mist Story_nostr_pubkey"
+const STORAGE_KEY_METHOD = "Mist Story_auth_method"
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<NostrUser | null>(null)
@@ -96,6 +101,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(() => {
     setUser(null)
     localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(STORAGE_KEY_METHOD)
+  }, [])
+
+  const signInWithNsec = useCallback(async (nsec: string): Promise<{ success: boolean; error?: string }> => {
+    // Validate nsec format
+    if (!isValidNsec(nsec)) {
+      return { success: false, error: "Invalid nsec format. Must start with nsec1" }
+    }
+
+    setIsLoading(true)
+    try {
+      const privateKeyHex = nsecToHex(nsec)
+      if (!privateKeyHex) {
+        return { success: false, error: "Failed to decode nsec" }
+      }
+
+      const pubkey = getPublicKeyFromPrivateKey(privateKeyHex)
+      if (!pubkey) {
+        return { success: false, error: "Failed to derive public key from nsec" }
+      }
+
+      const nostrUser = await createNostrUser(pubkey)
+      setUser(nostrUser)
+      localStorage.setItem(STORAGE_KEY, pubkey)
+      localStorage.setItem(STORAGE_KEY_METHOD, "nsec")
+      return { success: true }
+    } catch (error) {
+      console.error("Nsec sign in failed:", error)
+      return { success: false, error: "Failed to sign in with nsec" }
+    } finally {
+      setIsLoading(false)
+    }
   }, [])
 
   const refreshProfile = useCallback(async () => {
@@ -116,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isExtensionAvailable,
         signIn,
+        signInWithNsec,
         signOut,
         refreshProfile,
       }}
