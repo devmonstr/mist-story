@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Source_Serif_4, Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/context/auth-context'
+import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
 const sourceSerif = Source_Serif_4({ 
@@ -45,11 +46,18 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${sourceSerif.variable} ${inter.variable}`}>
+    <html lang="en" className={`${sourceSerif.variable} ${inter.variable}`} suppressHydrationWarning>
       <body className="font-sans antialiased min-h-screen">
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>

@@ -7,10 +7,12 @@ import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/context/auth-context'
+import { useTheme } from 'next-themes'
 import { LogOut, User, Bell, Lock, Palette, Code } from 'lucide-react'
 
 export default function SettingsPage() {
   const { user, logout } = useAuth()
+  const { theme, setTheme } = useTheme()
   const [activeTab, setActiveTab] = useState('profile')
   const [formData, setFormData] = useState({
     name: 'Sarah Mitchell',
@@ -24,7 +26,6 @@ export default function SettingsPage() {
     newChapterNotifications: true,
     commentNotifications: true,
     followNotifications: true,
-    theme: 'light',
     fontSize: 'medium',
   })
 
@@ -209,17 +210,17 @@ export default function SettingsPage() {
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-3">Theme</label>
                     <div className="space-y-2">
-                      {['light', 'dark', 'auto'].map((theme) => (
-                        <label key={theme} className="flex items-center gap-3 cursor-pointer">
+                      {['light', 'dark', 'system'].map((themeOption) => (
+                        <label key={themeOption} className="flex items-center gap-3 cursor-pointer">
                           <input
                             type="radio"
                             name="theme"
-                            value={theme}
-                            checked={preferences.theme === theme}
-                            onChange={() => handlePreferenceChange('theme', theme)}
+                            value={themeOption}
+                            checked={theme === themeOption}
+                            onChange={() => setTheme(themeOption)}
                             className="h-4 w-4"
                           />
-                          <span className="text-foreground capitalize">{theme === 'auto' ? 'Auto (system)' : theme}</span>
+                          <span className="text-foreground capitalize">{themeOption === 'system' ? 'Auto (system)' : themeOption}</span>
                         </label>
                       ))}
                     </div>
