@@ -72,8 +72,13 @@ export function AuthButton({ variant = "default", onAction }: AuthButtonProps) {
 
   if (variant === "mobile") {
     return (
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-3 px-2 py-3">
+      <div className="flex flex-col gap-1">
+        {/* User Header - clickable to profile */}
+        <Link
+          href={`/profile/${user.npub}`}
+          onClick={onAction}
+          className="flex items-center gap-3 px-2 py-3 rounded hover:bg-muted transition-colors"
+        >
           {user.profile?.picture ? (
             <img
               src={user.profile.picture}
@@ -85,74 +90,50 @@ export function AuthButton({ variant = "default", onAction }: AuthButtonProps) {
               <User className="h-5 w-5 text-muted-foreground" />
             </div>
           )}
-          <div className="flex flex-col">
+          <div className="flex flex-col flex-1">
             <span className="text-sm font-medium">{displayName}</span>
             <span className="text-xs text-muted-foreground">
-              {truncateNpub(user.npub, 8)}
+              View Profile
             </span>
           </div>
-        </div>
+        </Link>
+        <div className="border-t border-border my-2" />
         <Link
           href="/studio"
           onClick={onAction}
-          className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-2 px-2 py-2.5 text-sm text-muted-foreground hover:text-foreground"
         >
           <PenSquare className="h-4 w-4" />
           Writer Studio
         </Link>
         <Link
-          href="/library"
-          onClick={onAction}
-          className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <BookOpen className="h-4 w-4" />
-          My Library
-        </Link>
-        <Link
-          href={`/profile/${user.npub}`}
-          onClick={onAction}
-          className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <User className="h-4 w-4" />
-          My Profile
-        </Link>
-        <div className="border-t border-border my-2" />
-        <Link
           href="/bookmarks"
           onClick={onAction}
-          className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-2 px-2 py-2.5 text-sm text-muted-foreground hover:text-foreground"
         >
           <Bookmark className="h-4 w-4" />
           Bookmarks
         </Link>
         <Link
-          href="/history"
-          onClick={onAction}
-          className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <Clock className="h-4 w-4" />
-          Reading History
-        </Link>
-        <Link
           href="/notifications"
           onClick={onAction}
-          className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-2 px-2 py-2.5 text-sm text-muted-foreground hover:text-foreground"
         >
           <Bell className="h-4 w-4" />
           Notifications
         </Link>
-        <div className="border-t border-border my-2" />
         <Link
           href="/settings"
           onClick={onAction}
-          className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-2 px-2 py-2.5 text-sm text-muted-foreground hover:text-foreground"
         >
           <Settings className="h-4 w-4" />
           Settings
         </Link>
+        <div className="border-t border-border my-2" />
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-2 px-2 py-2.5 text-sm text-muted-foreground hover:text-foreground"
         >
           <LogOut className="h-4 w-4" />
           Sign out
