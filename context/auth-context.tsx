@@ -58,7 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const restoreSession = async () => {
       try {
         const storedPubkey = localStorage.getItem(STORAGE_KEY)
-        if (storedPubkey && isNostrExtensionAvailable()) {
+        if (storedPubkey) {
+          // Restore session for both extension and nsec users
           const nostrUser = await createNostrUser(storedPubkey)
           setUser(nostrUser)
         }

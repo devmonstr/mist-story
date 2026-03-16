@@ -167,56 +167,73 @@ export async function signEvent(event: NostrEvent): Promise<NostrEvent | null> {
   }
 }
 
-// Fetch profile from relay (simplified - uses a public relay)
+// Fetch profile from relay (uses multiple relays for reliability)
 export async function fetchProfile(pubkey: string): Promise<NostrProfile | null> {
-  try {
-    // Using a public relay to fetch profile metadata
-    const relayUrl = "wss://relay.damus.io"
-    
-    return new Promise((resolve) => {
-      const ws = new WebSocket(relayUrl)
-      const timeout = setTimeout(() => {
-        ws.close()
-        resolve(null)
-      }, 5000)
+  const relays = [
+    "wss://relay.damus.io",
+    "wss://nos.lol",
+    "wss://relay.nostr.band",
+  ]
 
-      ws.onopen = () => {
-        const subscriptionId = Math.random().toString(36).slice(2)
-        const filter = {
-          kinds: [0], // Kind 0 is profile metadata
-          authors: [pubkey],
-          limit: 1,
-        }
-        ws.send(JSON.stringify(["REQ", subscriptionId, filter]))
+  // Try each relay
+  for (const relayUrl of relays) {
+    try {
+      const profile = await fetchProfileFromRelay(relayUrl, pubkey)
+      if (profile) {
+        console.log(`[Nostr] Profile fetched from ${relayUrl}`)
+        return profile
       }
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data)
-          if (data[0] === "EVENT") {
-            const content = JSON.parse(data[2].content) as NostrProfile
-            clearTimeout(timeout)
-            ws.close()
-            resolve(content)
-          } else if (data[0] === "EOSE") {
-            clearTimeout(timeout)
-            ws.close()
-            resolve(null)
-          }
-        } catch {
-          // Continue waiting
-        }
-      }
-
-      ws.onerror = () => {
-        clearTimeout(timeout)
-        ws.close()
-        resolve(null)
-      }
-    })
-  } catch {
-    return null
+    } catch (error) {
+      console.warn(`[Nostr] Failed to fetch from ${relayUrl}:`, error)
+    }
   }
+
+  console.log("[Nostr] Profile not found on any relay")
+  return null
+}
+
+function fetchProfileFromRelay(relayUrl: string, pubkey: string): Promise<NostrProfile | null> {
+  return new Promise((resolve) => {
+    const ws = new WebSocket(relayUrl)
+    const timeout = setTimeout(() => {
+      ws.close()
+      resolve(null)
+    }, 8000)
+
+    ws.onopen = () => {
+      const subscriptionId = Math.random().toString(36).slice(2)
+      const filter = {
+        kinds: [0], // Kind 0 is profile metadata
+        authors: [pubkey],
+        limit: 1,
+      }
+      ws.send(JSON.stringify(["REQ", subscriptionId, filter]))
+    }
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        if (data[0] === "EVENT") {
+          const content = JSON.parse(data[2].content) as NostrProfile
+          clearTimeout(timeout)
+          ws.close()
+          resolve(content)
+        } else if (data[0] === "EOSE") {
+          clearTimeout(timeout)
+          ws.close()
+          resolve(null)
+        }
+      } catch {
+        // Continue waiting
+      }
+    }
+
+    ws.onerror = () => {
+      clearTimeout(timeout)
+      ws.close()
+      resolve(null)
+    }
+  })
 }
 
 // Create a NostrUser object
