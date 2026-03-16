@@ -187,7 +187,7 @@ export default function SignInPage() {
               you full ownership of your data and content.
             </p>
             <a
-              href="https://nostr.com"
+              href="https://github.com/nostr-protocol/nips"
               target="_blank"
               rel="noopener noreferrer"
               className="mt-2 inline-flex items-center gap-1 text-xs text-foreground underline hover:no-underline"
