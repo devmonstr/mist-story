@@ -3,6 +3,9 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
+const skeletonCard = 'rounded-xl border border-border/60 bg-card/80 shadow-sm backdrop-blur-sm'
+const skeletonSection = 'rounded-2xl border border-border/50 bg-card/60 shadow-sm'
+
 // ============================================
 // BASE VARIANT COMPONENTS
 // ============================================
@@ -47,18 +50,18 @@ export function SkeletonImage({
 
 export function NovelCardSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn('flex gap-4 rounded-lg border border-border/40 bg-card p-4', className)}>
+    <div className={cn(`flex gap-4 p-4 sm:p-5 ${skeletonCard}`, className)}>
       {/* Cover */}
-      <Skeleton className="h-32 w-20 flex-shrink-0 rounded" />
+      <Skeleton className="h-32 w-20 flex-shrink-0 rounded-lg" />
 
       <div className="flex-1 space-y-2">
         {/* Title */}
-        <Skeleton className="h-5 w-3/4" />
+        <Skeleton className="h-5 w-2/3" />
         {/* Author */}
-        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-4 w-2/5" />
         {/* Description */}
         <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-4 w-4/5" />
         {/* Stats */}
         <div className="flex gap-4 pt-2">
           <Skeleton className="h-4 w-16" />
@@ -81,8 +84,8 @@ export function NovelCardGridSkeleton({ count = 6, className }: { count?: number
 
 export function CategoryCardSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn('rounded-lg border border-border/40 bg-card p-6 space-y-4', className)}>
-      <Skeleton className="h-6 w-1/2" />
+    <div className={cn(`space-y-4 p-6 ${skeletonCard}`, className)}>
+      <Skeleton className="h-6 w-2/5" />
       <Skeleton className="h-4 w-full" />
       <Skeleton className="h-4 w-1/3" />
     </div>
@@ -91,8 +94,8 @@ export function CategoryCardSkeleton({ className }: { className?: string }) {
 
 export function CollectionCardSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn('rounded-lg border border-border/40 bg-card overflow-hidden', className)}>
-      <Skeleton className="h-32 w-full" />
+    <div className={cn(`overflow-hidden ${skeletonCard}`, className)}>
+      <Skeleton className="h-36 w-full" />
       <div className="p-4 space-y-2">
         <Skeleton className="h-5 w-3/4" />
         <Skeleton className="h-4 w-full" />
@@ -107,8 +110,8 @@ export function CollectionCardSkeleton({ className }: { className?: string }) {
 
 export function StudioNovelCardSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn('flex items-center gap-4 rounded-lg border border-border/40 bg-card p-4', className)}>
-      <Skeleton className="h-12 w-12 rounded" />
+    <div className={cn(`flex items-center gap-4 p-4 sm:p-5 ${skeletonCard}`, className)}>
+      <Skeleton className="h-12 w-12 rounded-lg" />
       <div className="flex-1 space-y-2">
         <Skeleton className="h-5 w-1/2" />
         <div className="flex gap-2">
@@ -132,10 +135,10 @@ export function ProfileSkeleton() {
   return (
     <div className="flex min-h-screen flex-col">
       {/* Banner */}
-      <Skeleton className="h-48 w-full" />
+      <Skeleton className="h-48 w-full rounded-b-3xl" />
 
       {/* Header Section */}
-      <div className="border-b border-border">
+      <div className="border-b border-border/60 bg-card/30">
         <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-start gap-4">
@@ -181,11 +184,11 @@ export function NovelDetailSkeleton() {
       <Skeleton className="h-64 w-full" />
 
       {/* Content */}
-      <div className="mx-auto max-w-4xl -mt-32 px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="relative z-10 mx-auto -mt-32 max-w-4xl px-4 sm:px-6 lg:px-8">
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="sticky top-24 space-y-4">
+            <div className="sticky top-24 space-y-4 rounded-2xl border border-border/50 bg-card/70 p-4 shadow-sm">
               <Skeleton className="aspect-[2/3] w-full rounded-lg" />
               <div className="space-y-2">
                 <Skeleton className="h-10 w-full rounded" />
@@ -285,7 +288,7 @@ export function StudioSkeleton() {
   return (
     <div className="flex min-h-screen flex-col">
       {/* Header */}
-      <header className="border-b border-border bg-background px-6 py-4">
+      <header className="border-b border-border/60 bg-background/95 px-6 py-4 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div className="flex items-center gap-4">
             <Skeleton className="h-8 w-32" />
@@ -295,7 +298,7 @@ export function StudioSkeleton() {
       </header>
 
       {/* Stats */}
-      <div className="border-b border-border bg-muted/30 px-6 py-8">
+      <div className="border-b border-border/60 bg-muted/20 px-6 py-8">
         <div className="mx-auto max-w-6xl grid grid-cols-2 gap-6 sm:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="text-center">
@@ -323,7 +326,7 @@ export function StudioEditorSkeleton() {
   return (
     <div className="flex h-screen">
       {/* Sidebar */}
-      <aside className="w-64 border-r border-border bg-muted/30 p-4 space-y-4">
+      <aside className="w-64 space-y-4 border-r border-border/60 bg-muted/20 p-4">
         <Skeleton className="h-6 w-24" />
         <div className="space-y-2">
           {Array.from({ length: 10 }).map((_, i) => (
@@ -394,7 +397,7 @@ export function BookmarkListSkeleton({ count = 5 }: { count?: number }) {
   return (
     <div className="space-y-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex gap-4 rounded-lg border border-border/40 bg-card p-4">
+        <div key={i} className={cn(`flex gap-4 p-4 ${skeletonCard}`)}>
           <Skeleton className="h-24 w-16 flex-shrink-0 rounded" />
           <div className="flex-1 space-y-2">
             <Skeleton className="h-5 w-3/4" />
@@ -415,7 +418,7 @@ export function NotificationListSkeleton({ count = 5 }: { count?: number }) {
   return (
     <div className="space-y-2">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex items-start gap-3 rounded-lg border border-border/40 bg-card p-4">
+        <div key={i} className={cn(`flex items-start gap-3 p-4 ${skeletonCard}`)}>
           <SkeletonAvatar size="sm" />
           <div className="flex-1 space-y-2">
             <Skeleton className="h-4 w-full" />
@@ -452,7 +455,7 @@ export function ListSkeleton({
   return (
     <div className="space-y-3">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3 rounded-lg border border-border/40 bg-card p-4">
+        <div key={i} className={cn(`flex items-center gap-3 p-4 ${skeletonCard}`)}>
           {showAvatar && <SkeletonAvatar size="md" />}
           <div className="flex-1 space-y-2">
             <Skeleton className="h-5 w-1/2" />
@@ -483,7 +486,7 @@ export function PricingCardsSkeleton() {
   return (
     <div className="grid gap-8 md:grid-cols-3">
       {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="rounded-lg border border-border/40 bg-card p-6 space-y-4">
+        <div key={i} className={cn(`space-y-4 p-6 ${skeletonCard}`)}>
           <Skeleton className="h-6 w-24" />
           <Skeleton className="h-10 w-20" />
           <SkeletonText lines={2} />
@@ -503,7 +506,7 @@ export function FAQSkeleton({ count = 5 }: { count?: number }) {
   return (
     <div className="space-y-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="rounded-lg border border-border/40 bg-card">
+        <div key={i} className={cn(`rounded-xl ${skeletonSection}`)}>
           <div className="flex items-center justify-between p-4">
             <Skeleton className="h-5 w-3/4" />
             <Skeleton className="h-5 w-5 rounded" />
@@ -518,7 +521,7 @@ export function GuideCardsSkeleton() {
   return (
     <div className="grid gap-6 md:grid-cols-3">
       {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="rounded-lg border border-border/40 bg-card p-6 space-y-4">
+        <div key={i} className={cn(`space-y-4 p-6 ${skeletonCard}`)}>
           <Skeleton className="h-12 w-12 rounded-lg" />
           <Skeleton className="h-6 w-3/4" />
           <SkeletonText lines={2} />
@@ -550,7 +553,7 @@ export function HomeSkeleton() {
           <Skeleton className="h-8 w-32 mb-8" />
           <div className="grid gap-6 md:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="rounded-lg border border-border/40 bg-card p-6 space-y-4">
+              <div key={i} className={cn(`space-y-4 p-6 ${skeletonCard}`)}>
                 <Skeleton className="h-10 w-10 rounded-lg" />
                 <Skeleton className="h-5 w-1/2" />
                 <SkeletonText lines={2} />
