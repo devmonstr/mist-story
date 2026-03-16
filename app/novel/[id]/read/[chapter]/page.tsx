@@ -1,17 +1,18 @@
 'use client'
 
 import { Button } from "@/components/ui/button"
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Settings, 
-  BookOpen, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Settings,
+  BookOpen,
   Home,
   List,
   Moon,
   Sun,
   Minus,
-  Plus
+  Plus,
+  Coffee
 } from "lucide-react"
 import Link from "next/link"
 import { use, useState } from "react"
@@ -102,14 +103,14 @@ const chapters = [
   { id: 10, title: "Bonds of Trust" },
 ]
 
-export default function ReadPage({ 
-  params 
-}: { 
-  params: Promise<{ id: string; chapter: string }> 
+export default function ReadPage({
+  params
+}: {
+  params: Promise<{ id: string; chapter: string }>
 }) {
   const { id, chapter } = use(params)
   const [fontSize, setFontSize] = useState(18)
-  const [isDarkMode, setIsDarkMode] = useState(false)
+  const [readerTheme, setReaderTheme] = useState<'light' | 'dark' | 'sepia'>('light')
   const [isChapterListOpen, setIsChapterListOpen] = useState(false)
 
   const contentKey = `${id}-${chapter}`
@@ -119,10 +120,46 @@ export default function ReadPage({
     setFontSize((prev) => Math.min(Math.max(prev + delta, 14), 24))
   }
 
+  // Theme styles
+  const themeStyles = {
+    light: {
+      bg: 'bg-background text-foreground',
+      header: 'border-border/40 bg-background/95',
+      sheet: '',
+      sheetText: '',
+      mutedText: 'text-muted-foreground',
+      border: 'bg-border',
+      icon: 'text-muted-foreground/50',
+      contentText: 'text-foreground/90',
+    },
+    dark: {
+      bg: 'bg-[#1a1a1a] text-[#e0e0e0]',
+      header: 'border-[#333] bg-[#1a1a1a]/95',
+      sheet: 'bg-[#1a1a1a] text-[#e0e0e0] border-[#333]',
+      sheetText: 'text-[#e0e0e0]',
+      mutedText: 'text-[#888]',
+      border: 'bg-[#333]',
+      icon: 'text-[#555]',
+      contentText: 'text-[#d0d0d0]',
+    },
+    sepia: {
+      bg: 'bg-[#f4ecd8] text-[#5b4636]',
+      header: 'border-[#d4c4a8] bg-[#f4ecd8]/95',
+      sheet: 'bg-[#f4ecd8] text-[#5b4636] border-[#d4c4a8]',
+      sheetText: 'text-[#5b4636]',
+      mutedText: 'text-[#8b7355]',
+      border: 'bg-[#d4c4a8]',
+      icon: 'text-[#a89880]',
+      contentText: 'text-[#433422]',
+    },
+  }
+
+  const theme = themeStyles[readerTheme]
+
   return (
-    <div className={`min-h-screen transition-colors ${isDarkMode ? 'bg-[#1a1a1a] text-[#e0e0e0]' : 'bg-background text-foreground'}`}>
+    <div className={`min-h-screen transition-colors ${theme.bg}`}>
       {/* Top Navigation */}
-      <header className={`sticky top-0 z-50 border-b ${isDarkMode ? 'border-[#333] bg-[#1a1a1a]/95' : 'border-border/40 bg-background/95'} backdrop-blur-sm`}>
+      <header className={`sticky top-0 z-50 border-b ${theme.header} backdrop-blur-sm`}>
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" asChild>
@@ -133,7 +170,7 @@ export default function ReadPage({
             </Button>
             <div className="hidden sm:block">
               <p className="text-sm font-medium line-clamp-1">{chapterData.novelTitle}</p>
-              <p className="text-xs text-muted-foreground">Chapter {chapterData.chapterNumber}</p>
+              <p className={`text-xs ${theme.mutedText}`}>Chapter {chapterData.chapterNumber}</p>
             </div>
           </div>
 
@@ -146,9 +183,9 @@ export default function ReadPage({
                   <span className="sr-only">Chapter list</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className={isDarkMode ? 'bg-[#1a1a1a] text-[#e0e0e0] border-[#333]' : ''}>
+              <SheetContent side="right" className={theme.sheet}>
                 <SheetHeader>
-                  <SheetTitle className={isDarkMode ? 'text-[#e0e0e0]' : ''}>Chapters</SheetTitle>
+                  <SheetTitle className={theme.sheetText}>Chapters</SheetTitle>
                 </SheetHeader>
                 <div className="mt-6 space-y-1">
                   {chapters.map((ch) => (
@@ -158,12 +195,10 @@ export default function ReadPage({
                       onClick={() => setIsChapterListOpen(false)}
                       className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
                         ch.id === parseInt(chapter)
-                          ? isDarkMode 
-                            ? 'bg-[#333] text-white' 
-                            : 'bg-muted text-foreground'
-                          : isDarkMode
-                            ? 'text-[#999] hover:bg-[#252525] hover:text-[#e0e0e0]'
-                            : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                          ? readerTheme === 'light'
+                            ? 'bg-muted text-foreground'
+                            : 'bg-[#333] text-white'
+                          : theme.mutedText + ' hover:opacity-80'
                       }`}
                     >
                       <span className="flex h-6 w-6 items-center justify-center rounded text-xs font-medium">
@@ -184,58 +219,62 @@ export default function ReadPage({
                   <span className="sr-only">Reading settings</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className={isDarkMode ? 'bg-[#1a1a1a] text-[#e0e0e0] border-[#333]' : ''}>
+              <SheetContent side="right" className={theme.sheet}>
                 <SheetHeader>
-                  <SheetTitle className={isDarkMode ? 'text-[#e0e0e0]' : ''}>Reading Settings</SheetTitle>
+                  <SheetTitle className={theme.sheetText}>Reading Settings</SheetTitle>
                 </SheetHeader>
                 <div className="mt-6 space-y-6">
                   {/* Font Size */}
                   <div>
                     <label className="text-sm font-medium">Font Size</label>
                     <div className="mt-3 flex items-center gap-4">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="icon"
                         onClick={() => adjustFontSize(-2)}
                         disabled={fontSize <= 14}
-                        className={isDarkMode ? 'border-[#333] hover:bg-[#252525]' : ''}
                       >
                         <Minus className="h-4 w-4" />
                       </Button>
                       <span className="w-12 text-center text-sm">{fontSize}px</span>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="icon"
                         onClick={() => adjustFontSize(2)}
                         disabled={fontSize >= 24}
-                        className={isDarkMode ? 'border-[#333] hover:bg-[#252525]' : ''}
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
 
-                  {/* Dark Mode */}
+                  {/* Theme */}
                   <div>
                     <label className="text-sm font-medium">Theme</label>
-                    <div className="mt-3 flex gap-2">
+                    <div className="mt-3 flex flex-wrap gap-2">
                       <Button
-                        variant={!isDarkMode ? "default" : "outline"}
+                        variant={readerTheme === 'light' ? "default" : "outline"}
                         size="sm"
-                        onClick={() => setIsDarkMode(false)}
-                        className={isDarkMode ? 'border-[#333] hover:bg-[#252525]' : ''}
+                        onClick={() => setReaderTheme('light')}
                       >
                         <Sun className="mr-2 h-4 w-4" />
                         Light
                       </Button>
                       <Button
-                        variant={isDarkMode ? "default" : "outline"}
+                        variant={readerTheme === 'dark' ? "default" : "outline"}
                         size="sm"
-                        onClick={() => setIsDarkMode(true)}
-                        className={isDarkMode && !isDarkMode ? 'border-[#333] hover:bg-[#252525]' : ''}
+                        onClick={() => setReaderTheme('dark')}
                       >
                         <Moon className="mr-2 h-4 w-4" />
                         Dark
+                      </Button>
+                      <Button
+                        variant={readerTheme === 'sepia' ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setReaderTheme('sepia')}
+                      >
+                        <Coffee className="mr-2 h-4 w-4" />
+                        Sepia
                       </Button>
                     </div>
                   </div>
@@ -258,7 +297,7 @@ export default function ReadPage({
       <main className="mx-auto max-w-2xl px-4 py-12 sm:px-6 sm:py-16">
         {/* Chapter Header */}
         <header className="mb-12 text-center">
-          <p className={`text-sm ${isDarkMode ? 'text-[#888]' : 'text-muted-foreground'}`}>
+          <p className={`text-sm ${theme.mutedText}`}>
             Chapter {chapterData.chapterNumber}
           </p>
           <h1 className="mt-2 font-serif text-3xl font-light tracking-tight sm:text-4xl">
@@ -267,14 +306,14 @@ export default function ReadPage({
         </header>
 
         {/* Content */}
-        <article 
+        <article
           className="prose prose-neutral max-w-none"
           style={{ fontSize: `${fontSize}px` }}
         >
           {chapterData.content.map((paragraph, index) => (
-            <p 
-              key={index} 
-              className={`mb-6 leading-relaxed ${isDarkMode ? 'text-[#d0d0d0]' : 'text-foreground/90'}`}
+            <p
+              key={index}
+              className={`mb-6 leading-relaxed ${theme.contentText}`}
               style={{ lineHeight: '1.8' }}
             >
               {paragraph}
@@ -285,15 +324,15 @@ export default function ReadPage({
         {/* Chapter End Decoration */}
         <div className="mt-16 flex justify-center">
           <div className="flex items-center gap-3">
-            <span className={`h-px w-12 ${isDarkMode ? 'bg-[#333]' : 'bg-border'}`} />
-            <BookOpen className={`h-5 w-5 ${isDarkMode ? 'text-[#555]' : 'text-muted-foreground/50'}`} />
-            <span className={`h-px w-12 ${isDarkMode ? 'bg-[#333]' : 'bg-border'}`} />
+            <span className={`h-px w-12 ${theme.border}`} />
+            <BookOpen className={`h-5 w-5 ${theme.icon}`} />
+            <span className={`h-px w-12 ${theme.border}`} />
           </div>
         </div>
       </main>
 
       {/* Bottom Navigation */}
-      <footer className={`sticky bottom-0 border-t ${isDarkMode ? 'border-[#333] bg-[#1a1a1a]/95' : 'border-border/40 bg-background/95'} backdrop-blur-sm`}>
+      <footer className={`sticky bottom-0 border-t ${theme.header} backdrop-blur-sm`}>
         <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4">
           {chapterData.prevChapter ? (
             <Button variant="ghost" asChild>
@@ -306,7 +345,7 @@ export default function ReadPage({
             <div />
           )}
 
-          <span className={`text-sm ${isDarkMode ? 'text-[#888]' : 'text-muted-foreground'}`}>
+          <span className={`text-sm ${theme.mutedText}`}>
             {chapterData.chapterNumber} / {chapters.length}
           </span>
 
