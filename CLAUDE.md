@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Inkwell** is a minimalist web platform for novel writers and readers built with Next.js 16, React 19, and Tailwind CSS 4. The platform integrates with the Nostr protocol via NIP-07 browser extensions for decentralized authentication.
+**Mist Story** is a minimalist web platform for novel writers and readers built with Next.js 16, React 19, and Tailwind CSS 4. The platform integrates with the Nostr protocol via NIP-07 browser extensions for decentralized authentication.
 
 ## Commands
 

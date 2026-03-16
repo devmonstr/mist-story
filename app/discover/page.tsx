@@ -72,7 +72,7 @@ const collections: Collection[] = [
     title: "Trending This Week",
     description: "The most-read stories gaining popularity right now.",
     storyCount: 45,
-    curator: "Inkwell Editors",
+    curator: "Mist Story Editors",
   },
   {
     id: "hidden-gems",
@@ -86,7 +86,7 @@ const collections: Collection[] = [
     title: "Editor's Picks",
     description: "Our favorite stories showcasing exceptional writing.",
     storyCount: 28,
-    curator: "Inkwell Team",
+    curator: "Mist Story Team",
   },
   {
     id: "new-voices",

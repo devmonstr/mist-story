@@ -11,17 +11,17 @@ export default function SupportPage() {
   const faqs = [
     {
       id: '1',
-      question: 'How do I sign in to Inkwell?',
-      answer: 'Inkwell uses Nostr NIP-07 for authentication. You\'ll need a compatible browser extension like Alby, nos2x, or Nostr Connect. Visit our Sign In page and click "Connect with Nostr" to authenticate using your extension.',
+      question: 'How do I sign in to Mist Story?',
+      answer: 'Mist Story uses Nostr NIP-07 for authentication. You\'ll need a compatible browser extension like Alby, nos2x, or Nostr Connect. Visit our Sign In page and click "Connect with Nostr" to authenticate using your extension.',
     },
     {
       id: '2',
-      question: 'How can I publish my novel on Inkwell?',
+      question: 'How can I publish my novel on Mist Story?',
       answer: 'After signing in, go to your Studio and click "Create New Novel". Fill in the novel details, then start writing chapters. You can save drafts and publish when ready. Published novels are distributed across Nostr relays.',
     },
     {
       id: '3',
-      question: 'Is my content secure on Inkwell?',
+      question: 'Is my content secure on Mist Story?',
       answer: 'Your content is secured using your Nostr keypair. Only you can publish or modify your work. Content is decentralized across Nostr relays, ensuring it remains available even if any single service goes down.',
     },
     {
@@ -32,7 +32,7 @@ export default function SupportPage() {
     {
       id: '5',
       question: 'How do I report inappropriate content?',
-      answer: 'If you encounter content that violates our community guidelines, please use the report button on the content page or contact us at support@inkwell.app with details.',
+      answer: 'If you encounter content that violates our community guidelines, please use the report button on the content page or contact us at support@Mist Story.app with details.',
     },
     {
       id: '6',
@@ -62,7 +62,7 @@ export default function SupportPage() {
             <h3 className="font-medium text-foreground mb-2">Email Support</h3>
             <p className="text-sm text-muted-foreground mb-4">Reach our support team</p>
             <Button variant="outline" asChild className="w-full">
-              <a href="mailto:support@inkwell.app">Send Email</a>
+              <a href="mailto:support@Mist Story.app">Send Email</a>
             </Button>
           </div>
 

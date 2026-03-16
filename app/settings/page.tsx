@@ -149,7 +149,7 @@ export default function SettingsPage() {
                 <div>
                   <h3 className="font-serif text-lg font-semibold text-foreground mb-4">Public Profile</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Your public profile URL: <code className="bg-muted px-2 py-1 rounded text-xs">inkwell.app/profile/{user?.npub?.slice(0, 16)}...</code>
+                    Your public profile URL: <code className="bg-muted px-2 py-1 rounded text-xs">Mist Story.app/profile/{user?.npub?.slice(0, 16)}...</code>
                   </p>
                   <Button variant="outline" asChild>
                     <Link href={`/profile/${user?.npub}`}>View Profile</Link>

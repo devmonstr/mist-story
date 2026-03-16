@@ -17,7 +17,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Inkwell — Where Stories Come to Life',
+  title: 'Mist Story — Where Stories Come to Life',
   description: 'A minimalist platform for novel writers and readers. Write, read, and discover extraordinary stories.',
   generator: 'v0.app',
   icons: {

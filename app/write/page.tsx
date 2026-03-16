@@ -29,7 +29,7 @@ const features = [
   {
     icon: Users,
     title: "Community Feedback",
-    description: "Get constructive feedback from the Inkwell community of readers and writers.",
+    description: "Get constructive feedback from the Mist Story community of readers and writers.",
   },
   {
     icon: Zap,
@@ -50,7 +50,7 @@ export default function WritePage() {
               Share Your Stories
             </h1>
             <p className="mt-6 text-lg text-muted-foreground">
-              Write, publish, and connect with readers. Bring your imagination to life on Inkwell.
+              Write, publish, and connect with readers. Bring your imagination to life on Mist Story.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
               <Button size="lg" asChild>
@@ -104,7 +104,7 @@ export default function WritePage() {
               Ready to Tell Your Story?
             </h2>
             <p className="mt-4 text-muted-foreground">
-              Join thousands of writers who are already sharing their work on Inkwell. It takes less than a minute to get started.
+              Join thousands of writers who are already sharing their work on Mist Story. It takes less than a minute to get started.
             </p>
             <Button size="lg" className="mt-8" asChild>
               <a href="/sign-up">Create Free Account</a>

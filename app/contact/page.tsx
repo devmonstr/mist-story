@@ -122,8 +122,8 @@ export default function ContactPage() {
             <div className="border-l-2 border-muted-foreground/30 pl-6">
               <Mail className="h-6 w-6 text-foreground mb-3" />
               <h3 className="font-medium text-foreground mb-2">Email</h3>
-              <a href="mailto:hello@inkwell.app" className="text-primary hover:underline">
-                hello@inkwell.app
+              <a href="mailto:hello@Mist Story.app" className="text-primary hover:underline">
+                hello@Mist Story.app
               </a>
               <p className="text-sm text-muted-foreground mt-2">
                 We typically respond within 24 hours
@@ -133,7 +133,7 @@ export default function ContactPage() {
             <div className="border-l-2 border-muted-foreground/30 pl-6">
               <Phone className="h-6 w-6 text-foreground mb-3" />
               <h3 className="font-medium text-foreground mb-2">Support</h3>
-              <p className="text-primary">support@inkwell.app</p>
+              <p className="text-primary">support@Mist Story.app</p>
               <p className="text-sm text-muted-foreground mt-2">
                 Available Monday to Friday, 9 AM - 6 PM PT
               </p>
@@ -143,7 +143,7 @@ export default function ContactPage() {
               <MapPin className="h-6 w-6 text-foreground mb-3" />
               <h3 className="font-medium text-foreground mb-2">Location</h3>
               <p className="text-foreground">
-                Inkwell<br />
+                Mist Story<br />
                 San Francisco, California<br />
                 United States
               </p>

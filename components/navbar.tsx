@@ -29,7 +29,7 @@ export function Navbar() {
         {/* Logo */}
         <Link href="/" className="flex items-center">
           <span className="font-serif text-xl tracking-tight text-foreground">
-            Inkwell
+            Mist Story
           </span>
         </Link>
 

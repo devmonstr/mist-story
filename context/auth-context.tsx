@@ -26,7 +26,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const STORAGE_KEY = "inkwell_nostr_pubkey"
+const STORAGE_KEY = "Mist Story_nostr_pubkey"
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<NostrUser | null>(null)
