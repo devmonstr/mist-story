@@ -428,27 +428,6 @@ export function NotificationListSkeleton({ count = 5 }: { count?: number }) {
   )
 }
 
-export function BookmarkListSkeleton({ count = 5 }: { count?: number }) {
-  return (
-    <div className="space-y-4">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex gap-4 rounded-lg border border-border/40 bg-card p-4">
-          <Skeleton className="h-24 w-16 flex-shrink-0 rounded" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-5 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-            <div className="space-y-1 pt-2">
-              <Skeleton className="h-2 w-full rounded-full" />
-              <Skeleton className="h-3 w-16" />
-            </div>
-          </div>
-          <Skeleton className="h-8 w-8 rounded" />
-        </div>
-      ))}
-    </div>
-  )
-}
-
 export function ChapterListSkeleton({ count = 10 }: { count?: number }) {
   return (
     <div className="space-y-1">

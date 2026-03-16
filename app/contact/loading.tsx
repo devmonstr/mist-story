@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
-import { FormSkeleton } from "@/components/skeletons"
+import { FormSkeleton, Skeleton } from "@/components/skeletons"
 
 export default function ContactLoading() {
   return (

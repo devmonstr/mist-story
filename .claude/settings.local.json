@@ -8,7 +8,11 @@
       "Bash(git push:*)",
       "Bash(git checkout:*)",
       "Bash(git merge:*)",
-      "Bash(git branch:*)"
+      "Bash(git branch:*)",
+      "Bash(git branch:*)",
+      "Bash(grep -n \"^[0-9][0-9]*$\" c:UsersBABYMONSTERcanDesktopmist-storycomponentsskeletons.tsx)",
+      "Bash(pnpm dev:*)",
+      "Bash(git rebase:*)"
     ]
   }
 }
