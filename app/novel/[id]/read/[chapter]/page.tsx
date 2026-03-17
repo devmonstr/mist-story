@@ -26,6 +26,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import { ZapPaywall } from "@/components/zap-paywall"
+import { isChapterUnlocked } from "@/lib/zap-utils"
 
 const READER_SETTINGS_KEY = "mist-story-reader-settings"
 const BOOKMARKS_KEY = "mist-story-bookmarks"
@@ -110,6 +112,17 @@ const chapters = [
   { id: 10, title: "Bonds of Trust" },
 ]
 
+// Paywall config per chapter (price in sats; undefined = free)
+// In production this would come from the novel's Nostr event metadata
+const chapterPrices: Record<string, number> = {
+  "3": 10, "4": 10, "5": 10, "6": 10,
+  "7": 10, "8": 10, "9": 10, "10": 10,
+}
+
+// Author info — in production fetched from the novel's Nostr event
+const AUTHOR_PUBKEY = "placeholder_author_pubkey_hex"
+const AUTHOR_LUD16 = "author@getalby.com"
+
 export default function ReadPage({
   params
 }: {
@@ -124,11 +137,15 @@ export default function ReadPage({
   const [isLoaded, setIsLoaded] = useState(false)
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [readingProgress, setReadingProgress] = useState(0)
-  const [scrollPosition, setScrollPosition] = useState(0)
 
   const contentKey = `${id}-${chapter}`
   const chapterData = chapterContent[contentKey] || chapterContent["1-1"]
   const chapterId = `${id}-${chapter}`
+
+  // Paywall state
+  const chapterPrice = chapterPrices[chapter]
+  const isPaidChapter = !!chapterPrice
+  const [isUnlocked, setIsUnlocked] = useState(true) // optimistic; corrected on mount
 
   // Load reader settings, bookmarks, and reading progress on mount
   useEffect(() => {
@@ -148,11 +165,15 @@ export default function ReadPage({
         setIsBookmarked(bookmarkedChapters.includes(chapterId))
       }
 
+      // Check paywall unlock status
+      if (isPaidChapter) {
+        setIsUnlocked(isChapterUnlocked(id, chapter))
+      }
+
       // Load reading progress for this chapter
       const progress = localStorage.getItem(`${READING_PROGRESS_KEY}-${chapterId}`)
       if (progress) {
         const { scrollY } = JSON.parse(progress)
-        setScrollPosition(scrollY)
         // Restore scroll position after a short delay
         setTimeout(() => {
           window.scrollTo({ top: scrollY, behavior: 'auto' })
@@ -162,7 +183,7 @@ export default function ReadPage({
       console.error('Failed to load reader data:', e)
     }
     setIsLoaded(true)
-  }, [chapterId])
+  }, [chapterId, id, chapter, isPaidChapter])
 
   // Save settings to localStorage when they change
   useEffect(() => {
@@ -185,7 +206,6 @@ export default function ReadPage({
       const docHeight = document.documentElement.scrollHeight - window.innerHeight
       const progress = docHeight > 0 ? (scrollY / docHeight) * 100 : 0
       
-      setScrollPosition(scrollY)
       setReadingProgress(progress)
 
       // Save progress to localStorage
@@ -446,20 +466,38 @@ export default function ReadPage({
         </header>
 
         {/* Content */}
-        <article
-          className="prose prose-neutral max-w-none"
-          style={{ fontSize: `${fontSize}px` }}
-        >
-          {chapterData.content.map((paragraph, index) => (
-            <p
-              key={index}
-              className={`mb-6 leading-relaxed ${theme.contentText}`}
-              style={{ lineHeight: '1.8' }}
-            >
-              {paragraph}
-            </p>
-          ))}
-        </article>
+        {isPaidChapter && !isUnlocked ? (
+          <ZapPaywall
+            novelId={id}
+            chapterId={chapter}
+            chapterTitle={chapterData.chapterTitle}
+            chapterNumber={chapterData.chapterNumber}
+            amountSats={chapterPrice!}
+            recipientPubkey={AUTHOR_PUBKEY}
+            recipientLud16={AUTHOR_LUD16}
+            onUnlocked={() => setIsUnlocked(true)}
+            theme={{
+              bg: theme.bg,
+              mutedText: theme.mutedText,
+              border: theme.border,
+            }}
+          />
+        ) : (
+          <article
+            className="prose prose-neutral max-w-none"
+            style={{ fontSize: `${fontSize}px` }}
+          >
+            {chapterData.content.map((paragraph, index) => (
+              <p
+                key={index}
+                className={`mb-6 leading-relaxed ${theme.contentText}`}
+                style={{ lineHeight: '1.8' }}
+              >
+                {paragraph}
+              </p>
+            ))}
+          </article>
+        )}
 
         {/* Chapter End Decoration */}
         <div className="mt-16 flex justify-center">
