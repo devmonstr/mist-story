@@ -223,7 +223,7 @@ export default function ReadPage({
                 <SheetHeader>
                   <SheetTitle className={theme.sheetText}>Reading Settings</SheetTitle>
                 </SheetHeader>
-                <div className="mt-6 space-y-6">
+                <div className="mt-6 space-y-6 px-2">
                   {/* Font Size */}
                   <div>
                     <label className="text-sm font-medium">Font Size</label>
