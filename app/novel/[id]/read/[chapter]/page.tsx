@@ -12,7 +12,8 @@ import {
   Sun,
   Minus,
   Plus,
-  Coffee
+  Coffee,
+  Check
 } from "lucide-react"
 import Link from "next/link"
 import { use, useState, useEffect } from "react"
@@ -293,27 +294,33 @@ export default function ReadPage({
                         size="sm"
                         onClick={() => setReaderTheme('light')}
                         style={readerTheme === 'dark' ? { borderColor: '#444', color: '#e0e0e0', backgroundColor: '#1a1a1a' } : {}}
+                        className={readerTheme === 'light' ? 'ring-2 ring-primary ring-offset-2' : ''}
                       >
                         <Sun className="mr-2 h-4 w-4" style={{ color: readerTheme === 'dark' ? '#e0e0e0' : '' }} />
                         Light
+                        {readerTheme === 'light' && <Check className="ml-2 h-4 w-4" />}
                       </Button>
                       <Button
                         variant={readerTheme === 'dark' ? "default" : "outline"}
                         size="sm"
                         onClick={() => setReaderTheme('dark')}
-                        style={readerTheme !== 'dark' ? { borderColor: '#444', color: '#e0e0e0', backgroundColor: '#1a1a1a' } : {}}
+                        style={readerTheme !== 'dark' ? { borderColor: '#444', color: '#e0e0e0', backgroundColor: '#1a1a1a' } : { borderColor: '#666', backgroundColor: '#2a2a2a' }}
+                        className={readerTheme === 'dark' ? 'ring-2 ring-primary ring-offset-2 ring-offset-[#1a1a1a]' : ''}
                       >
                         <Moon className="mr-2 h-4 w-4" style={{ color: readerTheme !== 'dark' ? '#e0e0e0' : '' }} />
                         Dark
+                        {readerTheme === 'dark' && <Check className="ml-2 h-4 w-4" />}
                       </Button>
                       <Button
                         variant={readerTheme === 'sepia' ? "default" : "outline"}
                         size="sm"
                         onClick={() => setReaderTheme('sepia')}
                         style={readerTheme === 'dark' ? { borderColor: '#444', color: '#e0e0e0', backgroundColor: '#1a1a1a' } : {}}
+                        className={readerTheme === 'sepia' ? 'ring-2 ring-primary ring-offset-2' : ''}
                       >
                         <Coffee className="mr-2 h-4 w-4" style={{ color: readerTheme === 'dark' ? '#e0e0e0' : '' }} />
                         Sepia
+                        {readerTheme === 'sepia' && <Check className="ml-2 h-4 w-4" />}
                       </Button>
                     </div>
                   </div>
