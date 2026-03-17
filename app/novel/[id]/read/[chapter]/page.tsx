@@ -260,58 +260,59 @@ export default function ReadPage({
                 <div className="mt-6 space-y-6 px-2">
                   {/* Font Size */}
                   <div>
-                    <label className="text-sm font-medium">Font Size</label>
+                    <label className="text-sm font-medium" style={{ color: readerTheme === 'dark' ? '#e0e0e0' : '' }}>Font Size</label>
                     <div className="mt-3 flex items-center gap-4">
                       <Button
                         variant="outline"
                         size="icon"
                         onClick={() => adjustFontSize(-2)}
                         disabled={fontSize <= 14}
-                        className={readerTheme === 'dark' ? 'border-[#444] text-[#e0e0e0] hover:bg-[#333]' : ''}
+                        style={readerTheme === 'dark' ? { borderColor: '#444', color: '#e0e0e0', backgroundColor: '#1a1a1a' } : {}}
                       >
-                        <Minus className={`h-4 w-4 ${readerTheme === 'dark' ? 'text-[#e0e0e0]' : ''}`} />
+                        <Minus className="h-4 w-4" style={{ color: readerTheme === 'dark' ? '#e0e0e0' : '' }} />
                       </Button>
-                      <span className={`w-12 text-center text-sm ${theme.sheetText}`}>{fontSize}px</span>
+                      <span className="w-12 text-center text-sm" style={{ color: readerTheme === 'dark' ? '#e0e0e0' : '' }}>{fontSize}px</span>
                       <Button
                         variant="outline"
                         size="icon"
                         onClick={() => adjustFontSize(2)}
                         disabled={fontSize >= 24}
-                        className={readerTheme === 'dark' ? 'border-[#444] text-[#e0e0e0] hover:bg-[#333]' : ''}
+                        style={readerTheme === 'dark' ? { borderColor: '#444', color: '#e0e0e0', backgroundColor: '#1a1a1a' } : {}}
                       >
-                        <Plus className={`h-4 w-4 ${readerTheme === 'dark' ? 'text-[#e0e0e0]' : ''}`} />
+                        <Plus className="h-4 w-4" style={{ color: readerTheme === 'dark' ? '#e0e0e0' : '' }} />
                       </Button>
                     </div>
                   </div>
 
                   {/* Theme */}
                   <div>
-                    <label className="text-sm font-medium">Theme</label>
+                    <label className="text-sm font-medium" style={{ color: readerTheme === 'dark' ? '#e0e0e0' : '' }}>Theme</label>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button
                         variant={readerTheme === 'light' ? "default" : "outline"}
                         size="sm"
                         onClick={() => setReaderTheme('light')}
-                        className={readerTheme === 'dark' ? 'border-[#444] text-[#e0e0e0] hover:bg-[#333]' : ''}
+                        style={readerTheme === 'dark' ? { borderColor: '#444', color: '#e0e0e0', backgroundColor: '#1a1a1a' } : {}}
                       >
-                        <Sun className={`mr-2 h-4 w-4 ${readerTheme === 'dark' ? 'text-[#e0e0e0]' : ''}`} />
+                        <Sun className="mr-2 h-4 w-4" style={{ color: readerTheme === 'dark' ? '#e0e0e0' : '' }} />
                         Light
                       </Button>
                       <Button
                         variant={readerTheme === 'dark' ? "default" : "outline"}
                         size="sm"
                         onClick={() => setReaderTheme('dark')}
+                        style={readerTheme !== 'dark' ? { borderColor: '#444', color: '#e0e0e0', backgroundColor: '#1a1a1a' } : {}}
                       >
-                        <Moon className="mr-2 h-4 w-4" />
+                        <Moon className="mr-2 h-4 w-4" style={{ color: readerTheme !== 'dark' ? '#e0e0e0' : '' }} />
                         Dark
                       </Button>
                       <Button
                         variant={readerTheme === 'sepia' ? "default" : "outline"}
                         size="sm"
                         onClick={() => setReaderTheme('sepia')}
-                        className={readerTheme === 'dark' ? 'border-[#444] text-[#e0e0e0] hover:bg-[#333]' : ''}
+                        style={readerTheme === 'dark' ? { borderColor: '#444', color: '#e0e0e0', backgroundColor: '#1a1a1a' } : {}}
                       >
-                        <Coffee className={`mr-2 h-4 w-4 ${readerTheme === 'dark' ? 'text-[#e0e0e0]' : ''}`} />
+                        <Coffee className="mr-2 h-4 w-4" style={{ color: readerTheme === 'dark' ? '#e0e0e0' : '' }} />
                         Sepia
                       </Button>
                     </div>
