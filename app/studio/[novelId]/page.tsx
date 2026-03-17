@@ -340,8 +340,11 @@ export default function NovelEditorPage() {
               <span className="hidden sm:inline">Preview</span>
             </Link>
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Settings className="h-4 w-4" />
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={`/studio/${novelId}/settings`}>
+              <Settings className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Settings</span>
+            </Link>
           </Button>
         </div>
       </header>
