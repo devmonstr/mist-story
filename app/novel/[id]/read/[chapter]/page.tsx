@@ -13,7 +13,9 @@ import {
   Minus,
   Plus,
   Coffee,
-  Check
+  Check,
+  Bookmark,
+  BookmarkCheck
 } from "lucide-react"
 import Link from "next/link"
 import { use, useState, useEffect } from "react"
@@ -26,6 +28,8 @@ import {
 } from "@/components/ui/sheet"
 
 const READER_SETTINGS_KEY = "mist-story-reader-settings"
+const BOOKMARKS_KEY = "mist-story-bookmarks"
+const READING_PROGRESS_KEY = "mist-story-reading-progress"
 
 // Sample chapter content
 const chapterContent: Record<string, {
@@ -112,27 +116,53 @@ export default function ReadPage({
   params: Promise<{ id: string; chapter: string }>
 }) {
   const { id, chapter } = use(params)
-  
+
   // Load settings from localStorage or use defaults
   const [fontSize, setFontSize] = useState(18)
   const [readerTheme, setReaderTheme] = useState<'light' | 'dark' | 'sepia'>('light')
   const [isChapterListOpen, setIsChapterListOpen] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [isBookmarked, setIsBookmarked] = useState(false)
+  const [readingProgress, setReadingProgress] = useState(0)
+  const [scrollPosition, setScrollPosition] = useState(0)
 
-  // Load reader settings from localStorage on mount
+  const contentKey = `${id}-${chapter}`
+  const chapterData = chapterContent[contentKey] || chapterContent["1-1"]
+  const chapterId = `${id}-${chapter}`
+
+  // Load reader settings, bookmarks, and reading progress on mount
   useEffect(() => {
     try {
+      // Load settings
       const saved = localStorage.getItem(READER_SETTINGS_KEY)
       if (saved) {
         const settings = JSON.parse(saved)
         if (settings.fontSize) setFontSize(settings.fontSize)
         if (settings.readerTheme) setReaderTheme(settings.readerTheme)
       }
+
+      // Load bookmarks
+      const bookmarks = localStorage.getItem(BOOKMARKS_KEY)
+      if (bookmarks) {
+        const bookmarkedChapters = JSON.parse(bookmarks)
+        setIsBookmarked(bookmarkedChapters.includes(chapterId))
+      }
+
+      // Load reading progress for this chapter
+      const progress = localStorage.getItem(`${READING_PROGRESS_KEY}-${chapterId}`)
+      if (progress) {
+        const { scrollY } = JSON.parse(progress)
+        setScrollPosition(scrollY)
+        // Restore scroll position after a short delay
+        setTimeout(() => {
+          window.scrollTo({ top: scrollY, behavior: 'auto' })
+        }, 100)
+      }
     } catch (e) {
-      console.error('Failed to load reader settings:', e)
+      console.error('Failed to load reader data:', e)
     }
     setIsLoaded(true)
-  }, [])
+  }, [chapterId])
 
   // Save settings to localStorage when they change
   useEffect(() => {
@@ -148,8 +178,50 @@ export default function ReadPage({
     }
   }, [fontSize, readerTheme, isLoaded])
 
-  const contentKey = `${id}-${chapter}`
-  const chapterData = chapterContent[contentKey] || chapterContent["1-1"]
+  // Save reading progress on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollY = window.scrollY
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight
+      const progress = docHeight > 0 ? (scrollY / docHeight) * 100 : 0
+      
+      setScrollPosition(scrollY)
+      setReadingProgress(progress)
+
+      // Save progress to localStorage
+      try {
+        localStorage.setItem(`${READING_PROGRESS_KEY}-${chapterId}`, JSON.stringify({
+          scrollY,
+          progress,
+          timestamp: Date.now(),
+        }))
+      } catch (e) {
+        console.error('Failed to save reading progress:', e)
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [chapterId])
+
+  // Toggle bookmark
+  const toggleBookmark = () => {
+    try {
+      const bookmarks = localStorage.getItem(BOOKMARKS_KEY)
+      let bookmarkedChapters: string[] = bookmarks ? JSON.parse(bookmarks) : []
+
+      if (isBookmarked) {
+        bookmarkedChapters = bookmarkedChapters.filter(id => id !== chapterId)
+      } else {
+        bookmarkedChapters.push(chapterId)
+      }
+
+      localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(bookmarkedChapters))
+      setIsBookmarked(!isBookmarked)
+    } catch (e) {
+      console.error('Failed to toggle bookmark:', e)
+    }
+  }
 
   const adjustFontSize = (delta: number) => {
     setFontSize((prev) => Math.min(Math.max(prev + delta, 14), 24))
@@ -195,6 +267,14 @@ export default function ReadPage({
     <div className={`min-h-screen transition-colors ${theme.bg}`}>
       {/* Top Navigation */}
       <header className={`sticky top-0 z-50 border-b ${theme.header} backdrop-blur-sm`}>
+        {/* Reading Progress Bar */}
+        <div className="h-0.5 w-full bg-transparent">
+          <div 
+            className="h-full bg-primary transition-all duration-150"
+            style={{ width: `${readingProgress}%` }}
+          />
+        </div>
+        
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" asChild>
@@ -245,6 +325,20 @@ export default function ReadPage({
                 </div>
               </SheetContent>
             </Sheet>
+
+            {/* Bookmark */}
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={toggleBookmark}
+              aria-label={isBookmarked ? "Remove bookmark" : "Add bookmark"}
+            >
+              {isBookmarked ? (
+                <BookmarkCheck className="h-5 w-5 text-primary" />
+              ) : (
+                <Bookmark className="h-5 w-5" />
+              )}
+            </Button>
 
             {/* Settings */}
             <Sheet>
@@ -391,9 +485,16 @@ export default function ReadPage({
             <div />
           )}
 
-          <span className={`text-sm ${theme.mutedText}`}>
-            {chapterData.chapterNumber} / {chapters.length}
-          </span>
+          <div className="flex flex-col items-center gap-1">
+            <span className={`text-sm ${theme.mutedText}`}>
+              {chapterData.chapterNumber} / {chapters.length}
+            </span>
+            {readingProgress > 0 && (
+              <span className={`text-xs ${theme.mutedText}`}>
+                {Math.round(readingProgress)}% read
+              </span>
+            )}
+          </div>
 
           {chapterData.nextChapter ? (
             <Button variant="ghost" asChild>
