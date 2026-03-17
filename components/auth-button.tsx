@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { truncateNpub } from "@/lib/nostr-utils"
-import { User, LogOut, PenSquare, BookOpen, Bookmark, Clock, Bell, Settings } from "lucide-react"
+import { User, LogOut, PenSquare, BookOpen, Clock, Settings } from "lucide-react"
 import Link from "next/link"
 
 interface AuthButtonProps {
@@ -107,21 +107,22 @@ export function AuthButton({ variant = "default", onAction }: AuthButtonProps) {
           Writer Studio
         </Link>
         <Link
-          href="/bookmarks"
+          href="/library"
           onClick={onAction}
           className="flex items-center gap-2 px-2 py-2.5 text-sm text-muted-foreground hover:text-foreground"
         >
-          <Bookmark className="h-4 w-4" />
-          Bookmarks
+          <BookOpen className="h-4 w-4" />
+          My Library
         </Link>
         <Link
-          href="/notifications"
+          href={`/profile/${user.npub}`}
           onClick={onAction}
           className="flex items-center gap-2 px-2 py-2.5 text-sm text-muted-foreground hover:text-foreground"
         >
-          <Bell className="h-4 w-4" />
-          Notifications
+          <User className="h-4 w-4" />
+          My Profile
         </Link>
+        <div className="border-t border-border my-2" />
         <Link
           href="/settings"
           onClick={onAction}
@@ -192,21 +193,9 @@ export function AuthButton({ variant = "default", onAction }: AuthButtonProps) {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/bookmarks" className="flex items-center gap-2">
-            <Bookmark className="h-4 w-4" />
-            Bookmarks
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
           <Link href="/history" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Reading History
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/notifications" className="flex items-center gap-2">
-            <Bell className="h-4 w-4" />
-            Notifications
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

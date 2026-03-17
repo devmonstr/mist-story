@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Menu, Search } from "lucide-react"
+import { Menu, Search, Bell, Bookmark } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -12,17 +12,19 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { AuthButton } from "@/components/auth-button"
 import { useState } from "react"
+import { useAuth } from "@/context/auth-context"
 
 const navLinks = [
   { href: "/library", label: "Library" },
   { href: "/write", label: "Write" },
   { href: "/discover", label: "Discover" },
-  { href: "/search", label: "Search" },
   { href: "/about", label: "About" },
 ]
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
+  const { user } = useAuth()
+  const isLoggedIn = !!user
 
   return (
     <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -47,8 +49,32 @@ export function Navbar() {
           ))}
         </div>
 
-        {/* Desktop Auth Buttons */}
-        <div className="hidden items-center md:flex">
+        {/* Desktop Right Section */}
+        <div className="hidden items-center gap-2 md:flex">
+          {/* Search Icon - Always visible */}
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/search" aria-label="Search">
+              <Search className="h-5 w-5" />
+            </Link>
+          </Button>
+
+          {/* Bookmarks & Notifications - Only when logged in */}
+          {isLoggedIn && (
+            <>
+              <Button variant="ghost" size="icon" asChild>
+                <Link href="/bookmarks" aria-label="Bookmarks">
+                  <Bookmark className="h-5 w-5" />
+                </Link>
+              </Button>
+              <Button variant="ghost" size="icon" asChild>
+                <Link href="/notifications" aria-label="Notifications">
+                  <Bell className="h-5 w-5" />
+                </Link>
+              </Button>
+            </>
+          )}
+
+          {/* Auth Button / Profile */}
           <AuthButton variant="default" />
         </div>
 
