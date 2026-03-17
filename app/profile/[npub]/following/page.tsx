@@ -1,14 +1,25 @@
 'use client'
 
 import Link from 'next/link'
-import { Navbar } from "@/components/navbar"
-import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
 import { Users } from 'lucide-react'
 import { useState } from 'react'
+import { use } from 'react'
+import { Navbar } from "@/components/navbar"
+import { Footer } from "@/components/footer"
 
-export default function FollowingPage() {
-  const [following] = useState([
+interface Following {
+  npub: string
+  name: string
+  bio: string
+  followers: number
+  novels: number
+}
+
+export default function FollowingPage({ params }: { params: Promise<{ npub: string }> }) {
+  const { npub } = use(params)
+  
+  const [following] = useState<Following[]>([
     {
       npub: 'nprofile1qqsrxje...',
       name: 'Eleanor Chen',
@@ -61,7 +72,7 @@ export default function FollowingPage() {
         </div>
       </div>
 
-      {/* Authors List */}
+      {/* Following List */}
       <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="space-y-4">
           {following.map((author) => (

@@ -1,14 +1,25 @@
 'use client'
 
 import Link from 'next/link'
-import { Navbar } from "@/components/navbar"
-import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
 import { Users } from 'lucide-react'
 import { useState } from 'react'
+import { use } from 'react'
+import { Navbar } from "@/components/navbar"
+import { Footer } from "@/components/footer"
 
-export default function FollowersPage() {
-  const [followers] = useState([
+interface Follower {
+  npub: string
+  name: string
+  bio: string
+  following: number
+  readingList: number
+}
+
+export default function FollowersPage({ params }: { params: Promise<{ npub: string }> }) {
+  const { npub } = use(params)
+  
+  const [followers] = useState<Follower[]>([
     {
       npub: 'nprofile1qqsrxje...',
       name: 'Alex Johnson',

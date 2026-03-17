@@ -164,7 +164,7 @@ export function ProfileHeader({ params }: { params: Promise<{ npub: string }> })
             </div>
             <div>
               <div className="text-2xl font-semibold text-foreground">
-                <Link href="/following" className="hover:underline">
+                <Link href={`/profile/${npub}/following`} className="hover:underline">
                   {authorStats.following}
                 </Link>
               </div>
