@@ -267,17 +267,19 @@ export default function ReadPage({
                         size="icon"
                         onClick={() => adjustFontSize(-2)}
                         disabled={fontSize <= 14}
+                        className={readerTheme === 'dark' ? 'border-[#444] text-[#e0e0e0] hover:bg-[#333]' : ''}
                       >
-                        <Minus className="h-4 w-4" />
+                        <Minus className={`h-4 w-4 ${readerTheme === 'dark' ? 'text-[#e0e0e0]' : ''}`} />
                       </Button>
-                      <span className="w-12 text-center text-sm">{fontSize}px</span>
+                      <span className={`w-12 text-center text-sm ${theme.sheetText}`}>{fontSize}px</span>
                       <Button
                         variant="outline"
                         size="icon"
                         onClick={() => adjustFontSize(2)}
                         disabled={fontSize >= 24}
+                        className={readerTheme === 'dark' ? 'border-[#444] text-[#e0e0e0] hover:bg-[#333]' : ''}
                       >
-                        <Plus className="h-4 w-4" />
+                        <Plus className={`h-4 w-4 ${readerTheme === 'dark' ? 'text-[#e0e0e0]' : ''}`} />
                       </Button>
                     </div>
                   </div>
@@ -290,24 +292,27 @@ export default function ReadPage({
                         variant={readerTheme === 'light' ? "default" : "outline"}
                         size="sm"
                         onClick={() => setReaderTheme('light')}
+                        className={readerTheme !== 'light' && readerTheme === 'dark' ? 'border-[#444] text-[#e0e0e0] hover:bg-[#333]' : ''}
                       >
-                        <Sun className="mr-2 h-4 w-4" />
+                        <Sun className={`mr-2 h-4 w-4 ${readerTheme !== 'light' && readerTheme === 'dark' ? 'text-[#e0e0e0]' : ''}`} />
                         Light
                       </Button>
                       <Button
                         variant={readerTheme === 'dark' ? "default" : "outline"}
                         size="sm"
                         onClick={() => setReaderTheme('dark')}
+                        className={readerTheme !== 'dark' && readerTheme === 'dark' ? 'border-[#444] text-[#e0e0e0] hover:bg-[#333]' : ''}
                       >
-                        <Moon className="mr-2 h-4 w-4" />
+                        <Moon className={`mr-2 h-4 w-4 ${readerTheme !== 'dark' && readerTheme === 'dark' ? 'text-[#e0e0e0]' : ''}`} />
                         Dark
                       </Button>
                       <Button
                         variant={readerTheme === 'sepia' ? "default" : "outline"}
                         size="sm"
                         onClick={() => setReaderTheme('sepia')}
+                        className={readerTheme === 'dark' ? 'border-[#444] text-[#e0e0e0] hover:bg-[#333]' : ''}
                       >
-                        <Coffee className="mr-2 h-4 w-4" />
+                        <Coffee className={`mr-2 h-4 w-4 ${readerTheme === 'dark' ? 'text-[#e0e0e0]' : ''}`} />
                         Sepia
                       </Button>
                     </div>
