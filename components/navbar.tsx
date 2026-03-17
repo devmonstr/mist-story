@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Menu, Search, Bell, Bookmark, PenSquare, BookOpen } from "lucide-react"
+import { Menu, Search, Bell, Bookmark, PenSquare, BookOpen, Book, Pen, Compass, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -15,10 +15,10 @@ import { useState } from "react"
 import { useAuth } from "@/context/auth-context"
 
 const navLinks = [
-  { href: "/library", label: "Library" },
-  { href: "/write", label: "Write" },
-  { href: "/discover", label: "Discover" },
-  { href: "/about", label: "About" },
+  { href: "/library", label: "Library", icon: Book },
+  { href: "/write", label: "Write", icon: Pen },
+  { href: "/discover", label: "Discover", icon: Compass },
+  { href: "/about", label: "About", icon: Info },
 ]
 
 export function Navbar() {
@@ -136,16 +136,20 @@ export function Navbar() {
 
                 {/* Main Navigation */}
                 <nav className="flex flex-col gap-1">
-                  {navLinks.map((link) => (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      onClick={() => setIsOpen(false)}
-                      className="px-2 py-3 text-base text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      {link.label}
-                    </Link>
-                  ))}
+                  {navLinks.map((link) => {
+                    const Icon = link.icon
+                    return (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        onClick={() => setIsOpen(false)}
+                        className="flex items-center gap-3 px-2 py-3 text-base text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <Icon className="h-5 w-5" />
+                        {link.label}
+                      </Link>
+                    )
+                  })}
                 </nav>
                 <Separator className="my-6" />
                 <div className="px-2">
