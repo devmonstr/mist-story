@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Menu, Search, Bell, Bookmark } from "lucide-react"
+import { Menu, Search, Bell, Bookmark, PenSquare, BookOpen } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -78,35 +78,83 @@ export function Navbar() {
           <AuthButton variant="default" />
         </div>
 
-        {/* Mobile Menu */}
-        <Sheet open={isOpen} onOpenChange={setIsOpen}>
-          <SheetTrigger asChild className="md:hidden">
-            <Button variant="ghost" size="icon" aria-label="Open menu">
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-full max-w-xs">
-            <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
-            <div className="flex flex-col pt-8">
-              <nav className="flex flex-col gap-1">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setIsOpen(false)}
-                    className="px-2 py-3 text-base text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </nav>
-              <Separator className="my-6" />
-              <div className="px-2">
-                <AuthButton variant="mobile" onAction={() => setIsOpen(false)} />
+        {/* Mobile Right Section */}
+        <div className="flex items-center gap-1 md:hidden">
+          {/* Search Icon - Always visible */}
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/search" aria-label="Search">
+              <Search className="h-5 w-5" />
+            </Link>
+          </Button>
+
+          {/* Bookmarks & Notifications - Only when logged in */}
+          {isLoggedIn && (
+            <>
+              <Button variant="ghost" size="icon" asChild>
+                <Link href="/bookmarks" aria-label="Bookmarks">
+                  <Bookmark className="h-5 w-5" />
+                </Link>
+              </Button>
+              <Button variant="ghost" size="icon" asChild>
+                <Link href="/notifications" aria-label="Notifications">
+                  <Bell className="h-5 w-5" />
+                </Link>
+              </Button>
+            </>
+          )}
+
+          {/* Hamburger Menu */}
+          <Sheet open={isOpen} onOpenChange={setIsOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="Open menu">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-full max-w-xs">
+              <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+              <div className="flex flex-col pt-8">
+                {/* Quick Actions - Only when logged in */}
+                {isLoggedIn && (
+                  <>
+                    <div className="flex items-center gap-2 px-2 pb-4">
+                      <Button variant="outline" size="sm" asChild className="flex-1">
+                        <Link href="/studio" onClick={() => setIsOpen(false)}>
+                          <PenSquare className="mr-2 h-4 w-4" />
+                          Studio
+                        </Link>
+                      </Button>
+                      <Button variant="outline" size="sm" asChild className="flex-1">
+                        <Link href="/library" onClick={() => setIsOpen(false)}>
+                          <BookOpen className="mr-2 h-4 w-4" />
+                          Library
+                        </Link>
+                      </Button>
+                    </div>
+                    <Separator className="my-4" />
+                  </>
+                )}
+
+                {/* Main Navigation */}
+                <nav className="flex flex-col gap-1">
+                  {navLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setIsOpen(false)}
+                      className="px-2 py-3 text-base text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </nav>
+                <Separator className="my-6" />
+                <div className="px-2">
+                  <AuthButton variant="mobile" onAction={() => setIsOpen(false)} />
+                </div>
               </div>
-            </div>
-          </SheetContent>
-        </Sheet>
+            </SheetContent>
+          </Sheet>
+        </div>
       </nav>
     </header>
   )
