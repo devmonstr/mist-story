@@ -292,18 +292,17 @@ export default function ReadPage({
                         variant={readerTheme === 'light' ? "default" : "outline"}
                         size="sm"
                         onClick={() => setReaderTheme('light')}
-                        className={readerTheme !== 'light' && readerTheme === 'dark' ? 'border-[#444] text-[#e0e0e0] hover:bg-[#333]' : ''}
+                        className={readerTheme === 'dark' ? 'border-[#444] text-[#e0e0e0] hover:bg-[#333]' : ''}
                       >
-                        <Sun className={`mr-2 h-4 w-4 ${readerTheme !== 'light' && readerTheme === 'dark' ? 'text-[#e0e0e0]' : ''}`} />
+                        <Sun className={`mr-2 h-4 w-4 ${readerTheme === 'dark' ? 'text-[#e0e0e0]' : ''}`} />
                         Light
                       </Button>
                       <Button
                         variant={readerTheme === 'dark' ? "default" : "outline"}
                         size="sm"
                         onClick={() => setReaderTheme('dark')}
-                        className={readerTheme !== 'dark' && readerTheme === 'dark' ? 'border-[#444] text-[#e0e0e0] hover:bg-[#333]' : ''}
                       >
-                        <Moon className={`mr-2 h-4 w-4 ${readerTheme !== 'dark' && readerTheme === 'dark' ? 'text-[#e0e0e0]' : ''}`} />
+                        <Moon className="mr-2 h-4 w-4" />
                         Dark
                       </Button>
                       <Button
