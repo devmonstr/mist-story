@@ -15,7 +15,7 @@ import {
   Coffee
 } from "lucide-react"
 import Link from "next/link"
-import { use, useState } from "react"
+import { use, useState, useEffect } from "react"
 import {
   Sheet,
   SheetContent,
@@ -23,6 +23,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+
+const READER_SETTINGS_KEY = "mist-story-reader-settings"
 
 // Sample chapter content
 const chapterContent: Record<string, {
@@ -109,9 +111,41 @@ export default function ReadPage({
   params: Promise<{ id: string; chapter: string }>
 }) {
   const { id, chapter } = use(params)
+  
+  // Load settings from localStorage or use defaults
   const [fontSize, setFontSize] = useState(18)
   const [readerTheme, setReaderTheme] = useState<'light' | 'dark' | 'sepia'>('light')
   const [isChapterListOpen, setIsChapterListOpen] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(false)
+
+  // Load reader settings from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(READER_SETTINGS_KEY)
+      if (saved) {
+        const settings = JSON.parse(saved)
+        if (settings.fontSize) setFontSize(settings.fontSize)
+        if (settings.readerTheme) setReaderTheme(settings.readerTheme)
+      }
+    } catch (e) {
+      console.error('Failed to load reader settings:', e)
+    }
+    setIsLoaded(true)
+  }, [])
+
+  // Save settings to localStorage when they change
+  useEffect(() => {
+    if (isLoaded) {
+      try {
+        localStorage.setItem(READER_SETTINGS_KEY, JSON.stringify({
+          fontSize,
+          readerTheme,
+        }))
+      } catch (e) {
+        console.error('Failed to save reader settings:', e)
+      }
+    }
+  }, [fontSize, readerTheme, isLoaded])
 
   const contentKey = `${id}-${chapter}`
   const chapterData = chapterContent[contentKey] || chapterContent["1-1"]
