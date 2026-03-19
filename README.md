@@ -34,6 +34,13 @@ pnpm db:migrate
 pnpm db:studio
 ```
 
+## Environment Notes
+
+- The repository expects `LF` line endings for source files. `.gitattributes` and `.editorconfig` are included to keep Git and editors aligned.
+- On Windows/WSL setups, prefer using one Git environment consistently for the same working copy to avoid noisy `git status` metadata changes.
+- If `pnpm install` fails with a Prisma `EPERM` error on `query_engine-windows.dll.node`, stop any running `pnpm dev`, Prisma Studio, or Node processes that may still be locking the engine file, then run `pnpm install` again.
+- See [`docs/windows-wsl-workflow.md`](docs/windows-wsl-workflow.md) for the recommended Windows/WSL workflow.
+
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
