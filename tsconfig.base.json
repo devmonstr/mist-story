@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleDetection": "force",
+    "baseUrl": ".",
+    "paths": {
+      "@mist/shared": ["packages/shared/src/index.ts"],
+      "@mist/shared/*": ["packages/shared/src/*"],
+      "@mist/db": ["packages/db/src/index.ts"],
+      "@mist/db/*": ["packages/db/src/*"],
+      "@mist/redis": ["packages/redis/src/index.ts"],
+      "@mist/redis/*": ["packages/redis/src/*"],
+      "@mist/queue": ["packages/queue/src/index.ts"],
+      "@mist/queue/*": ["packages/queue/src/*"]
+    }
+  }
+}

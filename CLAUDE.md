@@ -1,62 +1,66 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code and similar coding assistants when working with this repository.
 
 ## Project Overview
 
-**Mist Story** is a minimalist web platform for novel writers and readers built with Next.js 16, React 19, and Tailwind CSS 4. The platform integrates with the Nostr protocol via NIP-07 browser extensions for decentralized authentication.
+**Mist Story** is a monorepo for a novel platform with:
+- `apps/web` - Next.js 16 frontend
+- `apps/api` - Express.js API
+- `apps/worker` - BullMQ worker
+- `packages/db` - Prisma/PostgreSQL access
+- `packages/redis` - Redis helpers and key namespaces
+- `packages/queue` - BullMQ queue contracts and producers
+- `packages/shared` - shared Zod schemas, DTOs, and env parsing
 
 ## Commands
 
 ```bash
-pnpm dev          # Start development server (localhost:3000)
-pnpm build        # Build for production
-pnpm start        # Start production server
-pnpm lint         # Run ESLint
+pnpm dev
+pnpm build
+pnpm lint
+pnpm typecheck
+pnpm db:generate
+pnpm db:migrate
+pnpm db:studio
+docker compose up -d
 ```
 
-## Architecture
+## Workspace Layout
 
-### Tech Stack
-- **Framework**: Next.js 16 (App Router)
-- **React**: 19.2.4
-- **Styling**: Tailwind CSS 4 with CSS custom properties for theming
-- **UI Components**: shadcn/ui built on Radix UI primitives
-- **Forms**: react-hook-form with zod validation
-- **Fonts**: Source Serif 4 (serif), Inter (sans-serif)
+```text
+apps/
+  web/
+  api/
+  worker/
 
-### Directory Structure
-- `app/` - Next.js App Router pages and layouts
-- `components/` - Shared React components
-- `components/ui/` - shadcn/ui components (auto-generated)
-- `lib/` - Utility functions and types
-- `context/` - React contexts (currently: auth)
-- `hooks/` - Custom React hooks
+packages/
+  db/
+  queue/
+  redis/
+  shared/
+```
 
-### Key Routes
-- `/` - Landing page with hero, features, and CTA
-- `/library`, `/discover`, `/write` - Core app features
-- `/novel/[id]` - Novel details, `/novel/[id]/read/[chapter]` - Reader
-- `/studio` and `/studio/[novelId]` - Writing studio for authors
-- `/profile/[npub]` - User profiles using Nostr npub identifiers
-- `/sign-in` - Authentication page
+## Architecture Notes
 
-### Authentication Flow
-The app uses Nostr NIP-07 browser extensions (e.g., nos2x, Alby) for authentication:
-1. User clicks sign in, triggering extension popup
-2. Extension provides public key after user approval
-3. Profile fetched from Nostr relays (currently using wss://relay.damus.io)
-4. Session persisted via localStorage pubkey
+- Frontend talks to the backend through REST endpoints under `/api/v1`
+- Auth uses Nostr challenge/verify and Redis-backed HTTP-only sessions
+- PostgreSQL is accessed through Prisma in `packages/db`
+- Redis is used for session storage, cache keys, and BullMQ connections
+- Background jobs currently include chapter publishing and notification dispatch
 
-See [lib/nostr-types.ts](lib/nostr-types.ts) for type definitions and [lib/nostr-utils.ts](lib/nostr-utils.ts) for NIP-07 utilities.
+## Important Files
 
-### Styling Conventions
-- CSS variables defined in [app/globals.css](app/globals.css) using `oklch` color space
-- Dark mode via `.dark` class selector
-- Use the `cn()` utility from [lib/utils.ts](lib/utils.ts) for conditional class merging
-- Path alias `@/*` maps to project root
+- `pnpm-workspace.yaml` - workspace definition
+- `turbo.json` - task orchestration
+- `tsconfig.base.json` - shared TypeScript settings
+- `docker-compose.yml` - local Postgres and Redis
+- `packages/db/prisma/schema.prisma` - database schema
 
-### Component Patterns
-- Components use `"use client"` directive when using hooks/context
-- Layout components (Navbar, Footer) are separate from UI primitives
-- AuthButton handles conditional rendering based on auth state via `useAuth()` hook
+## Conventions
+
+- Prefer `pnpm` over `npm`
+- Keep shared contracts in `packages/shared`
+- Do not access Prisma directly from `apps/web`
+- Keep queue names and payloads in `packages/queue`
+- Preserve user changes already present in the worktree
