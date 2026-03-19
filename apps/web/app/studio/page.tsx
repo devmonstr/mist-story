@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import {
   BookOpen,
   Clock,
@@ -10,10 +9,10 @@ import {
   Loader2,
   Plus,
 } from "lucide-react"
-import { useAuth } from "@/context/auth-context"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
+import { useRequireAuth } from "@/hooks/use-require-auth"
 import { fetchStudioNovels } from "@/lib/api"
 import { mapNovelToCard, type StudioNovelCard } from "@/lib/studio"
 
@@ -37,17 +36,10 @@ function formatNumber(num: number): string {
 }
 
 export default function StudioPage() {
-  const { user, isLoading } = useAuth()
-  const router = useRouter()
+  const { user, isLoading, isAuthenticated } = useRequireAuth()
   const [filter, setFilter] = useState<"all" | "published" | "draft">("all")
   const [novels, setNovels] = useState<StudioNovelCard[]>([])
   const [isFetching, setIsFetching] = useState(true)
-
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/sign-in")
-    }
-  }, [user, isLoading, router])
 
   useEffect(() => {
     if (!user) return
@@ -88,7 +80,7 @@ export default function StudioPage() {
     )
   }
 
-  if (!user) return null
+  if (!isAuthenticated) return null
 
   return (
     <div className="flex min-h-screen flex-col">

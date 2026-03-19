@@ -107,7 +107,7 @@ export function AuthButton({ variant = "default", onAction }: AuthButtonProps) {
           Writer Studio
         </Link>
         <Link
-          href="/library"
+          href="/my-library"
           onClick={onAction}
           className="flex items-center gap-2 px-2 py-2.5 text-sm text-muted-foreground hover:text-foreground"
         >
@@ -180,7 +180,7 @@ export function AuthButton({ variant = "default", onAction }: AuthButtonProps) {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href="/library" className="flex items-center gap-2">
+          <Link href="/my-library" className="flex items-center gap-2">
             <BookOpen className="h-4 w-4" />
             My Library
           </Link>

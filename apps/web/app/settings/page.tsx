@@ -6,12 +6,12 @@ import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { useAuth } from '@/context/auth-context'
 import { useTheme } from 'next-themes'
-import { LogOut, User, Bell, Lock, Palette, Code } from 'lucide-react'
+import { useRequireAuth } from '@/hooks/use-require-auth'
+import { LogOut, User, Bell, Lock, Palette, Code, Loader2 } from 'lucide-react'
 
 export default function SettingsPage() {
-  const { user, signOut } = useAuth()
+  const { user, signOut, isLoading, isAuthenticated } = useRequireAuth()
   const { theme, setTheme } = useTheme()
   const [activeTab, setActiveTab] = useState('profile')
   const [formData, setFormData] = useState({
@@ -74,6 +74,22 @@ export default function SettingsPage() {
     { id: 'security', label: 'Security', icon: Lock },
     { id: 'api', label: 'API & Integration', icon: Code },
   ]
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Navbar />
+        <main className="flex flex-1 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return null
+  }
 
   return (
     <div className="flex min-h-screen flex-col">

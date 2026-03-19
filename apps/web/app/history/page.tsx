@@ -1,110 +1,88 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
-import { Clock, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { Clock, Loader2 } from 'lucide-react'
+import { useRequireAuth } from '@/hooks/use-require-auth'
+import { fetchMyLibrary } from '@/lib/api'
+import type { MyLibraryContinueReadingDto } from '@mist/shared'
+
+function formatRelativeDate(value: string) {
+  const date = new Date(value)
+  const diffMs = Date.now() - date.getTime()
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffHours / 24)
+
+  if (diffHours < 1) return "just now"
+  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`
+  if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
 
 export default function HistoryPage() {
-  const [history, setHistory] = useState([
-    {
-      id: '1',
-      title: 'The Forgotten Kingdom',
-      author: 'Sarah Mitchell',
-      currentChapter: 12,
-      totalChapters: 24,
-      chapterTitle: 'The Fall of the Eastern Gate',
-      lastRead: 'Today, 2:30 PM',
-      lastReadDate: 'March 15, 2026',
-      progress: 50,
-    },
-    {
-      id: '2',
-      title: 'Echoes of Tomorrow',
-      author: 'James Chen',
-      currentChapter: 8,
-      totalChapters: 18,
-      chapterTitle: 'Memories for Sale',
-      lastRead: 'Yesterday, 10:15 PM',
-      lastReadDate: 'March 14, 2026',
-      progress: 44,
-    },
-    {
-      id: '3',
-      title: 'Between Worlds',
-      author: 'Elena Rodriguez',
-      currentChapter: 1,
-      totalChapters: 12,
-      chapterTitle: 'Prologue: The Last Letter',
-      lastRead: 'March 12, 2026',
-      lastReadDate: 'March 12, 2026',
-      progress: 8,
-    },
-    {
-      id: '4',
-      title: 'Starlight Chronicles',
-      author: 'Marcus Williams',
-      currentChapter: 3,
-      totalChapters: 31,
-      chapterTitle: 'First Contact',
-      lastRead: 'March 10, 2026',
-      lastReadDate: 'March 10, 2026',
-      progress: 10,
-    },
-    {
-      id: '5',
-      title: 'The Lost Archive',
-      author: 'Priya Patel',
-      currentChapter: 15,
-      totalChapters: 20,
-      chapterTitle: 'Secrets in the Dust',
-      lastRead: 'March 8, 2026',
-      lastReadDate: 'March 8, 2026',
-      progress: 75,
-    },
-  ])
+  const { isLoading, isAuthenticated } = useRequireAuth()
+  const [history, setHistory] = useState<MyLibraryContinueReadingDto[]>([])
+  const [isFetching, setIsFetching] = useState(true)
 
-  const handleRemove = (id: string) => {
-    setHistory(history.filter((h) => h.id !== id))
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    const loadHistory = async () => {
+      try {
+        setIsFetching(true)
+        const payload = await fetchMyLibrary()
+        setHistory(payload.continueReading)
+      } catch (error) {
+        console.error("Failed to fetch reading history:", error)
+      } finally {
+        setIsFetching(false)
+      }
+    }
+
+    void loadHistory()
+  }, [isAuthenticated])
+
+  if (isLoading || isFetching) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Navbar />
+        <main className="flex flex-1 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </main>
+        <Footer />
+      </div>
+    )
   }
 
-  const handleClearAll = () => {
-    setHistory([])
+  if (!isAuthenticated) {
+    return null
   }
 
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
       <main className="flex-1 bg-background">
-      {/* Header */}
       <div className="border-b border-border">
         <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <Clock className="h-8 w-8 text-foreground" />
-              <h1 className="font-serif text-3xl font-bold text-foreground">Reading History</h1>
-            </div>
-            {history.length > 0 && (
-              <Button variant="outline" size="sm" onClick={handleClearAll}>
-                Clear All
-              </Button>
-            )}
+          <div className="mb-4 flex items-center gap-3">
+            <Clock className="h-8 w-8 text-foreground" />
+            <h1 className="font-serif text-3xl font-bold text-foreground">Reading History</h1>
           </div>
           <p className="text-muted-foreground">
-            {history.length} {history.length === 1 ? 'novel' : 'novels'} in progress
+            {history.length} {history.length === 1 ? 'story' : 'stories'} in progress
           </p>
         </div>
       </div>
 
-      {/* History List */}
       <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
         {history.length === 0 ? (
-          <div className="text-center py-12">
-            <Clock className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="font-serif text-xl font-semibold text-foreground mb-2">No reading history</h3>
-            <p className="text-muted-foreground mb-6">Start reading novels to build your reading history</p>
+          <div className="py-12 text-center">
+            <Clock className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+            <h3 className="mb-2 font-serif text-xl font-semibold text-foreground">No reading history</h3>
+            <p className="mb-6 text-muted-foreground">Start reading stories and your progress will appear here.</p>
             <Button asChild>
               <Link href="/library">Browse Library</Link>
             </Button>
@@ -113,41 +91,43 @@ export default function HistoryPage() {
           <div className="space-y-4">
             {history.map((item) => (
               <article
-                key={item.id}
+                key={item.novelId}
                 className="flex flex-col gap-4 border border-border/40 bg-card p-6 transition-all hover:border-border/80 hover:shadow-sm"
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex-1">
                     <div className="mb-2">
                       <h3 className="font-serif text-lg font-semibold text-foreground">
-                        <Link href={`/novel/${item.id}`} className="hover:underline">
+                        <Link href={`/novel/${item.novelId}`} className="hover:underline">
                           {item.title}
                         </Link>
                       </h3>
-                      <p className="text-sm text-muted-foreground">By {item.author}</p>
+                      <p className="text-sm text-muted-foreground">
+                        By {item.authorDisplayName || "Unknown author"}
+                      </p>
                     </div>
 
                     <div className="my-3 border-l-2 border-muted-foreground/30 pl-3">
                       <p className="text-sm font-medium text-foreground">
-                        Chapter {item.currentChapter}: {item.chapterTitle}
+                        Chapter {item.currentChapterNumber}
+                        {item.currentChapterTitle ? `: ${item.currentChapterTitle}` : ""}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Last read {item.lastRead}
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Last read {formatRelativeDate(item.updatedAt)}
                       </p>
                     </div>
 
-                    {/* Reading Progress */}
                     <div className="w-full">
-                      <div className="flex justify-between items-center mb-1">
+                      <div className="mb-1 flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
-                          Chapter {item.currentChapter} of {item.totalChapters}
+                          Chapter {item.currentChapterNumber} of {item.totalChapters}
                         </span>
-                        <span className="text-xs font-medium text-foreground">{item.progress}%</span>
+                        <span className="text-xs font-medium text-foreground">{item.progressPercent}%</span>
                       </div>
-                      <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                         <div
                           className="h-full bg-primary transition-all"
-                          style={{ width: `${item.progress}%` }}
+                          style={{ width: `${item.progressPercent}%` }}
                         />
                       </div>
                     </div>
@@ -155,17 +135,9 @@ export default function HistoryPage() {
 
                   <div className="flex gap-2 sm:flex-col sm:items-end">
                     <Button size="sm" asChild>
-                      <Link href={`/novel/${item.id}/read/${item.currentChapter}`}>
+                      <Link href={`/novel/${item.novelId}/read/${item.currentChapterNumber}`}>
                         Continue
                       </Link>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handleRemove(item.id)}
-                      title="Remove from history"
-                    >
-                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>

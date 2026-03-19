@@ -4,10 +4,12 @@ import Link from 'next/link'
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
-import { Bell, BookOpen, Heart, Users, MessageCircle, Trash2 } from 'lucide-react'
+import { Bell, BookOpen, Heart, Users, MessageCircle, Trash2, Loader2 } from 'lucide-react'
 import { useState } from 'react'
+import { useRequireAuth } from '@/hooks/use-require-auth'
 
 export default function NotificationsPage() {
+  const { isLoading, isAuthenticated } = useRequireAuth()
   const [notifications, setNotifications] = useState([
     {
       id: '1',
@@ -94,6 +96,22 @@ export default function NotificationsPage() {
   }
 
   const unreadCount = notifications.filter((n) => !n.read).length
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Navbar />
+        <main className="flex flex-1 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return null
+  }
 
   return (
     <div className="flex min-h-screen flex-col">

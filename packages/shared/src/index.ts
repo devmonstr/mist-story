@@ -1,5 +1,6 @@
 export * from "./auth.contracts"
 export * from "./chapter.contracts"
 export * from "./jobs.contracts"
+export * from "./library.contracts"
 export * from "./novel.contracts"
 export * from "./env/index"

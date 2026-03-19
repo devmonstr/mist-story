@@ -1,10 +1,9 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Loader2, X } from "lucide-react"
-import { useAuth } from "@/context/auth-context"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
@@ -25,6 +24,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { useRequireAuth } from "@/hooks/use-require-auth"
 import { createNovel } from "@/lib/api"
 import {
   buildNovelInputFromForm,
@@ -53,7 +53,7 @@ const STATUS_OPTIONS = [
 ]
 
 export default function NewNovelPage() {
-  const { user, isLoading } = useAuth()
+  const { user, isLoading, isAuthenticated } = useRequireAuth()
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState<StudioNovelFormData>({
@@ -69,12 +69,6 @@ export default function NewNovelPage() {
   const [tagInput, setTagInput] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<Partial<Record<keyof StudioNovelFormData, string>>>({})
-
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/sign-in")
-    }
-  }, [user, isLoading, router])
 
   const updateField = <K extends keyof StudioNovelFormData>(
     field: K,
@@ -149,7 +143,7 @@ export default function NewNovelPage() {
     )
   }
 
-  if (!user) return null
+  if (!isAuthenticated) return null
 
   return (
     <div className="flex min-h-screen flex-col">

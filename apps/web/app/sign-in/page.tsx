@@ -4,10 +4,11 @@ import { useAuth } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Key, ExternalLink, AlertCircle, CheckCircle2, Loader2, Eye, EyeOff, ShieldAlert } from "lucide-react"
 import Link from "next/link"
+import { normalizeRedirectTarget } from "@/lib/auth-routes"
 
 const NOSTR_EXTENSIONS = [
   {
@@ -32,18 +33,20 @@ type LoginMethod = "extension" | "nsec"
 export default function SignInPage() {
   const { user, isLoading, isExtensionAvailable, signIn, signInWithNsec } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isSigningIn, setIsSigningIn] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("extension")
   const [nsec, setNsec] = useState("")
   const [showNsec, setShowNsec] = useState(false)
+  const nextPath = normalizeRedirectTarget(searchParams.get("next"))
 
   // Redirect if already signed in
   useEffect(() => {
     if (user && !isLoading) {
-      router.push("/studio")
+      router.replace(nextPath)
     }
-  }, [user, isLoading, router])
+  }, [isLoading, nextPath, router, user])
 
   const handleSignIn = async () => {
     setError(null)
@@ -52,7 +55,7 @@ export default function SignInPage() {
     try {
       const success = await signIn()
       if (success) {
-        router.push("/studio")
+        router.replace(nextPath)
       } else {
         setError("Failed to sign in. Please make sure your Nostr extension is unlocked.")
       }
@@ -74,7 +77,7 @@ export default function SignInPage() {
     try {
       const result = await signInWithNsec(nsec.trim())
       if (result.success) {
-        router.push("/studio")
+        router.replace(nextPath)
       } else {
         setError(result.error || "Failed to sign in with nsec")
       }

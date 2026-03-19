@@ -7,6 +7,7 @@ import { requestLogger } from "./middleware/request-logger"
 import { sessionMiddleware } from "./middleware/session"
 import { authRouter } from "./routes/auth"
 import { chaptersRouter } from "./routes/chapters"
+import { meRouter } from "./routes/me"
 import { novelsRouter } from "./routes/novels"
 
 export function createApp() {
@@ -28,6 +29,7 @@ export function createApp() {
   })
 
   app.use("/api/v1/auth", authRouter)
+  app.use("/api/v1/me", meRouter)
   app.use("/api/v1/novels", novelsRouter)
   app.use("/api/v1", chaptersRouter)
 

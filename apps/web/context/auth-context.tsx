@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const restoreSession = async () => {
       try {
         const session = await getCurrentUser()
-        setUser(toNostrUser(session.user))
+        setUser(session ? toNostrUser(session.user) : null)
       } catch (error) {
         console.error("Failed to restore session:", error)
       } finally {
@@ -154,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const session = await getCurrentUser()
-      setUser(toNostrUser(session.user))
+      setUser(session ? toNostrUser(session.user) : null)
     } catch (error) {
       console.error("Failed to refresh profile:", error)
     }

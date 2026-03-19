@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import {
   AlignCenter,
   AlignLeft,
@@ -30,9 +30,9 @@ import {
   Underline,
   Undo,
 } from "lucide-react"
-import { useAuth } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { useRequireAuth } from "@/hooks/use-require-auth"
 import {
   Sheet,
   SheetContent,
@@ -62,8 +62,7 @@ interface EditorNovel {
 }
 
 export default function NovelEditorPage() {
-  const { user, isLoading } = useAuth()
-  const router = useRouter()
+  const { user, isLoading, isAuthenticated } = useRequireAuth()
   const params = useParams()
   const novelId = params.novelId as string
   const editorRef = useRef<HTMLDivElement>(null)
@@ -73,12 +72,6 @@ export default function NovelEditorPage() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
-
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/sign-in")
-    }
-  }, [user, isLoading, router])
 
   useEffect(() => {
     if (!user) return
@@ -221,7 +214,7 @@ export default function NovelEditorPage() {
     )
   }
 
-  if (!user || !novel) return null
+  if (!isAuthenticated || !novel) return null
 
   const ChaptersList = ({ onSelect }: { onSelect?: () => void }) => (
     <div className="flex h-full flex-col">

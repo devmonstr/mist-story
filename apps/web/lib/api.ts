@@ -7,6 +7,7 @@ import type {
   ChapterVersionDto,
   CreateChapterInput,
   CreateNovelInput,
+  MyLibraryResponse,
   NovelDto,
   PublishChapterInput,
   SignedNostrEvent,
@@ -17,6 +18,16 @@ import type { NostrUser } from "@/lib/nostr-types"
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:4000"
+
+class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message)
+    this.name = "ApiError"
+  }
+}
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -30,7 +41,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as { error?: string }
-    throw new Error(body.error || "Request failed")
+    throw new ApiError(body.error || "Request failed", response.status)
   }
 
   if (response.status === 204) {
@@ -41,7 +52,13 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export function getCurrentUser() {
-  return apiFetch<AuthMeResponse>("/api/v1/auth/me")
+  return apiFetch<AuthMeResponse>("/api/v1/auth/me").catch((error: unknown) => {
+    if (error instanceof ApiError && error.status === 401) {
+      return null
+    }
+
+    throw error
+  })
 }
 
 export function requestAuthChallenge(pubkey: string) {
@@ -66,6 +83,10 @@ export function signOutSession() {
   return apiFetch<void>("/api/v1/auth/sign-out", {
     method: "POST",
   })
+}
+
+export function fetchMyLibrary() {
+  return apiFetch<MyLibraryResponse>("/api/v1/me/library")
 }
 
 export function fetchStudioNovels() {

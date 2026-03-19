@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, use } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Loader2, X } from "lucide-react"
-import { useAuth } from "@/context/auth-context"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
@@ -25,6 +24,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { useRequireAuth } from "@/hooks/use-require-auth"
 import { fetchNovel, updateNovel } from "@/lib/api"
 import {
   buildNovelInputFromForm,
@@ -59,7 +59,7 @@ export default function NovelSettingsPage({
   params: Promise<{ novelId: string }>
 }) {
   const { novelId } = use(params)
-  const { user, isLoading } = useAuth()
+  const { user, isLoading, isAuthenticated } = useRequireAuth()
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState<StudioNovelFormData>({
@@ -75,12 +75,6 @@ export default function NovelSettingsPage({
   const [tagInput, setTagInput] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
-
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/sign-in")
-    }
-  }, [user, isLoading, router])
 
   useEffect(() => {
     if (!user) return
@@ -138,7 +132,7 @@ export default function NovelSettingsPage({
     )
   }
 
-  if (!user) return null
+  if (!isAuthenticated) return null
 
   return (
     <div className="flex min-h-screen flex-col">

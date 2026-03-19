@@ -124,9 +124,9 @@ export function Navbar() {
                         </Link>
                       </Button>
                       <Button variant="outline" size="sm" asChild className="flex-1">
-                        <Link href="/library" onClick={() => setIsOpen(false)}>
+                        <Link href="/my-library" onClick={() => setIsOpen(false)}>
                           <BookOpen className="mr-2 h-4 w-4" />
-                          Library
+                          My Library
                         </Link>
                       </Button>
                     </div>
