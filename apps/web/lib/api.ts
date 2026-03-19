@@ -7,10 +7,15 @@ import type {
   ChapterVersionDto,
   CreateChapterInput,
   CreateNovelInput,
+  BookmarkState,
   MyLibraryResponse,
+  NotificationDto,
+  NotificationsResponse,
   NovelDto,
   PublishChapterInput,
+  ReadingProgressState,
   SignedNostrEvent,
+  UpsertReadingProgressInput,
   UpdateChapterInput,
   UpdateNovelInput,
 } from "@mist/shared"
@@ -87,6 +92,67 @@ export function signOutSession() {
 
 export function fetchMyLibrary() {
   return apiFetch<MyLibraryResponse>("/api/v1/me/library")
+}
+
+export function fetchNotifications() {
+  return apiFetch<NotificationsResponse>("/api/v1/me/notifications")
+}
+
+export function markNotificationAsRead(notificationId: string) {
+  return apiFetch<NotificationDto>(`/api/v1/me/notifications/${notificationId}/read`, {
+    method: "POST",
+  })
+}
+
+export function markAllNotificationsAsRead() {
+  return apiFetch<{ updatedCount: number }>("/api/v1/me/notifications/read-all", {
+    method: "POST",
+  })
+}
+
+export function deleteNotification(notificationId: string) {
+  return apiFetch<void>(`/api/v1/me/notifications/${notificationId}`, {
+    method: "DELETE",
+  })
+}
+
+export function fetchBookmarkState(novelId: string) {
+  return apiFetch<BookmarkState>(`/api/v1/me/bookmarks/${novelId}`)
+}
+
+export function addBookmark(novelId: string) {
+  return apiFetch<BookmarkState>(`/api/v1/me/bookmarks/${novelId}`, {
+    method: "PUT",
+  })
+}
+
+export function removeBookmark(novelId: string) {
+  return apiFetch<BookmarkState>(`/api/v1/me/bookmarks/${novelId}`, {
+    method: "DELETE",
+  })
+}
+
+export function fetchReadingProgress(novelId: string) {
+  return apiFetch<ReadingProgressState>(`/api/v1/me/reading-progress/${novelId}`)
+}
+
+export function updateReadingProgress(input: UpsertReadingProgressInput) {
+  return apiFetch<ReadingProgressState>("/api/v1/me/reading-progress", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  })
+}
+
+export function removeReadingProgress(novelId: string) {
+  return apiFetch<void>(`/api/v1/me/reading-progress/${novelId}`, {
+    method: "DELETE",
+  })
+}
+
+export function clearReadingProgress() {
+  return apiFetch<void>("/api/v1/me/reading-progress", {
+    method: "DELETE",
+  })
 }
 
 export function fetchStudioNovels() {

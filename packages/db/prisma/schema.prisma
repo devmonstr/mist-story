@@ -175,6 +175,8 @@ enum ReportReason {
 }
 
 enum NotificationType {
+  CHAPTER_PUBLISHED
+  NOVEL_BOOKMARKED
   MENTION
   COMMENT_REPLY
   COMMENT_LIKE

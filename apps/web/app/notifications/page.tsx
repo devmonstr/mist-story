@@ -1,103 +1,134 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useMemo, useState } from 'react'
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
-import { Bell, BookOpen, Heart, Users, MessageCircle, Trash2, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import {
+  Bell,
+  BookOpen,
+  Bookmark,
+  Loader2,
+  MessageCircle,
+  Shield,
+  Trash2,
+} from 'lucide-react'
 import { useRequireAuth } from '@/hooks/use-require-auth'
+import {
+  deleteNotification,
+  fetchNotifications,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+} from '@/lib/api'
+import type { NotificationDto } from '@mist/shared'
+
+function formatRelativeDate(value: string) {
+  const date = new Date(value)
+  const diffMs = Date.now() - date.getTime()
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffHours / 24)
+
+  if (diffHours < 1) return "just now"
+  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`
+  if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
+
+function getNotificationIcon(notification: NotificationDto) {
+  switch (notification.type) {
+    case "CHAPTER_PUBLISHED":
+      return BookOpen
+    case "NOVEL_BOOKMARKED":
+      return Bookmark
+    case "COMMENT_REPLY":
+    case "COMMENT_LIKE":
+    case "MENTION":
+      return MessageCircle
+    default:
+      return Shield
+  }
+}
 
 export default function NotificationsPage() {
   const { isLoading, isAuthenticated } = useRequireAuth()
-  const [notifications, setNotifications] = useState([
-    {
-      id: '1',
-      type: 'new-chapter',
-      title: 'Sarah Mitchell published a new chapter',
-      description: 'Chapter 24: The Final Battle in "The Forgotten Kingdom"',
-      novelId: '1',
-      authorName: 'Sarah Mitchell',
-      timestamp: '2 hours ago',
-      read: false,
-      icon: BookOpen,
-    },
-    {
-      id: '2',
-      type: 'comment',
-      title: 'James Chen commented on your novel',
-      description: 'Great story! I loved the character development in this chapter.',
-      novelId: '3',
-      authorName: 'James Chen',
-      timestamp: '4 hours ago',
-      read: false,
-      icon: MessageCircle,
-    },
-    {
-      id: '3',
-      type: 'like',
-      title: 'Elena Rodriguez liked your novel',
-      description: 'She liked "Between Worlds"',
-      novelId: '2',
-      authorName: 'Elena Rodriguez',
-      timestamp: '6 hours ago',
-      read: true,
-      icon: Heart,
-    },
-    {
-      id: '4',
-      type: 'follow',
-      title: 'Marcus Williams is now following you',
-      description: 'He has 1,203 followers',
-      novelId: null,
-      authorName: 'Marcus Williams',
-      timestamp: '1 day ago',
-      read: true,
-      icon: Users,
-    },
-    {
-      id: '5',
-      type: 'new-chapter',
-      title: 'Eleanor Chen published a new chapter',
-      description: 'Chapter 12: The Convergence in "Echoes of Tomorrow"',
-      novelId: '4',
-      authorName: 'Eleanor Chen',
-      timestamp: '1 day ago',
-      read: true,
-      icon: BookOpen,
-    },
-    {
-      id: '6',
-      type: 'like',
-      title: 'Priya Patel liked your novel',
-      description: 'She liked "Starlight Chronicles"',
-      novelId: '5',
-      authorName: 'Priya Patel',
-      timestamp: '2 days ago',
-      read: true,
-      icon: Heart,
-    },
-  ])
+  const [notifications, setNotifications] = useState<NotificationDto[]>([])
+  const [isFetching, setIsFetching] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleDelete = (id: string) => {
-    setNotifications(notifications.filter((n) => n.id !== id))
-  }
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return
+    }
 
-  const handleMarkAsRead = (id: string) => {
-    setNotifications(
-      notifications.map((n) =>
-        n.id === id ? { ...n, read: true } : n
+    const loadNotifications = async () => {
+      try {
+        setIsFetching(true)
+        const payload = await fetchNotifications()
+        setNotifications(payload.notifications)
+      } catch (error) {
+        console.error("Failed to fetch notifications:", error)
+      } finally {
+        setIsFetching(false)
+      }
+    }
+
+    void loadNotifications()
+  }, [isAuthenticated])
+
+  const unreadCount = useMemo(
+    () => notifications.filter((notification) => !notification.readAt).length,
+    [notifications]
+  )
+
+  const handleMarkAsRead = async (notificationId: string) => {
+    try {
+      setIsSubmitting(true)
+      const updated = await markNotificationAsRead(notificationId)
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.id === notificationId ? updated : notification
+        )
       )
-    )
+    } catch (error) {
+      console.error("Failed to mark notification as read:", error)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const handleClearAll = () => {
-    setNotifications([])
+  const handleDelete = async (notificationId: string) => {
+    try {
+      setIsSubmitting(true)
+      await deleteNotification(notificationId)
+      setNotifications((current) =>
+        current.filter((notification) => notification.id !== notificationId)
+      )
+    } catch (error) {
+      console.error("Failed to delete notification:", error)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const unreadCount = notifications.filter((n) => !n.read).length
+  const handleMarkAllAsRead = async () => {
+    try {
+      setIsSubmitting(true)
+      await markAllNotificationsAsRead()
+      setNotifications((current) =>
+        current.map((notification) => ({
+          ...notification,
+          readAt: notification.readAt ?? new Date().toISOString(),
+        }))
+      )
+    } catch (error) {
+      console.error("Failed to mark all notifications as read:", error)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
-  if (isLoading) {
+  if (isLoading || isFetching) {
     return (
       <div className="flex min-h-screen flex-col">
         <Navbar />
@@ -117,112 +148,126 @@ export default function NotificationsPage() {
     <div className="flex min-h-screen flex-col">
       <Navbar />
       <main className="flex-1 bg-background">
-      {/* Header */}
-      <div className="border-b border-border">
-        <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Bell className="h-8 w-8 text-foreground" />
-              <h1 className="font-serif text-3xl font-bold text-foreground">Notifications</h1>
+        <div className="border-b border-border">
+          <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Bell className="h-8 w-8 text-foreground" />
+                <div>
+                  <h1 className="font-serif text-3xl font-bold text-foreground">Notifications</h1>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {unreadCount > 0
+                      ? `${unreadCount} unread ${unreadCount === 1 ? "notification" : "notifications"}`
+                      : "Everything is up to date"}
+                  </p>
+                </div>
+              </div>
+              {notifications.length > 0 && unreadCount > 0 && (
+                <Button variant="outline" size="sm" onClick={handleMarkAllAsRead} disabled={isSubmitting}>
+                  Mark All Read
+                </Button>
+              )}
             </div>
-            {notifications.length > 0 && (
-              <Button variant="outline" size="sm" onClick={handleClearAll}>
-                Clear All
-              </Button>
-            )}
           </div>
-          {unreadCount > 0 && (
-            <p className="mt-2 text-sm text-muted-foreground">
-              {unreadCount} new {unreadCount === 1 ? 'notification' : 'notifications'}
-            </p>
-          )}
         </div>
-      </div>
 
-      {/* Notifications List */}
-      <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-        {notifications.length === 0 ? (
-          <div className="text-center py-12">
-            <Bell className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
-              You're all caught up
-            </h3>
-            <p className="text-muted-foreground">
-              No new notifications right now. Check back later!
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {notifications.map((notification) => {
-              const Icon = notification.icon
-              return (
-                <div
-                  key={notification.id}
-                  className={`flex gap-4 p-4 border rounded transition-all ${
-                    notification.read
-                      ? 'border-border/40 bg-card hover:border-border/80'
-                      : 'border-primary/50 bg-primary/5 hover:border-primary/80'
-                  }`}
-                >
-                  <div className="flex-shrink-0 pt-1">
-                    <Icon className={`h-5 w-5 ${notification.read ? 'text-muted-foreground' : 'text-primary'}`} />
-                  </div>
+        <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+          {notifications.length === 0 ? (
+            <div className="py-12 text-center">
+              <Bell className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+              <h3 className="mb-2 font-serif text-xl font-semibold text-foreground">
+                You're all caught up
+              </h3>
+              <p className="text-muted-foreground">
+                No new notifications right now. Check back later.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {notifications.map((notification) => {
+                const Icon = getNotificationIcon(notification)
+                const actorName =
+                  notification.actor?.displayName?.trim() || "Someone"
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <h3 className={`font-medium ${notification.read ? 'text-foreground' : 'text-primary'}`}>
-                        {notification.title}
-                      </h3>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
-                        {notification.timestamp}
-                      </span>
+                return (
+                  <div
+                    key={notification.id}
+                    className={`flex gap-4 rounded border p-4 transition-all ${
+                      notification.readAt
+                        ? 'border-border/40 bg-card hover:border-border/80'
+                        : 'border-primary/50 bg-primary/5 hover:border-primary/80'
+                    }`}
+                  >
+                    <div className="flex-shrink-0 pt-1">
+                      <Icon
+                        className={`h-5 w-5 ${
+                          notification.readAt ? 'text-muted-foreground' : 'text-primary'
+                        }`}
+                      />
                     </div>
-                    <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                      {notification.description}
-                    </p>
 
-                    <div className="flex gap-2">
-                      {notification.novelId && (
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/novel/${notification.novelId}`}>
-                            View Novel
-                          </Link>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-start justify-between gap-2">
+                        <h3
+                          className={`font-medium ${
+                            notification.readAt ? 'text-foreground' : 'text-primary'
+                          }`}
+                        >
+                          {notification.title}
+                        </h3>
+                        <span className="ml-2 whitespace-nowrap text-xs text-muted-foreground">
+                          {formatRelativeDate(notification.createdAt)}
+                        </span>
+                      </div>
+                      <p className="mb-2 text-sm text-muted-foreground">
+                        {notification.message}
+                      </p>
+                      <p className="mb-3 text-xs text-muted-foreground">
+                        {actorName}
+                      </p>
+
+                      <div className="flex flex-wrap gap-2">
+                        {notification.targetUrl && (
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={notification.targetUrl}>Open</Link>
+                          </Button>
+                        )}
+                        {notification.novelId && !notification.targetUrl && (
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={`/novel/${notification.novelId}`}>View Story</Link>
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      {!notification.readAt && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={isSubmitting}
+                          onClick={() => void handleMarkAsRead(notification.id)}
+                        >
+                          Mark Read
                         </Button>
                       )}
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/profile/nprofile123`}>
-                          {notification.authorName}
-                        </Link>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        disabled={isSubmitting}
+                        onClick={() => void handleDelete(notification.id)}
+                        title="Delete notification"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
-
-                  <div className="flex flex-col gap-1">
-                    {!notification.read && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleMarkAsRead(notification.id)}
-                      >
-                        Mark Read
-                      </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleDelete(notification.id)}
-                      title="Delete notification"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </main>
       <Footer />
     </div>

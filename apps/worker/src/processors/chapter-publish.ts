@@ -38,12 +38,13 @@ export async function processChapterPublishJob(payload: ChapterPublishJobPayload
     const notification = await createNotification({
       userId: payload.actorUserId,
       actorUserId: payload.actorUserId,
-      type: "MODERATION",
+      type: "CHAPTER_PUBLISHED",
       novelId: chapterVersion.chapter.novel.id,
       chapterId: chapterVersion.chapter.id,
       chapterNumber: chapterVersion.chapter.number,
       title: "Chapter published",
       message: `${chapterVersion.chapter.title} has been published.`,
+      targetUrl: `/studio/${chapterVersion.chapter.novel.id}`,
       metadata: {
         eventType: "CHAPTER_PUBLISHED",
         chapterVersionId: updated.id,
