@@ -1,0 +1,20 @@
+{
+  "name": "@mist/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "dotenv -e ../../.env.local -- tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json --noEmit",
+    "start": "dotenv -e ../../.env.local -- tsx src/index.ts",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@mist/db": "workspace:*",
+    "@mist/queue": "workspace:*",
+    "@mist/redis": "workspace:*",
+    "@mist/shared": "workspace:*",
+    "bullmq": "^5.43.1"
+  }
+}

@@ -1,17 +1,37 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mist Story Monorepo
+
+This repository is a `pnpm` monorepo with:
+
+- `apps/web`: Next.js frontend
+- `apps/api`: Express API
+- `apps/worker`: BullMQ workers
+- `packages/db`: Prisma + PostgreSQL access
+- `packages/redis`: Redis helpers
+- `packages/queue`: BullMQ contracts and queue helpers
+- `packages/shared`: Shared Zod contracts and env parsing
 
 ## Getting Started
 
-First, run the development server:
+1. Copy `.env.example` to `.env.local`
+2. Start infrastructure
+3. Install dependencies
+4. Run the workspace
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm infra:up
+pnpm install
 pnpm dev
-# or
-bun dev
+```
+
+Useful commands:
+
+```bash
+pnpm build
+pnpm lint
+pnpm typecheck
+pnpm db:generate
+pnpm db:migrate
+pnpm db:studio
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.

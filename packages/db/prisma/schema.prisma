@@ -1,0 +1,755 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                          String                        @id @default(cuid())
+  pubkey                      String                        @unique
+  handle                      String?                       @unique
+  displayName                 String?
+  about                       String?
+  avatarUrl                   String?
+  nip05                       String?
+  nip05VerifiedAt             DateTime?
+  lud16                       String?
+  website                     String?
+  profileEventId              String?
+  profileEventCreatedAt       DateTime?
+  profileFetchedAt            DateTime?
+  authAuditLogs               AuthAuditLog[]
+  novels                      Novel[]
+  orders                      Order[]
+  entitlements                Entitlement[]
+  authoredOrderItems          OrderItem[]                   @relation("OrderItemAuthor")
+  authorLedgerEntries         LedgerEntry[]                 @relation("LedgerEntryAuthor")
+  payoutRequests              PayoutRequest[]
+  payouts                     Payout[]
+  comments                    Comment[]
+  commentLikes                CommentLike[]
+  commentLikeDeletes          CommentLikeDelete[]
+  commentMentions             CommentMention[]              @relation("CommentMentionTarget")
+  notifications               Notification[]
+  actedNotifications          Notification[]                @relation("NotificationActor")
+  notificationPreferences     NotificationPreference[]
+  notificationPreset          NotificationPreferencePreset?
+  notificationPresetUpdatedAt DateTime?
+  reports                     Report[]                      @relation("UserReports")
+  moderatedReports            Report[]                      @relation("UserModeratedReports")
+  moderationAuditLogs         ModerationAuditLog[]          @relation("UserModerationActions")
+  novelBookmarks              NovelBookmark[]
+  novelRatings                NovelRating[]
+  readingProgress             ReadingProgress[]
+  isReader                    Boolean                       @default(true)
+  isWriter                    Boolean                       @default(true)
+  isAdmin                     Boolean                       @default(false)
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime                      @updatedAt
+}
+
+enum AuthAuditAction {
+  CHALLENGE_ISSUED
+  CHALLENGE_REJECTED
+  VERIFY_ATTEMPT
+  VERIFY_SUCCESS
+  VERIFY_FAILURE
+}
+
+model AuthAuditLog {
+  id         String          @id @default(cuid())
+  action     AuthAuditAction
+  ipHash     String?
+  userAgent  String?
+  origin     String?
+  path       String
+  method     String
+  pubkey     String?
+  userId     String?
+  resultCode String
+  detail     String?
+  createdAt  DateTime        @default(now())
+  user       User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([action, createdAt])
+  @@index([pubkey, createdAt])
+  @@index([userId, createdAt])
+}
+
+enum NovelStatus {
+  Ongoing
+  Completed
+  Hiatus
+}
+
+enum NovelVisibility {
+  PUBLISHED
+  HIDDEN
+}
+
+enum ChapterStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ChapterVersionPublishState {
+  PENDING
+  PUBLISHED
+  FAILED
+}
+
+enum RelayPublishState {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum OrderStatus {
+  PENDING
+  INVOICE_CREATED
+  SETTLED
+  EXPIRED
+  FAILED
+}
+
+enum PaymentStatus {
+  PENDING
+  INVOICE_CREATED
+  SETTLED
+  EXPIRED
+  FAILED
+}
+
+enum LedgerEntryType {
+  AUTHOR_REVENUE
+  PLATFORM_FEE
+}
+
+enum PayoutRequestStatus {
+  REQUESTED
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELED
+  REJECTED
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+enum PayoutDestinationType {
+  LIGHTNING_ADDRESS
+  LNURL
+}
+
+enum CommentStatus {
+  VISIBLE
+  HIDDEN
+  REMOVED
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWED
+  RESOLVED
+  REJECTED
+}
+
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  HATE
+  MISINFORMATION
+  NSFW
+  OTHER
+}
+
+enum NotificationType {
+  MENTION
+  COMMENT_REPLY
+  COMMENT_LIKE
+  REPORT_UPDATE
+  MODERATION
+  ORDER_SETTLED
+  NOVEL_RATED
+  CHAPTER_PURCHASED
+  PAYOUT_REQUEST_QUEUED
+  PAYOUT_COMPLETED
+  PAYOUT_FAILED
+  ADMIN_REPORT_OPENED
+  ADMIN_PAYOUT_REQUESTED
+  ADMIN_PAYOUT_FAILED
+}
+
+enum NotificationPreferencePreset {
+  MINIMAL
+  CREATOR
+  ADMIN_ON_CALL
+  CUSTOM
+}
+
+enum CommentNostrPublishState {
+  NONE
+  PENDING
+  PUBLISHED
+  FAILED
+}
+
+enum ModerationTargetType {
+  COMMENT
+  REPORT
+}
+
+enum ModerationActionType {
+  COMMENT_HIDDEN
+  COMMENT_RESTORED
+  REPORT_REVIEWED
+  REPORT_RESOLVED
+  REPORT_REJECTED
+}
+
+model Novel {
+  id                String            @id @default(cuid())
+  slug              String            @unique
+  title             String
+  summary           String            @default("")
+  genre             String
+  subgenres         String[]          @default([])
+  tags              String[]          @default([])
+  searchDocument    Unsupported("tsvector")?
+  authorDisplayName String            @default("")
+  translatorName    String            @default("")
+  status            NovelStatus       @default(Ongoing)
+  visibility        NovelVisibility   @default(HIDDEN)
+  rating            Decimal           @default(0) @db.Decimal(3, 1)
+  ratingsCount      Int               @default(0)
+  updateNote        String            @default("")
+  coverUrl          String            @default("")
+  chaptersCount     Int               @default(0)
+  authorId          String
+  publishedAt       DateTime?
+  archivedAt        DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  author            User              @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  chapters          Chapter[]
+  orderItems        OrderItem[]
+  bookmarks         NovelBookmark[]
+  ratings           NovelRating[]
+  readingProgress   ReadingProgress[]
+
+  @@index([authorId])
+  @@index([visibility, status])
+}
+
+model Chapter {
+  id                       String            @id @default(cuid())
+  novelId                  String
+  number                   Int
+  title                    String
+  note                     String            @default("")
+  contentDraft             String?
+  draftCiphertext          String?
+  draftIv                  String?
+  draftAuthTag             String?
+  draftAlgorithm           String?
+  draftKeyVersion          String?
+  status                   ChapterStatus     @default(DRAFT)
+  publishedAt              DateTime?
+  archivedAt               DateTime?
+  latestVersionId          String?
+  latestPublishedVersionId String?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  novel                    Novel             @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  price                    ChapterPrice?
+  orderItems               OrderItem[]
+  entitlements             Entitlement[]
+  readingProgress          ReadingProgress[]
+  versions                 ChapterVersion[]  @relation("ChapterVersions")
+  latestVersion            ChapterVersion?   @relation("ChapterLatestVersion", fields: [latestVersionId], references: [id])
+  latestPublishedVersion   ChapterVersion?   @relation("ChapterLatestPublishedVersion", fields: [latestPublishedVersionId], references: [id])
+
+  @@unique([novelId, number])
+  @@index([novelId, status])
+  @@index([latestVersionId])
+  @@index([latestPublishedVersionId])
+}
+
+model NovelBookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  novelId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  novel     Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, novelId])
+  @@index([userId, createdAt])
+  @@index([novelId, createdAt])
+}
+
+model NovelRating {
+  id        String   @id @default(cuid())
+  userId    String
+  novelId   String
+  value     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  novel     Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, novelId])
+  @@index([novelId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model ReadingProgress {
+  id            String   @id @default(cuid())
+  userId        String
+  novelId       String
+  chapterId     String?
+  chapterNumber Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  novel         Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  chapter       Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, novelId])
+  @@index([userId, updatedAt])
+  @@index([novelId, updatedAt])
+  @@index([chapterId])
+}
+
+model ChapterPrice {
+  id         String   @id @default(cuid())
+  chapterId  String   @unique
+  amountSats Int
+  currency   String   @default("SATS")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  chapter    Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+}
+
+model ChapterVersion {
+  id                         String                       @id @default(cuid())
+  chapterId                  String
+  version                    Int
+  previewText                String
+  contentHash                String
+  ciphertext                 String?
+  cipherIv                   String?
+  cipherAuthTag              String?
+  cipherAlgorithm            String                       @default("aes-256-gcm")
+  wrappedDek                 String
+  wrappedDekIv               String
+  wrappedDekAuthTag          String
+  wrapAlgorithm              String                       @default("aes-256-gcm")
+  masterKeyVersion           String
+  publishState               ChapterVersionPublishState   @default(PENDING)
+  publishedEventId           String?
+  publishedRelayCount        Int                          @default(0)
+  lastPublishError           String?
+  publishRequestedAt         DateTime                     @default(now())
+  publishedAt                DateTime?
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime                     @updatedAt
+  chapter                    Chapter                      @relation("ChapterVersions", fields: [chapterId], references: [id], onDelete: Cascade)
+  latestForChapters          Chapter[]                    @relation("ChapterLatestVersion")
+  latestPublishedForChapters Chapter[]                    @relation("ChapterLatestPublishedVersion")
+  relayPublishes             ChapterVersionRelayPublish[]
+
+  @@unique([chapterId, version])
+  @@index([chapterId, publishState])
+}
+
+model ChapterVersionRelayPublish {
+  id               String            @id @default(cuid())
+  chapterVersionId String
+  relayUrl         String
+  publishState     RelayPublishState @default(PENDING)
+  eventId          String?
+  attemptCount     Int               @default(0)
+  lastError        String?
+  lastAttemptedAt  DateTime?
+  publishedAt      DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  chapterVersion   ChapterVersion    @relation(fields: [chapterVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([chapterVersionId, relayUrl])
+  @@index([relayUrl, publishState])
+}
+
+model Order {
+  id            String        @id @default(cuid())
+  buyerId       String
+  status        OrderStatus   @default(PENDING)
+  currency      String        @default("SATS")
+  subtotalSats  Int
+  totalSats     Int
+  settledAt     DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  buyer         User          @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  items         OrderItem[]
+  payment       Payment?
+  entitlements  Entitlement[]
+  ledgerEntries LedgerEntry[]
+
+  @@index([buyerId, createdAt])
+  @@index([status, createdAt])
+}
+
+model OrderItem {
+  id             String        @id @default(cuid())
+  orderId        String
+  chapterId      String
+  novelId        String
+  authorId       String
+  chapterNumber  Int
+  chapterTitle   String
+  unitAmountSats Int
+  quantity       Int           @default(1)
+  lineTotalSats  Int
+  createdAt      DateTime      @default(now())
+  order          Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  chapter        Chapter       @relation(fields: [chapterId], references: [id], onDelete: Restrict)
+  novel          Novel         @relation(fields: [novelId], references: [id], onDelete: Restrict)
+  author         User          @relation("OrderItemAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  ledgerEntries  LedgerEntry[]
+
+  @@unique([orderId, chapterId])
+  @@index([authorId])
+  @@index([novelId])
+}
+
+model Payment {
+  id               String                   @id @default(cuid())
+  orderId          String                   @unique
+  provider         String
+  status           PaymentStatus            @default(PENDING)
+  amountSats       Int
+  currency         String                   @default("SATS")
+  invoiceBolt11    String?
+  invoiceRef       String?
+  invoiceExpiresAt DateTime?
+  settledAt        DateTime?
+  failedAt         DateTime?
+  failureCode      String?
+  failureMessage   String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  order            Order                    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  entitlements     Entitlement[]
+  ledgerEntries    LedgerEntry[]
+  settlementEvents PaymentSettlementEvent[]
+
+  @@index([status, createdAt])
+  @@index([invoiceRef])
+}
+
+model PaymentSettlementEvent {
+  id             String    @id @default(cuid())
+  paymentId      String
+  idempotencyKey String    @unique
+  providerRef    String?
+  settledAt      DateTime?
+  receivedAt     DateTime  @default(now())
+  payment        Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId, receivedAt])
+}
+
+model Entitlement {
+  id        String   @id @default(cuid())
+  userId    String
+  chapterId String
+  orderId   String
+  paymentId String
+  grantedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Restrict)
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, chapterId])
+  @@index([orderId])
+  @@index([paymentId])
+}
+
+model LedgerEntry {
+  id          String          @id @default(cuid())
+  entryKey    String          @unique
+  orderId     String
+  orderItemId String
+  paymentId   String
+  authorId    String?
+  entryType   LedgerEntryType
+  amountSats  Int
+  currency    String          @default("SATS")
+  createdAt   DateTime        @default(now())
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem   OrderItem       @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  payment     Payment         @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  author      User?           @relation("LedgerEntryAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, entryType])
+  @@index([authorId, createdAt])
+}
+
+model PayoutRequest {
+  id                    String                @id @default(cuid())
+  userId                String
+  amountSats            Int
+  currency              String                @default("SATS")
+  destination           String
+  destinationType       PayoutDestinationType
+  status                PayoutRequestStatus   @default(REQUESTED)
+  availableSnapshotSats Int
+  queuedAt              DateTime?
+  processingAt          DateTime?
+  completedAt           DateTime?
+  failedAt              DateTime?
+  canceledAt            DateTime?
+  rejectedAt            DateTime?
+  failureCode           String?
+  failureMessage        String?
+  adminNote             String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payout                Payout?
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model Payout {
+  id              String                @id @default(cuid())
+  requestId       String                @unique
+  userId          String
+  provider        String
+  status          PayoutStatus          @default(PENDING)
+  amountSats      Int
+  currency        String                @default("SATS")
+  destination     String
+  destinationType PayoutDestinationType
+  idempotencyKey  String                @unique
+  attempts        Int                   @default(0)
+  providerRef     String?
+  txRef           String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  failedAt        DateTime?
+  canceledAt      DateTime?
+  failureCode     String?
+  failureMessage  String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  request         PayoutRequest         @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model Comment {
+  id                  String                   @id @default(cuid())
+  novelSlug           String
+  chapterNumber       Int?
+  userId              String
+  parentId            String?
+  status              CommentStatus            @default(VISIBLE)
+  content             String
+  mentionsCount       Int                      @default(0)
+  likesCount          Int                      @default(0)
+  nostrEventId        String?                  @unique
+  nostrParentEventId  String?
+  nostrRootExternalId String?
+  nostrRootKind       String?
+  nostrRelayHints     String[]                 @default([])
+  nostrPublishState   CommentNostrPublishState @default(NONE)
+  nostrPublishedAt    DateTime?
+  nostrPublishError   String?
+  nostrEventJson      Json?
+  hiddenAt            DateTime?
+  removedAt           DateTime?
+  hiddenReason        String?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent              Comment?                 @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies             Comment[]                @relation("CommentReplies")
+  likes               CommentLike[]
+  likeDeletes         CommentLikeDelete[]
+  mentions            CommentMention[]
+  reports             Report[]
+  notifications       Notification[]
+  moderationAuditLogs ModerationAuditLog[]     @relation("ModerationAuditComment")
+
+  @@index([novelSlug, chapterNumber, status, createdAt])
+  @@index([userId, createdAt])
+  @@index([parentId, createdAt])
+  @@index([nostrPublishState, createdAt])
+}
+
+model CommentLike {
+  id                String                   @id @default(cuid())
+  commentId         String
+  userId            String
+  nostrEventId      String?                  @unique
+  nostrPublishState CommentNostrPublishState @default(NONE)
+  nostrPublishedAt  DateTime?
+  nostrPublishError String?
+  nostrEventJson    Json?
+  nostrRelayHints   String[]                 @default([])
+  createdAt         DateTime                 @default(now())
+  comment           Comment                  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user              User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@index([userId, createdAt])
+}
+
+model CommentLikeDelete {
+  id                 String                   @id @default(cuid())
+  commentId          String
+  userId             String
+  targetNostrEventId String                   @unique
+  nostrEventId       String?                  @unique
+  nostrPublishState  CommentNostrPublishState @default(NONE)
+  nostrPublishedAt   DateTime?
+  nostrPublishError  String?
+  nostrEventJson     Json?
+  nostrRelayHints    String[]                 @default([])
+  createdAt          DateTime                 @default(now())
+  comment            Comment                  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user               User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([nostrPublishState, createdAt])
+}
+
+model CommentMention {
+  id              String        @id @default(cuid())
+  commentId       String
+  mentionedUserId String?
+  mentionHandle   String?
+  mentionPubkey   String?
+  createdAt       DateTime      @default(now())
+  comment         Comment       @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  mentionedUser   User?         @relation("CommentMentionTarget", fields: [mentionedUserId], references: [id], onDelete: SetNull)
+  notification    Notification?
+
+  @@index([mentionedUserId, createdAt])
+  @@index([mentionHandle])
+  @@index([mentionPubkey])
+}
+
+model Notification {
+  id              String           @id @default(cuid())
+  userId          String
+  actorUserId     String?
+  type            NotificationType
+  commentId       String?
+  mentionId       String?          @unique
+  reportId        String?
+  novelId         String?
+  novelSlug       String?
+  chapterId       String?
+  chapterNumber   Int?
+  orderId         String?
+  payoutRequestId String?
+  targetUrl       String?
+  dedupeKey       String?
+  groupKey        String?
+  metadata        Json?
+  title           String
+  message         String
+  readAt          DateTime?
+  createdAt       DateTime         @default(now())
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actor           User?            @relation("NotificationActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  comment         Comment?         @relation(fields: [commentId], references: [id], onDelete: SetNull)
+  mention         CommentMention?  @relation(fields: [mentionId], references: [id], onDelete: SetNull)
+  report          Report?          @relation(fields: [reportId], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt, createdAt])
+  @@index([userId, type, createdAt])
+  @@index([reportId, createdAt])
+  @@index([dedupeKey, createdAt])
+  @@index([groupKey, createdAt])
+}
+
+model NotificationPreference {
+  id         String           @id @default(cuid())
+  userId     String
+  type       NotificationType
+  enabled    Boolean          @default(true)
+  mutedUntil DateTime?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([userId, type])
+}
+
+model Report {
+  id                  String               @id @default(cuid())
+  commentId           String
+  reporterUserId      String
+  reason              ReportReason
+  details             String?
+  status              ReportStatus         @default(OPEN)
+  reviewedAt          DateTime?
+  resolvedAt          DateTime?
+  rejectedAt          DateTime?
+  resolvedByUserId    String?
+  resolutionNote      String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  comment             Comment              @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  reporter            User                 @relation("UserReports", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  resolvedBy          User?                @relation("UserModeratedReports", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+  notifications       Notification[]
+  moderationAuditLogs ModerationAuditLog[] @relation("ModerationAuditReport")
+
+  @@unique([commentId, reporterUserId])
+  @@index([status, createdAt])
+  @@index([reporterUserId, createdAt])
+}
+
+model ModerationAuditLog {
+  id          String               @id @default(cuid())
+  targetType  ModerationTargetType
+  actionType  ModerationActionType
+  actorUserId String
+  commentId   String?
+  reportId    String?
+  note        String?
+  metadata    Json?
+  createdAt   DateTime             @default(now())
+  actor       User                 @relation("UserModerationActions", fields: [actorUserId], references: [id], onDelete: Cascade)
+  comment     Comment?             @relation("ModerationAuditComment", fields: [commentId], references: [id], onDelete: SetNull)
+  report      Report?              @relation("ModerationAuditReport", fields: [reportId], references: [id], onDelete: SetNull)
+
+  @@index([targetType, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([commentId, createdAt])
+  @@index([reportId, createdAt])
+}
