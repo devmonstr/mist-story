@@ -3,10 +3,18 @@
 import { useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Loader2, X } from "lucide-react"
+import {
+  ArrowLeft,
+  Image as ImageIcon,
+  Loader2,
+  Plus,
+  Sparkles,
+  X,
+} from "lucide-react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -48,9 +56,16 @@ const GENRES = [
 
 const STATUS_OPTIONS = [
   { value: "draft", label: "Draft (Private)" },
-  { value: "publishing", label: "Publishing (Serializing)" },
-  { value: "published", label: "Published (Complete)" },
+  { value: "publishing", label: "Publishing (Visible to readers)" },
 ]
+
+const WORK_TYPE_OPTIONS = [
+  { value: "ORIGINAL", label: "Original" },
+  { value: "TRANSLATION", label: "Translation" },
+] as const
+
+const MAX_COVER_FILE_SIZE_BYTES = 5 * 1024 * 1024
+const ALLOWED_COVER_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
 
 export default function NewNovelPage() {
   const { user, isLoading, isAuthenticated } = useRequireAuth()
@@ -61,13 +76,18 @@ export default function NewNovelPage() {
     description: "",
     genre: "",
     status: "draft",
+    workType: "ORIGINAL",
     tags: [],
     coverImage: null,
+    coverImageName: null,
+    coverImageMimeType: null,
+    coverImageSizeBytes: null,
     isComplete: false,
     contentWarning: "",
   })
   const [tagInput, setTagInput] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [errors, setErrors] = useState<Partial<Record<keyof StudioNovelFormData, string>>>({})
 
   const updateField = <K extends keyof StudioNovelFormData>(
@@ -92,6 +112,9 @@ export default function NewNovelPage() {
     const nextErrors: Partial<Record<keyof StudioNovelFormData, string>> = {}
 
     if (!formData.title.trim()) nextErrors.title = "Title is required"
+    if (formData.title.length > 200) {
+      nextErrors.title = "Title must be less than 200 characters"
+    }
     if (!formData.genre.trim()) nextErrors.genre = "Please select a genre"
     if (formData.description.length > 2000) {
       nextErrors.description = "Description must be less than 2000 characters"
@@ -107,6 +130,7 @@ export default function NewNovelPage() {
 
     try {
       setIsSubmitting(true)
+      setSubmitError(null)
       const payload = buildNovelInputFromForm(
         formData,
         user?.profile?.display_name || user?.profile?.name || ""
@@ -115,6 +139,11 @@ export default function NewNovelPage() {
       router.push(`/studio/${novel.id}`)
     } catch (error) {
       console.error("Failed to create novel:", error)
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : "We could not create your novel right now."
+      )
     } finally {
       setIsSubmitting(false)
     }
@@ -124,11 +153,41 @@ export default function NewNovelPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    if (!ALLOWED_COVER_MIME_TYPES.has(file.type)) {
+      setErrors((prev) => ({
+        ...prev,
+        coverImage: "Please choose a JPG, PNG, or WEBP image",
+      }))
+      return
+    }
+
+    if (file.size > MAX_COVER_FILE_SIZE_BYTES) {
+      setErrors((prev) => ({
+        ...prev,
+        coverImage: "Cover image must be 5MB or smaller",
+      }))
+      return
+    }
+
     const reader = new FileReader()
     reader.onload = (event) => {
       updateField("coverImage", event.target?.result as string)
+      updateField("coverImageName", file.name)
+      updateField("coverImageMimeType", file.type)
+      updateField("coverImageSizeBytes", file.size)
     }
     reader.readAsDataURL(file)
+  }
+
+  const handleRemoveCoverImage = () => {
+    updateField("coverImage", null)
+    updateField("coverImageName", null)
+    updateField("coverImageMimeType", null)
+    updateField("coverImageSizeBytes", null)
+    setErrors((prev) => ({ ...prev, coverImage: undefined }))
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
   }
 
   if (isLoading) {
@@ -145,12 +204,18 @@ export default function NewNovelPage() {
 
   if (!isAuthenticated) return null
 
+  const storySnapshot = [
+    formData.workType === "TRANSLATION" ? "Translation" : "Original",
+    formData.status === "draft" ? "Private draft" : "Visible to readers",
+    formData.isComplete ? "Completed" : "Ongoing",
+  ]
+
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
 
-      <main className="flex-1">
-        <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+      <main className="flex-1 bg-[radial-gradient(circle_at_top,_rgba(120,119,198,0.08),transparent_40%),linear-gradient(to_bottom,rgba(255,255,255,0.5),transparent)]">
+        <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
           <Link
             href="/studio"
             className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
@@ -159,13 +224,39 @@ export default function NewNovelPage() {
             Back to Studio
           </Link>
 
-          <div className="mb-8">
-            <h1 className="font-serif text-2xl font-medium text-foreground sm:text-3xl">
-              Create a New Novel
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Start your writing journey. You can always change these details later.
-            </p>
+          <div className="mb-8 overflow-hidden rounded-3xl border border-border/50 bg-card/80 shadow-sm backdrop-blur">
+            <div className="grid gap-8 px-6 py-8 md:grid-cols-[1.4fr_0.9fr] md:px-8">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/80 px-3 py-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  New Story
+                </div>
+                <h1 className="mt-4 font-serif text-3xl font-medium text-foreground sm:text-4xl">
+                  Create a New Novel
+                </h1>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+                  Start with the essentials, shape the tone of your story, and give
+                  readers a strong first impression. You can refine these details again
+                  from your studio later.
+                </p>
+              </div>
+
+              <div className="grid gap-3 self-start">
+                <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Quick checklist
+                  </p>
+                  <ul className="mt-3 space-y-2 text-sm text-foreground">
+                    <li>Choose a clear title, genre, and work type</li>
+                    <li>Add a strong synopsis for discovery</li>
+                    <li>Upload a polished cover to make the project feel real</li>
+                  </ul>
+                </div>
+                <div className="rounded-2xl border border-border/50 bg-background/70 p-4 text-sm text-muted-foreground">
+                  Draft novels stay private until you decide to make them visible.
+                </div>
+              </div>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -176,14 +267,20 @@ export default function NewNovelPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="title">Title</Label>
+                  <Label htmlFor="title">
+                    Title <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="title"
                     value={formData.title}
                     onChange={(e) => updateField("title", e.target.value)}
                     placeholder="Enter your novel's title"
+                    className={errors.title ? "border-destructive" : ""}
                   />
                   {errors.title && <p className="text-xs text-destructive">{errors.title}</p>}
+                  <p className="text-xs text-muted-foreground">
+                    {formData.title.length}/200 characters
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -192,24 +289,33 @@ export default function NewNovelPage() {
                     id="description"
                     value={formData.description}
                     onChange={(e) => updateField("description", e.target.value)}
-                    placeholder="Tell readers what your story is about"
+                    placeholder="A short synopsis, premise, or hook for your story..."
                     rows={5}
+                    className={errors.description ? "border-destructive" : ""}
                   />
+                  {errors.description && (
+                    <p className="text-xs text-destructive">{errors.description}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {formData.description.length}/2000 characters
+                  </p>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 lg:grid-cols-3">
                   <div className="space-y-2">
-                    <Label>Genre</Label>
+                    <Label>
+                      Genre <span className="text-destructive">*</span>
+                    </Label>
                     <Select
                       value={formData.genre}
                       onValueChange={(value) => updateField("genre", value)}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className={errors.genre ? "border-destructive" : ""}>
                         <SelectValue placeholder="Select a genre" />
                       </SelectTrigger>
                       <SelectContent>
                         {GENRES.map((genre) => (
-                          <SelectItem key={genre} value={genre}>
+                          <SelectItem key={genre} value={genre.toLowerCase()}>
                             {genre}
                           </SelectItem>
                         ))}
@@ -219,10 +325,34 @@ export default function NewNovelPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Status</Label>
+                    <Label>Work Type</Label>
+                    <Select
+                      value={formData.workType}
+                      onValueChange={(value) => updateField("workType", value as StudioNovelFormData["workType"])}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose original or translation" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {WORK_TYPE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Use this to label the project as an original work or a translation.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Visibility</Label>
                     <Select
                       value={formData.status}
-                      onValueChange={(value) => updateField("status", value)}
+                      onValueChange={(value) =>
+                        updateField("status", value as StudioNovelFormData["status"])
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -235,6 +365,27 @@ export default function NewNovelPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Private drafts are only visible to you. Publishing makes the novel discoverable.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border/50 bg-muted/30 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="is-complete" className="text-sm font-medium text-foreground">
+                        Mark this novel as complete
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Completed novels are shown as finished reading experiences across the site.
+                      </p>
+                    </div>
+                    <Checkbox
+                      id="is-complete"
+                      checked={formData.isComplete}
+                      onCheckedChange={(checked) => updateField("isComplete", checked === true)}
+                    />
                   </div>
                 </div>
               </CardContent>
@@ -242,8 +393,82 @@ export default function NewNovelPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Tags and Cover</CardTitle>
-                <CardDescription>Add details to help readers discover your work.</CardDescription>
+                <CardTitle className="text-lg">Cover Image</CardTitle>
+                <CardDescription>Upload a cover for your novel.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                  {formData.coverImage ? (
+                    <div className="relative">
+                      <img
+                        src={formData.coverImage}
+                        alt="Cover preview"
+                        className="h-52 w-36 rounded-xl border border-border/50 object-cover shadow-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRemoveCoverImage}
+                        className="absolute -right-2 -top-2 rounded-full bg-destructive p-1 text-destructive-foreground transition-colors hover:bg-destructive/90"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex h-52 w-36 shrink-0 flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/60 px-4 text-center transition-colors hover:border-foreground/40 hover:bg-muted"
+                    >
+                      <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                      <span className="mt-3 text-sm font-medium text-foreground">
+                        Click to upload
+                      </span>
+                      <span className="mt-1 text-xs text-muted-foreground">
+                        600x900px recommended
+                      </span>
+                    </button>
+                  )}
+
+                  <div className="flex-1 space-y-3">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleCoverImageChange}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {formData.coverImage ? "Replace image" : "Upload cover"}
+                    </Button>
+                    {errors.coverImage && (
+                      <p className="text-xs text-destructive">{errors.coverImage}</p>
+                    )}
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      <p>Recommended ratio: 2:3 portrait</p>
+                      <p>Supported formats: JPG, PNG, WEBP</p>
+                      <p>Maximum file size: 5MB</p>
+                      <p>Uploads go to Cloudflare R2 and the asset metadata is saved with the novel.</p>
+                      {formData.coverImageName ? (
+                        <p className="text-foreground/80">
+                          Selected: {formData.coverImageName}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Tags</CardTitle>
+                <CardDescription>
+                  Add tags to help readers discover your novel.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -258,10 +483,16 @@ export default function NewNovelPage() {
                           handleAddTag()
                         }
                       }}
-                      placeholder="Add a tag"
+                      placeholder="Add a tag and press Enter"
                     />
-                    <Button type="button" variant="outline" onClick={handleAddTag}>
-                      Add
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={handleAddTag}
+                      disabled={!tagInput.trim()}
+                    >
+                      <Plus className="h-4 w-4" />
                     </Button>
                   </div>
                   {formData.tags.length > 0 && (
@@ -269,7 +500,7 @@ export default function NewNovelPage() {
                       {formData.tags.map((tag) => (
                         <span
                           key={tag}
-                          className="inline-flex items-center gap-1 rounded bg-muted px-2 py-1 text-xs"
+                          className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-sm"
                         >
                           {tag}
                           <button
@@ -280,6 +511,7 @@ export default function NewNovelPage() {
                                 formData.tags.filter((item) => item !== tag)
                               )
                             }
+                            className="rounded-full p-0.5 transition-colors hover:bg-muted-foreground/20"
                           >
                             <X className="h-3 w-3" />
                           </button>
@@ -287,46 +519,86 @@ export default function NewNovelPage() {
                       ))}
                     </div>
                   )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Cover Image</Label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleCoverImageChange}
-                    className="block w-full text-sm"
-                  />
-                  {formData.coverImage && (
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={formData.coverImage}
-                        alt=""
-                        className="h-20 w-14 rounded object-cover"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          updateField("coverImage", null)
-                          if (fileInputRef.current) fileInputRef.current.value = ""
-                        }}
-                      >
-                        Remove image
-                      </Button>
-                    </div>
-                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Lowercase tags work best for consistency and search.
+                  </p>
                 </div>
               </CardContent>
             </Card>
 
-            <div className="flex justify-end gap-3">
-              <Button type="button" variant="outline" asChild>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Content Warning</CardTitle>
+                <CardDescription>
+                  Optional notes for readers about sensitive material.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Textarea
+                  value={formData.contentWarning}
+                  onChange={(e) => updateField("contentWarning", e.target.value)}
+                  placeholder="Contains violence, strong language, mature themes..."
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                  This warning is saved with the novel metadata and can be shown to readers later.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/60 bg-card/90">
+              <CardHeader>
+                <CardTitle className="text-lg">Story Snapshot</CardTitle>
+                <CardDescription>
+                  A quick preview of how this project is framed before you create it.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  {storySnapshot.map((item) => (
+                    <span
+                      key={item}
+                      className="rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-medium text-foreground"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+                <div className="rounded-2xl border border-dashed border-border/60 bg-muted/30 p-4">
+                  <p className="font-serif text-xl text-foreground">
+                    {formData.title.trim() || "Your novel title"}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {formData.description.trim() ||
+                      "Your synopsis will appear here as a quick preview once you add one."}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {submitError ? (
+              <div className="rounded-2xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                {submitError}
+              </div>
+            ) : null}
+
+            <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" asChild className="sm:min-w-[120px]">
                 <Link href="/studio">Cancel</Link>
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Create Novel"}
+              <Button
+                type="submit"
+                disabled={isSubmitting || !formData.title.trim()}
+                className="sm:min-w-[140px]"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Novel"
+                )}
               </Button>
             </div>
           </form>

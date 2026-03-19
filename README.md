@@ -34,6 +34,20 @@ pnpm db:migrate
 pnpm db:studio
 ```
 
+### Cloudflare R2 Cover Uploads
+
+Novel cover uploads can be stored in Cloudflare R2. Set these values in `.env.local` if you want cover images uploaded through the studio:
+
+```bash
+R2_ACCOUNT_ID=""
+R2_ACCESS_KEY_ID=""
+R2_SECRET_ACCESS_KEY=""
+R2_BUCKET_NAME=""
+R2_PUBLIC_BASE_URL=""
+```
+
+`R2_PUBLIC_BASE_URL` should point to the public base URL or custom domain that serves your bucket objects.
+
 ## Environment Notes
 
 - The repository expects `LF` line endings for source files. `.gitattributes` and `.editorconfig` are included to keep Git and editors aligned.

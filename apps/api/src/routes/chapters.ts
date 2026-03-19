@@ -2,22 +2,28 @@ import { Router } from "express"
 import {
   createChapterInputSchema,
   publishChapterInputSchema,
+  reorderChaptersInputSchema,
   updateChapterInputSchema,
 } from "@mist/shared"
 import { requireAuth } from "../middleware/require-auth"
 import { validateBody } from "../middleware/validate"
 import {
-  createChapter,
+  createChapterForAuthor,
+  deleteChapterForAuthor,
   listChapters,
   publishChapter,
-  updateChapter,
+  reorderChaptersForAuthor,
+  updateChapterForAuthor,
 } from "../services/chapter-service"
 
 export const chaptersRouter = Router()
 
 chaptersRouter.get("/novels/:novelId/chapters", async (request, response, next) => {
   try {
-    const payload = await listChapters(String(request.params.novelId))
+    const payload = await listChapters(
+      String(request.params.novelId),
+      response.locals.user?.id as string | undefined
+    )
     return response.json(payload)
   } catch (error) {
     return next(error)
@@ -30,8 +36,30 @@ chaptersRouter.post(
   validateBody(createChapterInputSchema),
   async (request, response, next) => {
     try {
-      const payload = await createChapter(String(request.params.novelId), request.body)
+      const payload = await createChapterForAuthor(
+        String(request.params.novelId),
+        response.locals.user.id as string,
+        request.body
+      )
       return response.status(201).json(payload)
+    } catch (error) {
+      return next(error)
+    }
+  }
+)
+
+chaptersRouter.put(
+  "/novels/:novelId/chapters/reorder",
+  requireAuth,
+  validateBody(reorderChaptersInputSchema),
+  async (request, response, next) => {
+    try {
+      const payload = await reorderChaptersForAuthor(
+        String(request.params.novelId),
+        response.locals.user.id as string,
+        request.body
+      )
+      return response.json(payload)
     } catch (error) {
       return next(error)
     }
@@ -44,8 +72,28 @@ chaptersRouter.patch(
   validateBody(updateChapterInputSchema),
   async (request, response, next) => {
     try {
-      const payload = await updateChapter(String(request.params.chapterId), request.body)
+      const payload = await updateChapterForAuthor(
+        String(request.params.chapterId),
+        response.locals.user.id as string,
+        request.body
+      )
       return response.json(payload)
+    } catch (error) {
+      return next(error)
+    }
+  }
+)
+
+chaptersRouter.delete(
+  "/chapters/:chapterId",
+  requireAuth,
+  async (request, response, next) => {
+    try {
+      await deleteChapterForAuthor(
+        String(request.params.chapterId),
+        response.locals.user.id as string
+      )
+      return response.status(204).send()
     } catch (error) {
       return next(error)
     }

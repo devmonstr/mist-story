@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, X } from "lucide-react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -49,9 +50,16 @@ const GENRES = [
 
 const STATUS_OPTIONS = [
   { value: "draft", label: "Draft (Private)" },
-  { value: "publishing", label: "Publishing (Serializing)" },
-  { value: "published", label: "Published (Complete)" },
+  { value: "publishing", label: "Publishing (Visible to readers)" },
 ]
+
+const WORK_TYPE_OPTIONS = [
+  { value: "ORIGINAL", label: "Original" },
+  { value: "TRANSLATION", label: "Translation" },
+] as const
+
+const MAX_COVER_FILE_SIZE_BYTES = 5 * 1024 * 1024
+const ALLOWED_COVER_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
 
 export default function NovelSettingsPage({
   params,
@@ -67,14 +75,20 @@ export default function NovelSettingsPage({
     description: "",
     genre: "",
     status: "draft",
+    workType: "ORIGINAL",
     tags: [],
     coverImage: null,
+    coverImageName: null,
+    coverImageMimeType: null,
+    coverImageSizeBytes: null,
     isComplete: false,
     contentWarning: "",
   })
   const [tagInput, setTagInput] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [coverError, setCoverError] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -105,6 +119,7 @@ export default function NovelSettingsPage({
 
     try {
       setIsSubmitting(true)
+      setSubmitError(null)
       await updateNovel(
         novelId,
         buildNovelInputFromForm(
@@ -115,6 +130,11 @@ export default function NovelSettingsPage({
       router.push(`/studio/${novelId}`)
     } catch (error) {
       console.error("Failed to update novel:", error)
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : "We could not save your novel settings right now."
+      )
     } finally {
       setIsSubmitting(false)
     }
@@ -186,7 +206,7 @@ export default function NovelSettingsPage({
                       </SelectTrigger>
                       <SelectContent>
                         {GENRES.map((genre) => (
-                          <SelectItem key={genre} value={genre}>
+                          <SelectItem key={genre} value={genre.toLowerCase()}>
                             {genre}
                           </SelectItem>
                         ))}
@@ -195,10 +215,35 @@ export default function NovelSettingsPage({
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Status</Label>
+                    <Label>Work Type</Label>
+                    <Select
+                      value={formData.workType}
+                      onValueChange={(value) =>
+                        updateField("workType", value as StudioNovelFormData["workType"])
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {WORK_TYPE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-start">
+                  <div className="space-y-2">
+                    <Label>Visibility</Label>
                     <Select
                       value={formData.status}
-                      onValueChange={(value) => updateField("status", value)}
+                      onValueChange={(value) =>
+                        updateField("status", value as StudioNovelFormData["status"])
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -211,6 +256,19 @@ export default function NovelSettingsPage({
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="novel-complete">Complete</Label>
+                    <div className="flex h-10 items-center">
+                      <Checkbox
+                        id="novel-complete"
+                        checked={formData.isComplete}
+                        onCheckedChange={(checked) =>
+                          updateField("isComplete", checked === true)
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -280,14 +338,33 @@ export default function NovelSettingsPage({
                     onChange={(event) => {
                       const file = event.target.files?.[0]
                       if (!file) return
+                      if (!ALLOWED_COVER_MIME_TYPES.has(file.type)) {
+                        setCoverError("Please choose a JPG, PNG, or WEBP image.")
+                        return
+                      }
+                      if (file.size > MAX_COVER_FILE_SIZE_BYTES) {
+                        setCoverError("Cover image must be 5MB or smaller.")
+                        return
+                      }
+                      setCoverError(null)
                       const reader = new FileReader()
                       reader.onload = (loadEvent) => {
                         updateField("coverImage", loadEvent.target?.result as string)
+                        updateField("coverImageName", file.name)
+                        updateField("coverImageMimeType", file.type)
+                        updateField("coverImageSizeBytes", file.size)
                       }
                       reader.readAsDataURL(file)
                     }}
                     className="block w-full text-sm"
                   />
+                  {coverError ? (
+                    <p className="text-xs text-destructive">{coverError}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Uploads are stored in Cloudflare R2 and linked to this novel in PostgreSQL.
+                    </p>
+                  )}
                   {formData.coverImage && (
                     <div className="flex items-center gap-3">
                       <img
@@ -300,6 +377,10 @@ export default function NovelSettingsPage({
                         variant="outline"
                         onClick={() => {
                           updateField("coverImage", null)
+                          updateField("coverImageName", null)
+                          updateField("coverImageMimeType", null)
+                          updateField("coverImageSizeBytes", null)
+                          setCoverError(null)
                           if (fileInputRef.current) fileInputRef.current.value = ""
                         }}
                       >
@@ -308,8 +389,26 @@ export default function NovelSettingsPage({
                     </div>
                   )}
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Content Warning</Label>
+                  <Textarea
+                    value={formData.contentWarning}
+                    onChange={(event) =>
+                      updateField("contentWarning", event.target.value)
+                    }
+                    rows={3}
+                    placeholder="Contains violence, strong language, mature themes..."
+                  />
+                </div>
               </CardContent>
             </Card>
+
+            {submitError ? (
+              <div className="rounded-2xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                {submitError}
+              </div>
+            ) : null}
 
             <div className="flex justify-end gap-3">
               <Button type="button" variant="outline" asChild>

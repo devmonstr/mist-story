@@ -17,6 +17,7 @@ import type {
   ProfileFollowState,
   ProfilePageResponse,
   PublishChapterInput,
+  ReorderChaptersInput,
   ReadingProgressState,
   SignedNostrEvent,
   UpsertReadingProgressInput,
@@ -336,10 +337,23 @@ export function createChapter(novelId: string, input: CreateChapterInput) {
   })
 }
 
+export function reorderChapters(novelId: string, input: ReorderChaptersInput) {
+  return apiFetch<ChapterDto[]>(`/api/v1/novels/${novelId}/chapters/reorder`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  })
+}
+
 export function updateChapter(chapterId: string, input: UpdateChapterInput) {
   return apiFetch<ChapterDto>(`/api/v1/chapters/${chapterId}`, {
     method: "PATCH",
     body: JSON.stringify(input),
+  })
+}
+
+export function deleteChapter(chapterId: string) {
+  return apiFetch<void>(`/api/v1/chapters/${chapterId}`, {
+    method: "DELETE",
   })
 }
 

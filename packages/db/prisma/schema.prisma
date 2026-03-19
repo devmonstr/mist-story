@@ -96,6 +96,11 @@ enum NovelVisibility {
   HIDDEN
 }
 
+enum NovelWorkType {
+  ORIGINAL
+  TRANSLATION
+}
+
 enum ChapterStatus {
   DRAFT
   PUBLISHED
@@ -245,6 +250,7 @@ model Novel {
   title             String
   summary           String            @default("")
   genre             String
+  workType          NovelWorkType     @default(ORIGINAL)
   subgenres         String[]          @default([])
   tags              String[]          @default([])
   searchDocument    Unsupported("tsvector")?
@@ -252,10 +258,15 @@ model Novel {
   translatorName    String            @default("")
   status            NovelStatus       @default(Ongoing)
   visibility        NovelVisibility   @default(HIDDEN)
+  contentWarning    String            @default("")
   rating            Decimal           @default(0) @db.Decimal(3, 1)
   ratingsCount      Int               @default(0)
   updateNote        String            @default("")
   coverUrl          String            @default("")
+  coverStorageKey   String?
+  coverMimeType     String?
+  coverOriginalName String?
+  coverFileSizeBytes Int?
   chaptersCount     Int               @default(0)
   authorId          String
   publishedAt       DateTime?

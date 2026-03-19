@@ -51,8 +51,13 @@ export const publishChapterInputSchema = z.object({
   previewText: z.string().default(""),
 })
 
+export const reorderChaptersInputSchema = z.object({
+  orderedChapterIds: z.array(z.string()).min(1),
+})
+
 export type ChapterDto = z.infer<typeof chapterSchema>
 export type ChapterVersionDto = z.infer<typeof chapterVersionSchema>
 export type CreateChapterInput = z.infer<typeof createChapterInputSchema>
 export type UpdateChapterInput = z.infer<typeof updateChapterInputSchema>
 export type PublishChapterInput = z.infer<typeof publishChapterInputSchema>
+export type ReorderChaptersInput = z.infer<typeof reorderChaptersInputSchema>
