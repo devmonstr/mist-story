@@ -5,9 +5,9 @@ import { useEffect, useState } from 'react'
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
-import { Bookmark, Loader2 } from 'lucide-react'
+import { Bookmark, Loader2, Trash2 } from 'lucide-react'
 import { useRequireAuth } from '@/hooks/use-require-auth'
-import { fetchMyLibrary } from '@/lib/api'
+import { fetchMyLibrary, removeBookmark } from '@/lib/api'
 import type { MyLibrarySavedNovelDto } from '@mist/shared'
 
 function formatSavedDate(value: string) {
@@ -19,6 +19,7 @@ export default function BookmarksPage() {
   const { isLoading, isAuthenticated } = useRequireAuth()
   const [bookmarks, setBookmarks] = useState<MyLibrarySavedNovelDto[]>([])
   const [isFetching, setIsFetching] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     if (!isAuthenticated) return
@@ -52,6 +53,18 @@ export default function BookmarksPage() {
 
   if (!isAuthenticated) {
     return null
+  }
+
+  const handleRemove = async (novelId: string) => {
+    try {
+      setIsSubmitting(true)
+      await removeBookmark(novelId)
+      setBookmarks((current) => current.filter((bookmark) => bookmark.novelId !== novelId))
+    } catch (error) {
+      console.error("Failed to remove bookmark:", error)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -137,6 +150,15 @@ export default function BookmarksPage() {
                       >
                         {novel.currentChapterNumber ? 'Continue Reading' : 'Open Story'}
                       </Link>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      disabled={isSubmitting}
+                      onClick={() => void handleRemove(novel.novelId)}
+                      title="Remove from bookmarks"
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>

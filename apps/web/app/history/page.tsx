@@ -5,9 +5,9 @@ import { useEffect, useState } from 'react'
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
-import { Clock, Loader2 } from 'lucide-react'
+import { Clock, Loader2, Trash2 } from 'lucide-react'
 import { useRequireAuth } from '@/hooks/use-require-auth'
-import { fetchMyLibrary } from '@/lib/api'
+import { clearReadingProgress, fetchMyLibrary, removeReadingProgress } from '@/lib/api'
 import type { MyLibraryContinueReadingDto } from '@mist/shared'
 
 function formatRelativeDate(value: string) {
@@ -26,6 +26,7 @@ export default function HistoryPage() {
   const { isLoading, isAuthenticated } = useRequireAuth()
   const [history, setHistory] = useState<MyLibraryContinueReadingDto[]>([])
   const [isFetching, setIsFetching] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     if (!isAuthenticated) return
@@ -61,20 +62,53 @@ export default function HistoryPage() {
     return null
   }
 
+  const handleRemove = async (novelId: string) => {
+    try {
+      setIsSubmitting(true)
+      await removeReadingProgress(novelId)
+      setHistory((current) => current.filter((item) => item.novelId !== novelId))
+    } catch (error) {
+      console.error("Failed to remove reading progress:", error)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleClearAll = async () => {
+    try {
+      setIsSubmitting(true)
+      await clearReadingProgress()
+      setHistory([])
+    } catch (error) {
+      console.error("Failed to clear reading history:", error)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
       <main className="flex-1 bg-background">
-      <div className="border-b border-border">
-        <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="mb-4 flex items-center gap-3">
-            <Clock className="h-8 w-8 text-foreground" />
-            <h1 className="font-serif text-3xl font-bold text-foreground">Reading History</h1>
+        <div className="border-b border-border">
+          <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Clock className="h-8 w-8 text-foreground" />
+                <div>
+                  <h1 className="font-serif text-3xl font-bold text-foreground">Reading History</h1>
+                  <p className="text-muted-foreground">
+                    {history.length} {history.length === 1 ? 'story' : 'stories'} in progress
+                  </p>
+                </div>
+              </div>
+              {history.length > 0 && (
+                <Button variant="outline" size="sm" disabled={isSubmitting} onClick={() => void handleClearAll()}>
+                  Clear All
+                </Button>
+              )}
+            </div>
           </div>
-          <p className="text-muted-foreground">
-            {history.length} {history.length === 1 ? 'story' : 'stories'} in progress
-          </p>
-        </div>
       </div>
 
       <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
@@ -138,6 +172,15 @@ export default function HistoryPage() {
                       <Link href={`/novel/${item.novelId}/read/${item.currentChapterNumber}`}>
                         Continue
                       </Link>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      disabled={isSubmitting}
+                      onClick={() => void handleRemove(item.novelId)}
+                      title="Remove from history"
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>

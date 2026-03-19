@@ -13,6 +13,15 @@ export async function findChapterById(chapterId: string) {
   })
 }
 
+export async function findChapterForNovelByNumber(novelId: string, chapterNumber: number) {
+  return prisma.chapter.findFirst({
+    where: {
+      novelId,
+      number: chapterNumber,
+    },
+  })
+}
+
 export async function createChapterForNovel(
   novelId: string,
   input: {

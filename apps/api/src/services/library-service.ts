@@ -1,12 +1,32 @@
 import {
+  createNotification,
+  findChapterById,
+  findChapterForNovelByNumber,
+  findNovelBookmarkForUser,
+  findNovelByIdOrSlug,
   listBookmarkedNovelsForUser,
   listReadingProgressForUser,
+  upsertNovelBookmarkForUser,
+  upsertReadingProgressForUser,
+  deleteNovelBookmarkForUser,
+  findReadingProgressForUserAndNovel,
+  deleteReadingProgressForUserAndNovel,
+  clearReadingProgressForUser,
 } from "@mist/db"
 import type {
+  BookmarkState,
   MyLibraryContinueReadingDto,
   MyLibraryResponse,
   MyLibrarySavedNovelDto,
+  ReadingProgressState,
+  UpsertReadingProgressInput,
 } from "@mist/shared"
+import { enqueueNotificationDispatch } from "@mist/queue"
+import { createRedisClient } from "@mist/redis"
+import { env } from "../config/env"
+import { HttpError } from "../utils/http-error"
+
+const redis = createRedisClient(env.REDIS_URL)
 
 function calculateProgressPercent(chapterNumber: number, totalChapters: number) {
   if (totalChapters <= 0) {
@@ -59,4 +79,158 @@ export async function getMyLibrary(userId: string): Promise<MyLibraryResponse> {
     savedNovels: savedNovelDtos,
     continueReading: continueReadingDtos,
   }
+}
+
+function serializeBookmarkState(
+  novelId: string,
+  bookmark: { createdAt: Date } | null
+): BookmarkState {
+  return {
+    novelId,
+    isBookmarked: Boolean(bookmark),
+    savedAt: bookmark?.createdAt.toISOString() ?? null,
+  }
+}
+
+function serializeReadingProgressState(
+  novelId: string,
+  progress:
+    | {
+        chapterId: string | null
+        chapterNumber: number
+        updatedAt: Date
+      }
+    | null
+): ReadingProgressState {
+  return {
+    novelId,
+    chapterId: progress?.chapterId ?? null,
+    chapterNumber: progress?.chapterNumber ?? null,
+    updatedAt: progress?.updatedAt.toISOString() ?? null,
+  }
+}
+
+export async function getBookmarkState(
+  userId: string,
+  novelIdentifier: string
+): Promise<BookmarkState> {
+  const novel = await findNovelByIdOrSlug(novelIdentifier)
+  if (!novel) {
+    throw new HttpError(404, "Novel not found")
+  }
+
+  const bookmark = await findNovelBookmarkForUser(userId, novel.id)
+  return serializeBookmarkState(novel.id, bookmark)
+}
+
+export async function addBookmark(
+  userId: string,
+  novelIdentifier: string
+): Promise<BookmarkState> {
+  const novel = await findNovelByIdOrSlug(novelIdentifier)
+  if (!novel) {
+    throw new HttpError(404, "Novel not found")
+  }
+
+  const existingBookmark = await findNovelBookmarkForUser(userId, novel.id)
+  const bookmark = await upsertNovelBookmarkForUser(userId, novel.id)
+
+  if (!existingBookmark && novel.authorId !== userId) {
+    const notification = await createNotification({
+      userId: novel.authorId,
+      actorUserId: userId,
+      type: "NOVEL_BOOKMARKED",
+      novelId: novel.id,
+      title: "New library save",
+      message: `A reader added "${novel.title}" to their library.`,
+      targetUrl: `/novel/${novel.id}`,
+      metadata: {
+        eventType: "NOVEL_BOOKMARKED",
+      },
+    })
+
+    await enqueueNotificationDispatch(redis, {
+      notificationId: notification.id,
+    })
+  }
+
+  return serializeBookmarkState(novel.id, bookmark)
+}
+
+export async function removeBookmark(
+  userId: string,
+  novelIdentifier: string
+): Promise<BookmarkState> {
+  const novel = await findNovelByIdOrSlug(novelIdentifier)
+  if (!novel) {
+    throw new HttpError(404, "Novel not found")
+  }
+
+  await deleteNovelBookmarkForUser(userId, novel.id)
+  return serializeBookmarkState(novel.id, null)
+}
+
+export async function getReadingProgress(
+  userId: string,
+  novelIdentifier: string
+): Promise<ReadingProgressState> {
+  const novel = await findNovelByIdOrSlug(novelIdentifier)
+  if (!novel) {
+    throw new HttpError(404, "Novel not found")
+  }
+
+  const progress = await findReadingProgressForUserAndNovel(userId, novel.id)
+  return serializeReadingProgressState(novel.id, progress)
+}
+
+export async function saveReadingProgress(
+  userId: string,
+  input: UpsertReadingProgressInput
+): Promise<ReadingProgressState> {
+  const novel = await findNovelByIdOrSlug(input.novelId)
+  if (!novel) {
+    throw new HttpError(404, "Novel not found")
+  }
+
+  let chapterId = input.chapterId ?? null
+  let chapterNumber = input.chapterNumber
+
+  if (chapterId) {
+    const chapter = await findChapterById(chapterId)
+    if (!chapter || chapter.novelId !== novel.id) {
+      throw new HttpError(404, "Chapter not found")
+    }
+
+    chapterNumber = chapter.number
+    chapterId = chapter.id
+  } else {
+    const chapter = await findChapterForNovelByNumber(novel.id, input.chapterNumber)
+    chapterId = chapter?.id ?? null
+    chapterNumber = input.chapterNumber
+  }
+
+  const progress = await upsertReadingProgressForUser({
+    userId,
+    novelId: novel.id,
+    chapterId,
+    chapterNumber,
+  })
+
+  return serializeReadingProgressState(novel.id, progress)
+}
+
+export async function removeReadingProgress(
+  userId: string,
+  novelIdentifier: string
+) {
+  const novel = await findNovelByIdOrSlug(novelIdentifier)
+  if (!novel) {
+    throw new HttpError(404, "Novel not found")
+  }
+
+  await deleteReadingProgressForUserAndNovel(userId, novel.id)
+}
+
+export async function clearReadingHistory(userId: string) {
+  await clearReadingProgressForUser(userId)
 }

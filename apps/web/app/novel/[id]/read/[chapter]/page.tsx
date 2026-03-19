@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { use, useState, useEffect } from "react"
+import { usePathname, useRouter } from "next/navigation"
 import {
   Sheet,
   SheetContent,
@@ -26,11 +27,18 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import { useAuth } from "@/context/auth-context"
+import { buildSignInPath } from "@/lib/auth-routes"
+import {
+  addBookmark,
+  fetchBookmarkState,
+  removeBookmark,
+  updateReadingProgress,
+} from "@/lib/api"
 import { ZapPaywall } from "@/components/zap-paywall"
 import { isChapterUnlocked } from "@/lib/zap-utils"
 
 const READER_SETTINGS_KEY = "mist-story-reader-settings"
-const BOOKMARKS_KEY = "mist-story-bookmarks"
 const READING_PROGRESS_KEY = "mist-story-reading-progress"
 
 // Sample chapter content
@@ -129,6 +137,9 @@ export default function ReadPage({
   params: Promise<{ id: string; chapter: string }>
 }) {
   const { id, chapter } = use(params)
+  const router = useRouter()
+  const pathname = usePathname()
+  const { user, isLoading: isAuthLoading } = useAuth()
 
   // Load settings from localStorage or use defaults
   const [fontSize, setFontSize] = useState(18)
@@ -136,6 +147,7 @@ export default function ReadPage({
   const [isChapterListOpen, setIsChapterListOpen] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
   const [isBookmarked, setIsBookmarked] = useState(false)
+  const [isBookmarkSubmitting, setIsBookmarkSubmitting] = useState(false)
   const [readingProgress, setReadingProgress] = useState(0)
 
   const contentKey = `${id}-${chapter}`
@@ -147,7 +159,7 @@ export default function ReadPage({
   const isPaidChapter = !!chapterPrice
   const [isUnlocked, setIsUnlocked] = useState(true) // optimistic; corrected on mount
 
-  // Load reader settings, bookmarks, and reading progress on mount
+  // Load reader settings and scroll restore on mount
   useEffect(() => {
     try {
       // Load settings
@@ -156,13 +168,6 @@ export default function ReadPage({
         const settings = JSON.parse(saved)
         if (settings.fontSize) setFontSize(settings.fontSize)
         if (settings.readerTheme) setReaderTheme(settings.readerTheme)
-      }
-
-      // Load bookmarks
-      const bookmarks = localStorage.getItem(BOOKMARKS_KEY)
-      if (bookmarks) {
-        const bookmarkedChapters = JSON.parse(bookmarks)
-        setIsBookmarked(bookmarkedChapters.includes(chapterId))
       }
 
       // Check paywall unlock status
@@ -184,6 +189,24 @@ export default function ReadPage({
     }
     setIsLoaded(true)
   }, [chapterId, id, chapter, isPaidChapter])
+
+  useEffect(() => {
+    if (isAuthLoading || !user) {
+      setIsBookmarked(false)
+      return
+    }
+
+    const loadBookmarkState = async () => {
+      try {
+        const state = await fetchBookmarkState(id)
+        setIsBookmarked(state.isBookmarked)
+      } catch {
+        setIsBookmarked(false)
+      }
+    }
+
+    void loadBookmarkState()
+  }, [id, isAuthLoading, user])
 
   // Save settings to localStorage when they change
   useEffect(() => {
@@ -224,22 +247,44 @@ export default function ReadPage({
     return () => window.removeEventListener('scroll', handleScroll)
   }, [chapterId])
 
-  // Toggle bookmark
-  const toggleBookmark = () => {
-    try {
-      const bookmarks = localStorage.getItem(BOOKMARKS_KEY)
-      let bookmarkedChapters: string[] = bookmarks ? JSON.parse(bookmarks) : []
+  useEffect(() => {
+    const chapterNumber = Number.parseInt(chapter, 10)
+    if (isAuthLoading || !user || Number.isNaN(chapterNumber)) {
+      return
+    }
 
-      if (isBookmarked) {
-        bookmarkedChapters = bookmarkedChapters.filter(id => id !== chapterId)
-      } else {
-        bookmarkedChapters.push(chapterId)
+    const persistProgress = async () => {
+      try {
+        await updateReadingProgress({
+          novelId: id,
+          chapterNumber,
+        })
+      } catch (error) {
+        console.error('Failed to sync reading progress:', error)
       }
+    }
 
-      localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(bookmarkedChapters))
-      setIsBookmarked(!isBookmarked)
-    } catch (e) {
-      console.error('Failed to toggle bookmark:', e)
+    void persistProgress()
+  }, [chapter, id, isAuthLoading, user])
+
+  const toggleBookmark = async () => {
+    if (isAuthLoading) {
+      return
+    }
+
+    if (!user) {
+      router.push(buildSignInPath(pathname))
+      return
+    }
+
+    try {
+      setIsBookmarkSubmitting(true)
+      const state = isBookmarked ? await removeBookmark(id) : await addBookmark(id)
+      setIsBookmarked(state.isBookmarked)
+    } catch (error) {
+      console.error('Failed to toggle bookmark:', error)
+    } finally {
+      setIsBookmarkSubmitting(false)
     }
   }
 
@@ -350,7 +395,8 @@ export default function ReadPage({
             <Button 
               variant="ghost" 
               size="icon"
-              onClick={toggleBookmark}
+              disabled={isBookmarkSubmitting}
+              onClick={() => void toggleBookmark()}
               aria-label={isBookmarked ? "Remove bookmark" : "Add bookmark"}
             >
               {isBookmarked ? (

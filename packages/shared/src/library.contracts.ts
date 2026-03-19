@@ -30,6 +30,28 @@ export const myLibraryResponseSchema = z.object({
   continueReading: z.array(myLibraryContinueReadingSchema),
 })
 
+export const bookmarkStateSchema = z.object({
+  novelId: z.string(),
+  isBookmarked: z.boolean(),
+  savedAt: z.string().nullable(),
+})
+
+export const readingProgressStateSchema = z.object({
+  novelId: z.string(),
+  chapterId: z.string().nullable(),
+  chapterNumber: z.number().nullable(),
+  updatedAt: z.string().nullable(),
+})
+
+export const upsertReadingProgressInputSchema = z.object({
+  novelId: z.string(),
+  chapterId: z.string().nullable().optional(),
+  chapterNumber: z.number().int().min(1),
+})
+
 export type MyLibrarySavedNovelDto = z.infer<typeof myLibrarySavedNovelSchema>
 export type MyLibraryContinueReadingDto = z.infer<typeof myLibraryContinueReadingSchema>
 export type MyLibraryResponse = z.infer<typeof myLibraryResponseSchema>
+export type BookmarkState = z.infer<typeof bookmarkStateSchema>
+export type ReadingProgressState = z.infer<typeof readingProgressStateSchema>
+export type UpsertReadingProgressInput = z.infer<typeof upsertReadingProgressInputSchema>
