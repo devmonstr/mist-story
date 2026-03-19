@@ -32,6 +32,12 @@ function hexToBytes(hex: string) {
   return bytes
 }
 
+function bytesToHex(bytes: Uint8Array) {
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+}
+
 function convertBits(
   data: Uint8Array,
   fromBits: number,
@@ -89,6 +95,35 @@ export function hexToNpub(hex: string) {
   return `npub1${[...words, ...checksum].map((word) => BECH32_CHARSET[word]).join("")}`
 }
 
+export function npubToHex(npub: string) {
+  try {
+    const separatorIndex = npub.lastIndexOf("1")
+    if (separatorIndex < 1) {
+      return null
+    }
+
+    const prefix = npub.slice(0, separatorIndex)
+    if (prefix !== "npub") {
+      return null
+    }
+
+    const dataPart = npub.slice(separatorIndex + 1)
+    const words = dataPart
+      .slice(0, -6)
+      .split("")
+      .map((character) => BECH32_CHARSET.indexOf(character))
+
+    if (words.some((word) => word < 0)) {
+      return null
+    }
+
+    const bytes = convertBits(new Uint8Array(words), 5, 8, false)
+    return bytesToHex(new Uint8Array(bytes))
+  } catch {
+    return null
+  }
+}
+
 export function toIsoString(value: Date | null) {
   return value ? value.toISOString() : null
 }
@@ -114,6 +149,7 @@ export function serializeUser(user: User): AuthUserDto {
       name: user.handle ?? null,
       display_name: user.displayName ?? null,
       picture: user.avatarUrl ?? null,
+      banner: user.bannerUrl ?? null,
       about: user.about ?? null,
       nip05: user.nip05 ?? null,
       lud16: user.lud16 ?? null,

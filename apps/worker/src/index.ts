@@ -4,13 +4,16 @@ import { createBullMQConnection } from "@mist/redis"
 import type {
   ChapterPublishJobPayload,
   NotificationDispatchJobPayload,
+  ProfileSyncJobPayload,
 } from "@mist/shared"
 import { env } from "./config/env"
 import { processChapterPublishJob } from "./processors/chapter-publish"
 import { processNotificationDispatchJob } from "./processors/notification-dispatch"
+import { processProfileSyncJob } from "./processors/profile-sync"
 
 const chapterPublishConnection = createBullMQConnection(env.REDIS_URL)
 const notificationConnection = createBullMQConnection(env.REDIS_URL)
+const profileSyncConnection = createBullMQConnection(env.REDIS_URL)
 
 const chapterPublishWorker = new Worker<ChapterPublishJobPayload>(
   queueNames.chapterPublish,
@@ -24,6 +27,12 @@ const notificationWorker = new Worker<NotificationDispatchJobPayload>(
   { connection: notificationConnection as never }
 )
 
+const profileSyncWorker = new Worker<ProfileSyncJobPayload>(
+  queueNames.profileSync,
+  async (job) => processProfileSyncJob(job.data),
+  { connection: profileSyncConnection as never }
+)
+
 chapterPublishWorker.on("completed", (job) => {
   console.log(`[worker] completed ${job.name}:${job.id}`)
 })
@@ -33,6 +42,10 @@ chapterPublishWorker.on("failed", (job, error) => {
 })
 
 notificationWorker.on("failed", (job, error) => {
+  console.error(`[worker] failed ${job?.name}:${job?.id}`, error)
+})
+
+profileSyncWorker.on("failed", (job, error) => {
   console.error(`[worker] failed ${job?.name}:${job?.id}`, error)
 })
 

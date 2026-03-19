@@ -9,6 +9,8 @@ import { authRouter } from "./routes/auth"
 import { chaptersRouter } from "./routes/chapters"
 import { meRouter } from "./routes/me"
 import { novelsRouter } from "./routes/novels"
+import { profilesRouter } from "./routes/profiles"
+import { settingsRouter } from "./routes/settings"
 
 export function createApp() {
   const app = express()
@@ -30,7 +32,9 @@ export function createApp() {
 
   app.use("/api/v1/auth", authRouter)
   app.use("/api/v1/me", meRouter)
+  app.use("/api/v1/me/settings", settingsRouter)
   app.use("/api/v1/novels", novelsRouter)
+  app.use("/api/v1/profiles", profilesRouter)
   app.use("/api/v1", chaptersRouter)
 
   app.use(errorHandler)

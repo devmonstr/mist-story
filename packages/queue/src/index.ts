@@ -2,11 +2,13 @@ import { Queue } from "bullmq"
 import type {
   ChapterPublishJobPayload,
   NotificationDispatchJobPayload,
+  ProfileSyncJobPayload,
 } from "@mist/shared"
 
 export const queueNames = {
   chapterPublish: "chapter-publish",
   notificationDispatch: "notification-dispatch",
+  profileSync: "profile-sync",
 } as const
 
 export function createChapterPublishQueue(connection: unknown) {
@@ -28,6 +30,15 @@ export function createNotificationDispatchQueue(connection: unknown) {
   })
 }
 
+export function createProfileSyncQueue(connection: unknown) {
+  return new Queue<ProfileSyncJobPayload, unknown, typeof queueNames.profileSync>(
+    queueNames.profileSync,
+    {
+      connection: connection as never,
+    }
+  )
+}
+
 export async function enqueueChapterPublish(
   connection: unknown,
   payload: ChapterPublishJobPayload
@@ -42,4 +53,12 @@ export async function enqueueNotificationDispatch(
 ) {
   const queue = createNotificationDispatchQueue(connection)
   return queue.add(queueNames.notificationDispatch, payload)
+}
+
+export async function enqueueProfileSync(
+  connection: unknown,
+  payload: ProfileSyncJobPayload
+) {
+  const queue = createProfileSyncQueue(connection)
+  return queue.add(queueNames.profileSync, payload)
 }

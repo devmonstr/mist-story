@@ -9,5 +9,10 @@ export const notificationDispatchJobPayloadSchema = z.object({
   notificationId: z.string(),
 })
 
+export const profileSyncJobPayloadSchema = z.object({
+  pubkey: z.string().min(1),
+})
+
 export type ChapterPublishJobPayload = z.infer<typeof chapterPublishJobPayloadSchema>
 export type NotificationDispatchJobPayload = z.infer<typeof notificationDispatchJobPayloadSchema>
+export type ProfileSyncJobPayload = z.infer<typeof profileSyncJobPayloadSchema>

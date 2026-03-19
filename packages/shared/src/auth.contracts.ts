@@ -4,6 +4,7 @@ export const nostrProfileSchema = z.object({
   name: z.string().nullish(),
   display_name: z.string().nullish(),
   picture: z.string().url().nullish(),
+  banner: z.string().url().nullish(),
   about: z.string().nullish(),
   nip05: z.string().nullish(),
   lud16: z.string().nullish(),

@@ -3,15 +3,19 @@ import type {
   AuthMeResponse,
   AuthUserDto,
   AuthVerifyResponse,
+  BookmarkState,
   ChapterDto,
   ChapterVersionDto,
   CreateChapterInput,
   CreateNovelInput,
-  BookmarkState,
   MyLibraryResponse,
+  MyProfileResponse,
   NotificationDto,
   NotificationsResponse,
   NovelDto,
+  ProfileConnectionsResponse,
+  ProfileFollowState,
+  ProfilePageResponse,
   PublishChapterInput,
   ReadingProgressState,
   SignedNostrEvent,
@@ -20,6 +24,60 @@ import type {
   UpdateNovelInput,
 } from "@mist/shared"
 import type { NostrUser } from "@/lib/nostr-types"
+
+export type NotificationSettingsDto = {
+  emailNotifications: boolean
+  newChapterNotifications: boolean
+  commentNotifications: boolean
+  followNotifications: boolean
+}
+
+export type AppearanceSettingsDto = {
+  theme: "light" | "dark" | "system"
+  fontSize: "small" | "medium" | "large"
+}
+
+export type SecurityActivityDto = {
+  id: string
+  action: string
+  resultCode: string
+  detail: string | null
+  createdAt: string
+}
+
+export type SecuritySettingsDto = {
+  npub: string
+  pubkey: string
+  recentAuthActivity: SecurityActivityDto[]
+}
+
+export type ApiKeyDto = {
+  id: string
+  name: string
+  keyPreview: string
+  lastUsedAt: string | null
+  createdAt: string
+  revokedAt: string | null
+}
+
+export type RelayDto = {
+  id: string
+  url: string
+  read: boolean
+  write: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type IntegrationsSettingsDto = {
+  apiKeys: ApiKeyDto[]
+  relays: RelayDto[]
+}
+
+export type CreateApiKeyResponse = {
+  apiKey: ApiKeyDto
+  token: string
+}
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:4000"
@@ -98,6 +156,72 @@ export function fetchNotifications() {
   return apiFetch<NotificationsResponse>("/api/v1/me/notifications")
 }
 
+export function fetchMyProfile() {
+  return apiFetch<MyProfileResponse>("/api/v1/me/profile")
+}
+
+export function refreshMyProfile() {
+  return apiFetch<MyProfileResponse>("/api/v1/me/profile/refresh", {
+    method: "POST",
+  })
+}
+
+export function fetchNotificationSettings() {
+  return apiFetch<NotificationSettingsDto>("/api/v1/me/settings/notifications")
+}
+
+export function updateNotificationSettings(input: NotificationSettingsDto) {
+  return apiFetch<NotificationSettingsDto>("/api/v1/me/settings/notifications", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  })
+}
+
+export function fetchAppearanceSettings() {
+  return apiFetch<AppearanceSettingsDto>("/api/v1/me/settings/appearance")
+}
+
+export function updateAppearanceSettings(input: AppearanceSettingsDto) {
+  return apiFetch<AppearanceSettingsDto>("/api/v1/me/settings/appearance", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  })
+}
+
+export function fetchSecuritySettings() {
+  return apiFetch<SecuritySettingsDto>("/api/v1/me/settings/security")
+}
+
+export function fetchIntegrationsSettings() {
+  return apiFetch<IntegrationsSettingsDto>("/api/v1/me/settings/integrations")
+}
+
+export function createApiKey(input: { name: string }) {
+  return apiFetch<CreateApiKeyResponse>("/api/v1/me/settings/api-keys", {
+    method: "POST",
+    body: JSON.stringify(input),
+  })
+}
+
+export function revokeApiKey(apiKeyId: string) {
+  return apiFetch<void>(`/api/v1/me/settings/api-keys/${apiKeyId}`, {
+    method: "DELETE",
+  })
+}
+
+export function createRelay(input: { url: string; read: boolean; write: boolean }) {
+  return apiFetch<RelayDto>("/api/v1/me/settings/relays", {
+    method: "POST",
+    body: JSON.stringify(input),
+  })
+}
+
+export function deleteRelay(relayId: string) {
+  return apiFetch<void>(`/api/v1/me/settings/relays/${relayId}`, {
+    method: "DELETE",
+  })
+}
+
 export function markNotificationAsRead(notificationId: string) {
   return apiFetch<NotificationDto>(`/api/v1/me/notifications/${notificationId}/read`, {
     method: "POST",
@@ -163,6 +287,30 @@ export function fetchNovel(novelId: string) {
   return apiFetch<NovelDto>(`/api/v1/novels/${novelId}`)
 }
 
+export function fetchProfilePage(npub: string) {
+  return apiFetch<ProfilePageResponse>(`/api/v1/profiles/${npub}`)
+}
+
+export function fetchProfileFollowers(npub: string) {
+  return apiFetch<ProfileConnectionsResponse>(`/api/v1/profiles/${npub}/followers`)
+}
+
+export function fetchProfileFollowing(npub: string) {
+  return apiFetch<ProfileConnectionsResponse>(`/api/v1/profiles/${npub}/following`)
+}
+
+export function followProfile(npub: string) {
+  return apiFetch<ProfileFollowState>(`/api/v1/profiles/${npub}/follow`, {
+    method: "PUT",
+  })
+}
+
+export function unfollowProfile(npub: string) {
+  return apiFetch<ProfileFollowState>(`/api/v1/profiles/${npub}/follow`, {
+    method: "DELETE",
+  })
+}
+
 export function createNovel(input: CreateNovelInput) {
   return apiFetch<NovelDto>("/api/v1/novels", {
     method: "POST",
@@ -211,6 +359,7 @@ export function toNostrUser(user: AuthUserDto): NostrUser {
           name: user.profile.name ?? undefined,
           display_name: user.profile.display_name ?? undefined,
           picture: user.profile.picture ?? undefined,
+          banner: user.profile.banner ?? undefined,
           about: user.profile.about ?? undefined,
           nip05: user.profile.nip05 ?? undefined,
           lud16: user.profile.lud16 ?? undefined,

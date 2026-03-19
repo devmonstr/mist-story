@@ -14,10 +14,10 @@ export default function ProfilePage({ params }: { params: Promise<{ npub: string
       <main className="flex-1 bg-background">
         <ProfileShell params={params}>
           <Suspense fallback={<ProfileHeaderSkeleton />}>
-            <ProfileHeader params={params} />
+            <ProfileHeader />
           </Suspense>
           <Suspense fallback={<NovelListSkeleton />}>
-            <ProfileNovels params={params} />
+            <ProfileNovels />
           </Suspense>
         </ProfileShell>
       </main>
