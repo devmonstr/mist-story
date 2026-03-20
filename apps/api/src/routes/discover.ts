@@ -1,5 +1,4 @@
 import { Router } from "express"
-import { decodeCatalogCursor } from "../services/catalog-cursor"
 import { getDiscoverData, searchCatalog } from "../services/discover-search-service"
 
 export const discoverRouter = Router()
@@ -58,24 +57,19 @@ discoverRouter.get("/search", async (request, response, next) => {
         ? request.query.sort
         : "relevance"
 
-    const cursorPage = decodeCatalogCursor(
-      typeof request.query.cursor === "string" ? request.query.cursor : undefined
-    )
     const cursorDirection =
       request.query.direction === "next" || request.query.direction === "prev"
         ? request.query.direction
         : null
-    const fallbackPage = parsePositiveInt(request.query.page, 1)
-    const resolvedPage = cursorPage
-      ? Math.max(1, cursorDirection === "prev" ? cursorPage - 1 : cursorPage + 1)
-      : fallbackPage
 
     const payload = await searchCatalog({
       query,
       filterType,
       sortBy,
-      page: resolvedPage,
+      page: parsePositiveInt(request.query.page, 1),
       pageSize: parsePositiveInt(request.query.pageSize, 20),
+      cursor: typeof request.query.cursor === "string" ? request.query.cursor : undefined,
+      direction: cursorDirection,
       genre: typeof request.query.genre === "string" ? request.query.genre : undefined,
       workType:
         request.query.workType === "ORIGINAL" || request.query.workType === "TRANSLATION"

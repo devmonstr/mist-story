@@ -4,7 +4,6 @@ import {
   getPublicNovelDetail,
   listLibraryCatalog,
 } from "../services/catalog-service"
-import { decodeCatalogCursor } from "../services/catalog-cursor"
 
 export const libraryRouter = Router()
 
@@ -15,17 +14,10 @@ function parsePositiveInt(value: unknown, fallback: number) {
 
 libraryRouter.get("/", async (request, response, next) => {
   try {
-    const cursorPage = decodeCatalogCursor(
-      typeof request.query.cursor === "string" ? request.query.cursor : undefined
-    )
     const cursorDirection =
       request.query.direction === "next" || request.query.direction === "prev"
         ? request.query.direction
         : null
-    const fallbackPage = parsePositiveInt(request.query.page, 1)
-    const resolvedPage = cursorPage
-      ? Math.max(1, cursorDirection === "prev" ? cursorPage - 1 : cursorPage + 1)
-      : fallbackPage
 
     const payload = await listLibraryCatalog({
       query: typeof request.query.q === "string" ? request.query.q : undefined,
@@ -37,8 +29,10 @@ libraryRouter.get("/", async (request, response, next) => {
         request.query.sort === "title"
           ? request.query.sort
           : "recent",
-      page: resolvedPage,
+      page: parsePositiveInt(request.query.page, 1),
       pageSize: parsePositiveInt(request.query.pageSize, 18),
+      cursor: typeof request.query.cursor === "string" ? request.query.cursor : undefined,
+      direction: cursorDirection,
       genre: typeof request.query.genre === "string" ? request.query.genre : undefined,
       workType:
         request.query.workType === "ORIGINAL" || request.query.workType === "TRANSLATION"

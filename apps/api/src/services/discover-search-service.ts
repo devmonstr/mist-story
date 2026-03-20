@@ -5,7 +5,9 @@ import {
   listDiscoverGenres,
   listLibraryCatalogFacetCounts,
   normalizeCatalogPagination,
+  searchAuthorsWithCursor,
   searchAuthorsWithPagination,
+  searchPublishedNovelsWithCursor,
   searchPublishedNovelsWithPagination,
 } from "@mist/db"
 import type {
@@ -20,7 +22,14 @@ import type {
   SearchResultItemDto,
   SearchSortBy,
 } from "@mist/shared"
-import { encodeCatalogCursor } from "./catalog-cursor"
+import {
+  decodeCatalogCursor,
+  decodeSearchAuthorCursor,
+  decodeSearchNovelCursor,
+  encodeCatalogCursor,
+  encodeSearchAuthorCursor,
+  encodeSearchNovelCursor,
+} from "./catalog-cursor"
 
 const GENRE_DESCRIPTIONS: Record<string, string> = {
   Fantasy: "Epic adventures, magic, and otherworldly realms.",
@@ -273,6 +282,7 @@ export async function searchCatalog(input: {
   const query = input.query.trim()
   const filterType = input.filterType
   const sortBy = input.sortBy
+  const direction = input.direction ?? null
   const pagination = normalizeCatalogPagination({
     page: input.page,
     pageSize: input.pageSize,
@@ -318,28 +328,23 @@ export async function searchCatalog(input: {
     }
   }
 
-  const shouldLoadNovels = filterType === "all" || filterType === "novel"
-  const shouldLoadAuthors = filterType === "all" || filterType === "author"
+  const novelCursor = filterType === "novel" ? decodeSearchNovelCursor(input.cursor) : null
+  const authorCursor = filterType === "author" ? decodeSearchAuthorCursor(input.cursor) : null
+  const mixedCursorPage = filterType === "all" ? decodeCatalogCursor(input.cursor) : null
+  const mixedPagination = normalizeCatalogPagination({
+    page: mixedCursorPage
+      ? Math.max(1, direction === "prev" ? mixedCursorPage - 1 : mixedCursorPage + 1)
+      : input.page,
+    pageSize: input.pageSize,
+  })
 
-  const [novels, authors] = await Promise.all([
-    shouldLoadNovels
-      ? searchPublishedNovelsWithPagination(filters, query, sortBy, pagination)
-      : Promise.resolve({
-          items: [],
-          total: 0,
-          pagination,
-        }),
-    shouldLoadAuthors
-      ? searchAuthorsWithPagination(query, sortBy, pagination)
-      : Promise.resolve({
-          items: [],
-          total: 0,
-          pagination,
-        }),
-  ])
-  const facetCounts = shouldLoadNovels ? await listLibraryCatalogFacetCounts(filters) : null
-
-  const novelResults: SearchNovelResultDto[] = novels.items.map((novel) => ({
+  if (filterType === "novel") {
+    const novels = await searchPublishedNovelsWithCursor(filters, query, sortBy, {
+      pageSize: pagination.pageSize,
+      cursor: novelCursor,
+      direction,
+    })
+    const novelResults: SearchNovelResultDto[] = novels.items.map((novel) => ({
       id: novel.id,
       type: "novel",
       slug: novel.slug,
@@ -353,8 +358,64 @@ export async function searchCatalog(input: {
       coverUrl: novel.coverUrl,
       coverStorageKey: novel.coverStorageKey,
     }))
+    const firstNovel = novels.items[0]
+    const lastNovel = novels.items[novels.items.length - 1]
+    const hasPreviousPage = direction === "prev" ? novels.hasMore : Boolean(novelCursor)
+    const hasNextPage = direction === "prev" ? Boolean(novelCursor) : novels.hasMore
 
-  const authorResults: SearchAuthorResultDto[] = authors.items.map((author) => ({
+    return {
+      query,
+      filterType,
+      sortBy,
+      total: novels.total,
+      pagination: {
+        page: pagination.page,
+        pageSize: novels.pageSize,
+        totalItems: novels.total,
+        totalPages: novels.total > 0 ? Math.ceil(novels.total / novels.pageSize) : 0,
+        currentCursor: input.cursor ?? null,
+        nextCursor:
+          hasNextPage && lastNovel
+            ? encodeSearchNovelCursor({
+                sortBy,
+                id: lastNovel.id,
+                readsCount: lastNovel.readsCount,
+                bookmarksCount: lastNovel.bookmarksCount,
+                ratingsCount: lastNovel.ratingsCount,
+                orderDate: (lastNovel.publishedAt ?? lastNovel.updatedAt).toISOString(),
+                rankScore: lastNovel.rankScore,
+                similarityScore: lastNovel.similarityScore,
+              })
+            : null,
+        previousCursor:
+          hasPreviousPage && firstNovel
+            ? encodeSearchNovelCursor({
+                sortBy,
+                id: firstNovel.id,
+                readsCount: firstNovel.readsCount,
+                bookmarksCount: firstNovel.bookmarksCount,
+                ratingsCount: firstNovel.ratingsCount,
+                orderDate: (firstNovel.publishedAt ?? firstNovel.updatedAt).toISOString(),
+                rankScore: firstNovel.rankScore,
+                similarityScore: firstNovel.similarityScore,
+              })
+            : null,
+        hasPreviousPage,
+        hasNextPage,
+      },
+      items: novelResults,
+      activeFilters: filters,
+      facets: mapFacetCounts(await listLibraryCatalogFacetCounts(filters)),
+    }
+  }
+
+  if (filterType === "author") {
+    const authors = await searchAuthorsWithCursor(query, sortBy, {
+      pageSize: pagination.pageSize,
+      cursor: authorCursor,
+      direction,
+    })
+    const authorResults: SearchAuthorResultDto[] = authors.items.map((author) => ({
       id: author.id,
       type: "author",
       npub: hexToNpub(author.pubkey),
@@ -364,61 +425,88 @@ export async function searchCatalog(input: {
       novelsCount: author.novelsCount,
       avatarUrl: author.avatarUrl ?? null,
     }))
+    const firstAuthor = authors.items[0]
+    const lastAuthor = authors.items[authors.items.length - 1]
+    const hasPreviousPage = direction === "prev" ? authors.hasMore : Boolean(authorCursor)
+    const hasNextPage = direction === "prev" ? Boolean(authorCursor) : authors.hasMore
 
-  let items: SearchResultItemDto[] = []
-  let total = 0
-  let responsePagination = {
-    page: pagination.page,
-    pageSize: pagination.pageSize,
-    totalItems: 0,
-    totalPages: 0,
-    currentCursor: null as string | null,
-    nextCursor: null as string | null,
-    previousCursor: null as string | null,
-    hasPreviousPage: false,
-    hasNextPage: false,
+    return {
+      query,
+      filterType,
+      sortBy,
+      total: authors.total,
+      pagination: {
+        page: pagination.page,
+        pageSize: authors.pageSize,
+        totalItems: authors.total,
+        totalPages: authors.total > 0 ? Math.ceil(authors.total / authors.pageSize) : 0,
+        currentCursor: input.cursor ?? null,
+        nextCursor:
+          hasNextPage && lastAuthor
+            ? encodeSearchAuthorCursor({
+                sortBy,
+                id: lastAuthor.id,
+                followersCount: lastAuthor.followersCount,
+                novelsCount: lastAuthor.novelsCount,
+                updatedAt: lastAuthor.updatedAt.toISOString(),
+                rankScore: lastAuthor.rankScore,
+                similarityScore: lastAuthor.similarityScore,
+              })
+            : null,
+        previousCursor:
+          hasPreviousPage && firstAuthor
+            ? encodeSearchAuthorCursor({
+                sortBy,
+                id: firstAuthor.id,
+                followersCount: firstAuthor.followersCount,
+                novelsCount: firstAuthor.novelsCount,
+                updatedAt: firstAuthor.updatedAt.toISOString(),
+                rankScore: firstAuthor.rankScore,
+                similarityScore: firstAuthor.similarityScore,
+              })
+            : null,
+        hasPreviousPage,
+        hasNextPage,
+      },
+      items: authorResults,
+      activeFilters: filters,
+      facets: undefined,
+    }
   }
 
-  if (filterType === "novel") {
-    items = novelResults
-    total = novels.total
-    responsePagination = {
-      page: novels.pagination.page,
-      pageSize: novels.pagination.pageSize,
-      totalItems: novels.total,
-      totalPages: novels.total > 0 ? Math.ceil(novels.total / novels.pagination.pageSize) : 0,
-      currentCursor: novels.total > 0 ? encodeCatalogCursor(novels.pagination.page) : null,
-      nextCursor:
-        novels.total > novels.pagination.page * novels.pagination.pageSize
-          ? encodeCatalogCursor(novels.pagination.page)
-          : null,
-      previousCursor:
-        novels.pagination.page > 1 ? encodeCatalogCursor(novels.pagination.page) : null,
-      hasPreviousPage: novels.pagination.page > 1,
-      hasNextPage:
-        novels.total > novels.pagination.page * novels.pagination.pageSize,
-    }
-  } else if (filterType === "author") {
-    items = authorResults
-    total = authors.total
-    responsePagination = {
-      page: authors.pagination.page,
-      pageSize: authors.pagination.pageSize,
-      totalItems: authors.total,
-      totalPages: authors.total > 0 ? Math.ceil(authors.total / authors.pagination.pageSize) : 0,
-      currentCursor: authors.total > 0 ? encodeCatalogCursor(authors.pagination.page) : null,
-      nextCursor:
-        authors.total > authors.pagination.page * authors.pagination.pageSize
-          ? encodeCatalogCursor(authors.pagination.page)
-          : null,
-      previousCursor:
-        authors.pagination.page > 1 ? encodeCatalogCursor(authors.pagination.page) : null,
-      hasPreviousPage: authors.pagination.page > 1,
-      hasNextPage:
-        authors.total > authors.pagination.page * authors.pagination.pageSize,
-    }
-  } else {
-    items = [...novelResults, ...authorResults].sort((a, b) => {
+  const [novels, authors, facetCounts] = await Promise.all([
+    searchPublishedNovelsWithPagination(filters, query, sortBy, mixedPagination),
+    searchAuthorsWithPagination(query, sortBy, mixedPagination),
+    listLibraryCatalogFacetCounts(filters),
+  ])
+
+  const novelResults: SearchNovelResultDto[] = novels.items.map((novel) => ({
+    id: novel.id,
+    type: "novel",
+    slug: novel.slug,
+    title: novel.title,
+    authorName: novel.authorName,
+    authorNpub: hexToNpub(novel.authorPubkey),
+    genre: novel.genre,
+    summary: novel.summary,
+    readsCount: novel.readsCount,
+    chaptersCount: novel.chaptersCount,
+    coverUrl: novel.coverUrl,
+    coverStorageKey: novel.coverStorageKey,
+  }))
+
+  const authorResults: SearchAuthorResultDto[] = authors.items.map((author) => ({
+    id: author.id,
+    type: "author",
+    npub: hexToNpub(author.pubkey),
+    name: author.name,
+    bio: author.bio ?? "",
+    followersCount: author.followersCount,
+    novelsCount: author.novelsCount,
+    avatarUrl: author.avatarUrl ?? null,
+  }))
+
+  const items = [...novelResults, ...authorResults].sort((a, b) => {
       if (sortBy === "popular") {
         const aScore = a.type === "novel" ? a.readsCount : a.followersCount
         const bScore = b.type === "novel" ? b.readsCount : b.followersCount
@@ -431,38 +519,36 @@ export async function searchCatalog(input: {
 
       return 0
     })
-    total = novels.total + authors.total
-    responsePagination = {
-      page: pagination.page,
-      pageSize: pagination.pageSize,
-      totalItems: total,
-      totalPages: Math.max(
-        novels.total > 0 ? Math.ceil(novels.total / pagination.pageSize) : 0,
-        authors.total > 0 ? Math.ceil(authors.total / pagination.pageSize) : 0
-      ),
-      currentCursor: total > 0 ? encodeCatalogCursor(pagination.page) : null,
-      nextCursor:
-        novels.total > pagination.page * pagination.pageSize ||
-        authors.total > pagination.page * pagination.pageSize
-          ? encodeCatalogCursor(pagination.page)
-          : null,
-      previousCursor:
-        pagination.page > 1 ? encodeCatalogCursor(pagination.page) : null,
-      hasPreviousPage: pagination.page > 1,
-      hasNextPage:
-        novels.total > pagination.page * pagination.pageSize ||
-        authors.total > pagination.page * pagination.pageSize,
-    }
-  }
+  const total = novels.total + authors.total
 
   return {
     query,
     filterType,
     sortBy,
     total,
-    pagination: responsePagination,
+    pagination: {
+      page: mixedPagination.page,
+      pageSize: mixedPagination.pageSize,
+      totalItems: total,
+      totalPages: Math.max(
+        novels.total > 0 ? Math.ceil(novels.total / mixedPagination.pageSize) : 0,
+        authors.total > 0 ? Math.ceil(authors.total / mixedPagination.pageSize) : 0
+      ),
+      currentCursor: total > 0 ? input.cursor ?? encodeCatalogCursor(mixedPagination.page) : null,
+      nextCursor:
+        novels.total > mixedPagination.page * mixedPagination.pageSize ||
+        authors.total > mixedPagination.page * mixedPagination.pageSize
+          ? encodeCatalogCursor(mixedPagination.page)
+          : null,
+      previousCursor:
+        mixedPagination.page > 1 ? encodeCatalogCursor(mixedPagination.page) : null,
+      hasPreviousPage: mixedPagination.page > 1,
+      hasNextPage:
+        novels.total > mixedPagination.page * mixedPagination.pageSize ||
+        authors.total > mixedPagination.page * mixedPagination.pageSize,
+    },
     items,
     activeFilters: filters,
-    facets: facetCounts ? mapFacetCounts(facetCounts) : undefined,
+    facets: mapFacetCounts(facetCounts),
   }
 }

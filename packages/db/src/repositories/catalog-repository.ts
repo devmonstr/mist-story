@@ -15,6 +15,17 @@ export type CatalogCollection =
   | "editors-picks"
   | "new-voices"
 
+export type LibraryCatalogKeysetCursor = {
+  sortBy: CatalogSortBy
+  id: string
+  orderDate: string
+  readsCount?: number
+  bookmarksCount?: number
+  ratingsCount?: number
+  rating?: number
+  title?: string
+}
+
 export type CatalogPaginationInput = {
   page?: number
   pageSize?: number
@@ -581,6 +592,348 @@ export async function listLibraryCollectionFacetCounts(
       label: item.value,
       count: item.count,
     })),
+  }
+}
+
+type LibraryCatalogCursorQueryInput = {
+  sortBy?: CatalogSortBy
+  pageSize?: number
+  cursor?: LibraryCatalogKeysetCursor | null
+  direction?: "next" | "prev" | null
+  collection?: CatalogCollection | null
+}
+
+type LibraryCatalogCursorRow = LibraryCollectionNovelRow
+
+function buildLibraryCatalogCursorWhereSql(
+  sortBy: CatalogSortBy,
+  cursor: LibraryCatalogKeysetCursor | null | undefined,
+  direction: "next" | "prev" | null | undefined
+) {
+  if (!cursor) {
+    return Prisma.empty
+  }
+
+  const orderDate = new Date(cursor.orderDate)
+  if (Number.isNaN(orderDate.getTime())) {
+    return Prisma.empty
+  }
+
+  const isBackward = direction === "prev"
+
+  if (sortBy === "popular") {
+    if (isBackward) {
+      return Prisma.sql`
+        AND (
+          base."readsCount" > ${cursor.readsCount ?? 0}
+          OR (
+            base."readsCount" = ${cursor.readsCount ?? 0}
+            AND base."bookmarksCount" > ${cursor.bookmarksCount ?? 0}
+          )
+          OR (
+            base."readsCount" = ${cursor.readsCount ?? 0}
+            AND base."bookmarksCount" = ${cursor.bookmarksCount ?? 0}
+            AND base."ratingsCount" > ${cursor.ratingsCount ?? 0}
+          )
+          OR (
+            base."readsCount" = ${cursor.readsCount ?? 0}
+            AND base."bookmarksCount" = ${cursor.bookmarksCount ?? 0}
+            AND base."ratingsCount" = ${cursor.ratingsCount ?? 0}
+            AND coalesce(base."publishedAt", base."updatedAt") > ${orderDate}
+          )
+          OR (
+            base."readsCount" = ${cursor.readsCount ?? 0}
+            AND base."bookmarksCount" = ${cursor.bookmarksCount ?? 0}
+            AND base."ratingsCount" = ${cursor.ratingsCount ?? 0}
+            AND coalesce(base."publishedAt", base."updatedAt") = ${orderDate}
+            AND base.id > ${cursor.id}
+          )
+        )
+      `
+    }
+
+    return Prisma.sql`
+      AND (
+        base."readsCount" < ${cursor.readsCount ?? 0}
+        OR (
+          base."readsCount" = ${cursor.readsCount ?? 0}
+          AND base."bookmarksCount" < ${cursor.bookmarksCount ?? 0}
+        )
+        OR (
+          base."readsCount" = ${cursor.readsCount ?? 0}
+          AND base."bookmarksCount" = ${cursor.bookmarksCount ?? 0}
+          AND base."ratingsCount" < ${cursor.ratingsCount ?? 0}
+        )
+        OR (
+          base."readsCount" = ${cursor.readsCount ?? 0}
+          AND base."bookmarksCount" = ${cursor.bookmarksCount ?? 0}
+          AND base."ratingsCount" = ${cursor.ratingsCount ?? 0}
+          AND coalesce(base."publishedAt", base."updatedAt") < ${orderDate}
+        )
+        OR (
+          base."readsCount" = ${cursor.readsCount ?? 0}
+          AND base."bookmarksCount" = ${cursor.bookmarksCount ?? 0}
+          AND base."ratingsCount" = ${cursor.ratingsCount ?? 0}
+          AND coalesce(base."publishedAt", base."updatedAt") = ${orderDate}
+          AND base.id < ${cursor.id}
+        )
+      )
+    `
+  }
+
+  if (sortBy === "rating") {
+    if (isBackward) {
+      return Prisma.sql`
+        AND (
+          base.rating > ${cursor.rating ?? 0}
+          OR (
+            base.rating = ${cursor.rating ?? 0}
+            AND base."ratingsCount" > ${cursor.ratingsCount ?? 0}
+          )
+          OR (
+            base.rating = ${cursor.rating ?? 0}
+            AND base."ratingsCount" = ${cursor.ratingsCount ?? 0}
+            AND coalesce(base."publishedAt", base."updatedAt") > ${orderDate}
+          )
+          OR (
+            base.rating = ${cursor.rating ?? 0}
+            AND base."ratingsCount" = ${cursor.ratingsCount ?? 0}
+            AND coalesce(base."publishedAt", base."updatedAt") = ${orderDate}
+            AND base.id > ${cursor.id}
+          )
+        )
+      `
+    }
+
+    return Prisma.sql`
+      AND (
+        base.rating < ${cursor.rating ?? 0}
+        OR (
+          base.rating = ${cursor.rating ?? 0}
+          AND base."ratingsCount" < ${cursor.ratingsCount ?? 0}
+        )
+        OR (
+          base.rating = ${cursor.rating ?? 0}
+          AND base."ratingsCount" = ${cursor.ratingsCount ?? 0}
+          AND coalesce(base."publishedAt", base."updatedAt") < ${orderDate}
+        )
+        OR (
+          base.rating = ${cursor.rating ?? 0}
+          AND base."ratingsCount" = ${cursor.ratingsCount ?? 0}
+          AND coalesce(base."publishedAt", base."updatedAt") = ${orderDate}
+          AND base.id < ${cursor.id}
+        )
+      )
+    `
+  }
+
+  if (sortBy === "title") {
+    const normalizedTitle = cursor.title?.trim().toLocaleLowerCase() ?? ""
+
+    if (isBackward) {
+      return Prisma.sql`
+        AND (
+          lower(base."title") < ${normalizedTitle}
+          OR (
+            lower(base."title") = ${normalizedTitle}
+            AND base.id < ${cursor.id}
+          )
+        )
+      `
+    }
+
+    return Prisma.sql`
+      AND (
+        lower(base."title") > ${normalizedTitle}
+        OR (
+          lower(base."title") = ${normalizedTitle}
+          AND base.id > ${cursor.id}
+        )
+      )
+    `
+  }
+
+  if (isBackward) {
+    return Prisma.sql`
+      AND (
+        coalesce(base."publishedAt", base."updatedAt") > ${orderDate}
+        OR (
+          coalesce(base."publishedAt", base."updatedAt") = ${orderDate}
+          AND base.id > ${cursor.id}
+        )
+      )
+    `
+  }
+
+  return Prisma.sql`
+    AND (
+      coalesce(base."publishedAt", base."updatedAt") < ${orderDate}
+      OR (
+        coalesce(base."publishedAt", base."updatedAt") = ${orderDate}
+        AND base.id < ${cursor.id}
+      )
+    )
+  `
+}
+
+function buildLibraryCatalogCursorOrderBySql(
+  sortBy: CatalogSortBy,
+  direction: "next" | "prev" | null | undefined
+) {
+  const isBackward = direction === "prev"
+
+  if (sortBy === "popular") {
+    return isBackward
+      ? Prisma.sql`
+          ORDER BY
+            base."readsCount" ASC,
+            base."bookmarksCount" ASC,
+            base."ratingsCount" ASC,
+            coalesce(base."publishedAt", base."updatedAt") ASC,
+            base.id ASC
+        `
+      : Prisma.sql`
+          ORDER BY
+            base."readsCount" DESC,
+            base."bookmarksCount" DESC,
+            base."ratingsCount" DESC,
+            coalesce(base."publishedAt", base."updatedAt") DESC,
+            base.id DESC
+        `
+  }
+
+  if (sortBy === "rating") {
+    return isBackward
+      ? Prisma.sql`
+          ORDER BY
+            base.rating ASC,
+            base."ratingsCount" ASC,
+            coalesce(base."publishedAt", base."updatedAt") ASC,
+            base.id ASC
+        `
+      : Prisma.sql`
+          ORDER BY
+            base.rating DESC,
+            base."ratingsCount" DESC,
+            coalesce(base."publishedAt", base."updatedAt") DESC,
+            base.id DESC
+        `
+  }
+
+  if (sortBy === "title") {
+    return isBackward
+      ? Prisma.sql`
+          ORDER BY
+            lower(base."title") DESC,
+            base.id DESC
+        `
+      : Prisma.sql`
+          ORDER BY
+            lower(base."title") ASC,
+            base.id ASC
+        `
+  }
+
+  return isBackward
+    ? Prisma.sql`
+        ORDER BY
+          coalesce(base."publishedAt", base."updatedAt") ASC,
+          base.id ASC
+      `
+    : Prisma.sql`
+        ORDER BY
+          coalesce(base."publishedAt", base."updatedAt") DESC,
+          base.id DESC
+      `
+}
+
+export async function listLibraryCatalogNovelsByCursor(
+  filters: PublicCatalogNovelFilters = {},
+  input: LibraryCatalogCursorQueryInput = {}
+) {
+  const sortBy = input.sortBy ?? "recent"
+  const pageSize =
+    Number.isFinite(input.pageSize) && (input.pageSize ?? 0) > 0
+      ? Math.min(MAX_CATALOG_PAGE_SIZE, Math.floor(input.pageSize!))
+      : DEFAULT_LIBRARY_PAGE_SIZE
+  const cursorWhereSql = buildLibraryCatalogCursorWhereSql(
+    sortBy,
+    input.cursor,
+    input.direction
+  )
+  const orderBySql = buildLibraryCatalogCursorOrderBySql(sortBy, input.direction)
+  const baseSql = buildLibraryCollectionBaseCte(filters)
+  const collectionWhereSql = input.collection
+    ? buildLibraryCollectionWhereSql(input.collection)
+    : Prisma.empty
+
+  const rows = await prisma.$queryRaw<
+    Array<{
+      id: string
+      slug: string
+      title: string
+      summary: string
+      genre: string
+      workType: "ORIGINAL" | "TRANSLATION"
+      status: "Ongoing" | "Completed" | "Hiatus"
+      visibility: "PUBLISHED" | "HIDDEN"
+      coverUrl: string
+      coverStorageKey: string | null
+      chaptersCount: number
+      rating: number
+      ratingsCount: number
+      publishedAt: Date | null
+      updatedAt: Date
+      authorDisplayName: string | null
+      authorId: string
+      authorPubkey: string
+      authorName: string | null
+      authorHandle: string | null
+      authorAvatarUrl: string | null
+      readsCount: number
+      bookmarksCount: number
+    }>
+  >(Prisma.sql`
+    ${baseSql}
+    SELECT
+      base.id,
+      base.slug,
+      base."title",
+      base."summary",
+      base."genre",
+      base."workType",
+      base."status",
+      base."visibility",
+      base."coverUrl",
+      base."coverStorageKey",
+      base."chaptersCount",
+      base.rating,
+      base."ratingsCount",
+      base."publishedAt",
+      base."updatedAt",
+      base."authorDisplayName",
+      base."authorId" AS "authorId",
+      base."authorPubkey" AS "authorPubkey",
+      base."authorName" AS "authorName",
+      base."authorHandle" AS "authorHandle",
+      base."authorAvatarUrl" AS "authorAvatarUrl",
+      base."readsCount" AS "readsCount",
+      base."bookmarksCount" AS "bookmarksCount"
+    FROM catalog_base base
+    WHERE 1 = 1
+    ${collectionWhereSql}
+    ${cursorWhereSql}
+    ${orderBySql}
+    LIMIT ${pageSize + 1}
+  `)
+
+  const hasMore = rows.length > pageSize
+  const slicedRows = hasMore ? rows.slice(0, pageSize) : rows
+  const orderedRows = input.direction === "prev" ? [...slicedRows].reverse() : slicedRows
+
+  return {
+    items: orderedRows.map(mapLibraryCollectionNovelRow),
+    hasMore,
   }
 }
 

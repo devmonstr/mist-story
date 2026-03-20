@@ -9,6 +9,7 @@ import {
   findPublicChapterForNovelByNumber,
   findPublicNovelByIdOrSlug,
   hexToNpub,
+  listLibraryCatalogNovelsByCursor,
   listLibraryCollectionFacetCounts,
   listLibraryCollectionNovels,
   listLibraryCatalogFacetCounts,
@@ -30,7 +31,10 @@ import type {
   PublicNovelReaderResponse,
   PublicNovelViewerStateDto,
 } from "@mist/shared"
-import { encodeCatalogCursor } from "./catalog-cursor"
+import {
+  decodeLibraryCatalogCursor,
+  encodeLibraryCatalogCursor,
+} from "./catalog-cursor"
 import { HttpError } from "../utils/http-error"
 
 function stripHtml(html: string) {
@@ -403,6 +407,12 @@ export async function listLibraryCatalog(input: {
   const workType = input.workType ?? null
   const status = input.status ?? null
   const collection = input.collection ?? null
+  const supportsKeysetSort =
+    sortBy === "recent" || sortBy === "popular" || sortBy === "rating" || sortBy === "title"
+  const direction = input.direction ?? null
+  const decodedCursor = supportsKeysetSort
+    ? decodeLibraryCatalogCursor(input.cursor ?? undefined)
+    : null
   const pagination = normalizeCatalogPagination({
     page: input.page,
     pageSize: input.pageSize,
@@ -423,29 +433,41 @@ export async function listLibraryCatalog(input: {
   }
   let catalogNovels: LibraryCatalogNovelSource[]
   let totalItems: number
+  let hasPreviousPage = false
+  let hasNextPage = false
 
   if (collection) {
-    const [collectionFacets, collectionNovels, collectionTotal] = await Promise.all([
+    const [collectionFacets, collectionTotal, collectionPage] = await Promise.all([
       listLibraryCollectionFacetCounts(collection, filters),
-      listLibraryCollectionNovels(collection, filters, {
-        page: pagination.page,
-        pageSize: pagination.pageSize,
-      }),
       countLibraryCollectionNovels(collection, filters),
+      listLibraryCatalogNovelsByCursor(filters, {
+        sortBy,
+        pageSize: pagination.pageSize,
+        cursor: decodedCursor,
+        direction,
+        collection,
+      }),
     ])
 
     facetCounts = collectionFacets
-    catalogNovels = collectionNovels
+    catalogNovels = collectionPage.items
     totalItems = collectionTotal
+    hasNextPage =
+      direction === "prev" ? Boolean(decodedCursor) : collectionPage.hasMore
+    hasPreviousPage =
+      direction === "prev" ? collectionPage.hasMore : Boolean(decodedCursor)
   } else {
-    const [novels, aggregateFacetCounts, totalSource] = await Promise.all([
-      listLibraryCatalogNovels(filters, {
-        sortBy,
-        page: pagination.page,
-        pageSize: pagination.pageSize,
-      }),
+    const [aggregateFacetCounts, totalSource, novelsPage] = await Promise.all([
       listLibraryCatalogFacetCounts(filters),
       countLibraryCatalogNovels(filters),
+      supportsKeysetSort
+        ? listLibraryCatalogNovelsByCursor(filters, {
+            sortBy,
+            pageSize: pagination.pageSize,
+            cursor: decodedCursor,
+            direction,
+          })
+        : Promise.resolve(null),
     ])
 
     facetCounts = {
@@ -466,7 +488,24 @@ export async function listLibraryCatalog(input: {
         count: item._count._all,
       })),
     }
-    catalogNovels = sortCatalogNovels(novels, sortBy, normalizedQuery)
+    if (novelsPage) {
+      catalogNovels = novelsPage.items
+      hasNextPage =
+        direction === "prev" ? Boolean(decodedCursor) : novelsPage.hasMore
+      hasPreviousPage =
+        direction === "prev" ? novelsPage.hasMore : Boolean(decodedCursor)
+    } else {
+      const novels = await listLibraryCatalogNovels(filters, {
+        sortBy,
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+      })
+      catalogNovels = sortCatalogNovels(novels, sortBy, normalizedQuery)
+      const totalPagesForFallback =
+        totalSource > 0 ? Math.ceil(totalSource / pagination.pageSize) : 0
+      hasPreviousPage = pagination.page > 1
+      hasNextPage = totalPagesForFallback > pagination.page
+    }
     totalItems = totalSource
   }
 
@@ -481,9 +520,35 @@ export async function listLibraryCatalog(input: {
     page: pagination.page,
     pageSize: pagination.pageSize,
   })
-  const currentCursor = totalItems > 0 ? encodeCatalogCursor(pagination.page) : null
-  const nextCursor = totalPages > pagination.page ? currentCursor : null
-  const previousCursor = pagination.page > 1 ? currentCursor : null
+  const firstNovel = catalogNovels[0]
+  const lastNovel = catalogNovels[catalogNovels.length - 1]
+  const currentCursor = input.cursor ?? null
+  const nextCursor =
+    hasNextPage && lastNovel
+      ? encodeLibraryCatalogCursor({
+          sortBy,
+          id: lastNovel.id,
+          orderDate: (lastNovel.publishedAt ?? lastNovel.updatedAt).toISOString(),
+          readsCount: lastNovel._count.readingProgress,
+          bookmarksCount: lastNovel._count.bookmarks,
+          ratingsCount: lastNovel.ratingsCount,
+          rating: decimalToNumber(lastNovel.rating),
+          title: lastNovel.title,
+        })
+      : null
+  const previousCursor =
+    hasPreviousPage && firstNovel
+      ? encodeLibraryCatalogCursor({
+          sortBy,
+          id: firstNovel.id,
+          orderDate: (firstNovel.publishedAt ?? firstNovel.updatedAt).toISOString(),
+          readsCount: firstNovel._count.readingProgress,
+          bookmarksCount: firstNovel._count.bookmarks,
+          ratingsCount: firstNovel.ratingsCount,
+          rating: decimalToNumber(firstNovel.rating),
+          title: firstNovel.title,
+        })
+      : null
 
   return {
     query: normalizedQuery,
@@ -498,7 +563,7 @@ export async function listLibraryCatalog(input: {
       page: pagination.page,
       pageSize: pagination.pageSize,
       cursor: currentCursor,
-      direction: null,
+      direction,
     },
     pagination: {
       page: pagination.page,
@@ -508,8 +573,8 @@ export async function listLibraryCatalog(input: {
       currentCursor,
       nextCursor,
       previousCursor,
-      hasPreviousPage: pagination.page > 1,
-      hasNextPage: totalPages > pagination.page,
+      hasPreviousPage,
+      hasNextPage,
     },
     facets: {
       genres: facetCounts.genres,
