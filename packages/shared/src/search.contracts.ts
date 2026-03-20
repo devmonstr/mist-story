@@ -1,4 +1,9 @@
 import { z } from "zod"
+import {
+  catalogPaginationSchema,
+  publicCatalogFacetCountsSchema,
+  publicCatalogQuerySchema,
+} from "./catalog.contracts"
 
 export const searchFilterTypeSchema = z.enum(["all", "novel", "author"])
 export const searchSortBySchema = z.enum(["relevance", "popular", "recent"])
@@ -39,7 +44,10 @@ export const searchResponseSchema = z.object({
   filterType: searchFilterTypeSchema,
   sortBy: searchSortBySchema,
   total: z.number().int().nonnegative(),
+  pagination: catalogPaginationSchema,
   items: z.array(searchResultItemSchema),
+  activeFilters: publicCatalogQuerySchema.optional(),
+  facets: publicCatalogFacetCountsSchema.optional(),
 })
 
 export type SearchFilterType = z.infer<typeof searchFilterTypeSchema>

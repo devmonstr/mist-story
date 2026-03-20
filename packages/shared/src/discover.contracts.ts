@@ -1,4 +1,8 @@
 import { z } from "zod"
+import {
+  publicCatalogFacetCountsSchema,
+  publicCatalogQuerySchema,
+} from "./catalog.contracts"
 
 export const discoverGenreSchema = z.object({
   id: z.string(),
@@ -20,6 +24,8 @@ export const discoverCollectionSchema = z.object({
 export const discoverResponseSchema = z.object({
   genres: z.array(discoverGenreSchema),
   collections: z.array(discoverCollectionSchema),
+  activeFilters: publicCatalogQuerySchema.optional(),
+  facets: publicCatalogFacetCountsSchema.optional(),
 })
 
 export type DiscoverGenreDto = z.infer<typeof discoverGenreSchema>

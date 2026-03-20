@@ -1,12 +1,16 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, BookOpen, RefreshCcw } from "lucide-react"
 import { resolveNovelCoverSrc } from "@/lib/novel-cover"
 import { useLibraryCatalogContext } from "./library-catalog-context"
-import { loadLibraryCatalog, type LibraryCatalogNovel } from "./library-catalog"
+import {
+  loadLibraryCatalog,
+  type LibraryCatalogNovel,
+  type LibraryCatalogResponse,
+} from "./library-catalog"
 import { StoriesGridSkeleton } from "./stories-grid-skeleton"
 
 function formatWorkType(value: LibraryCatalogNovel["workType"]) {
@@ -26,11 +30,28 @@ function formatStoryDate(value: string | null | undefined) {
 }
 
 export function StoriesGrid() {
-  const { deferredQuery, query, clearQuery } = useLibraryCatalogContext()
+  const {
+    query,
+    deferredQuery,
+    sortBy,
+    page,
+    genre,
+    workType,
+    status,
+    collection,
+    setPage,
+    setGenre,
+    setWorkType,
+    setStatus,
+    setCollection,
+    clearQuery,
+    clearFilters,
+  } = useLibraryCatalogContext()
   const [stories, setStories] = useState<LibraryCatalogNovel[]>([])
+  const [catalog, setCatalog] = useState<LibraryCatalogResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [sortMode, setSortMode] = useState<"popular" | "recent">("popular")
+  const [refreshToken, setRefreshToken] = useState(0)
 
   useEffect(() => {
     let isActive = true
@@ -39,12 +60,22 @@ export function StoriesGrid() {
       setIsLoading(true)
       setError(null)
 
-      void loadLibraryCatalog(deferredQuery)
+      void loadLibraryCatalog({
+        query: deferredQuery,
+        sortBy,
+        page,
+        pageSize: 18,
+        genre,
+        workType,
+        status,
+        collection,
+      })
         .then((payload) => {
           if (!isActive) {
             return
           }
 
+          setCatalog(payload)
           setStories(payload.novels)
         })
         .catch((loadError) => {
@@ -52,6 +83,7 @@ export function StoriesGrid() {
             return
           }
 
+          setCatalog(null)
           setStories([])
           setError(
             loadError instanceof Error
@@ -70,31 +102,7 @@ export function StoriesGrid() {
       isActive = false
       window.clearTimeout(timer)
     }
-  }, [deferredQuery])
-
-  const sortedStories = useMemo(() => {
-    const copy = [...stories]
-
-    if (sortMode === "recent") {
-      return copy.sort((a, b) => {
-        const left = new Date(a.publishedAt ?? a.updatedAt).getTime()
-        const right = new Date(b.publishedAt ?? b.updatedAt).getTime()
-        return right - left
-      })
-    }
-
-    return copy.sort((a, b) => {
-      if (b.readsCount !== a.readsCount) {
-        return b.readsCount - a.readsCount
-      }
-
-      if (b.bookmarksCount !== a.bookmarksCount) {
-        return b.bookmarksCount - a.bookmarksCount
-      }
-
-      return b.ratingsCount - a.ratingsCount
-    })
-  }, [sortMode, stories])
+  }, [collection, deferredQuery, genre, page, refreshToken, sortBy, status, workType])
 
   if (isLoading) {
     return <StoriesGridSkeleton />
@@ -111,13 +119,18 @@ export function StoriesGrid() {
         </h2>
         <p className="mt-3 text-sm text-muted-foreground">{error}</p>
         <div className="mt-6 flex items-center justify-center gap-3">
-          <Button onClick={() => window.location.reload()}>
+          <Button onClick={() => setRefreshToken((value) => value + 1)}>
             <RefreshCcw className="mr-2 h-4 w-4" />
             Try again
           </Button>
           {query ? (
             <Button variant="outline" onClick={clearQuery}>
               Clear search
+            </Button>
+          ) : null}
+          {genre || workType || status || collection ? (
+            <Button variant="outline" onClick={clearFilters}>
+              Reset filters
             </Button>
           ) : null}
         </div>
@@ -132,17 +145,24 @@ export function StoriesGrid() {
           <BookOpen className="h-5 w-5" />
         </div>
         <h2 className="mt-4 font-serif text-2xl text-foreground">
-          {query ? "No stories matched your search" : "No published stories yet"}
+          {query || genre || workType || status || collection
+            ? "No stories matched your filters"
+            : "No published stories yet"}
         </h2>
         <p className="mt-3 text-sm text-muted-foreground">
-          {query
-            ? "Try adjusting your search terms and browse the full library again."
+          {query || genre || workType || status || collection
+            ? "Try adjusting your search or filters and browse the full library again."
             : "Once authors publish novels, they will appear here automatically."}
         </p>
-        {query ? (
-          <div className="mt-6">
-            <Button variant="outline" onClick={clearQuery}>
-              Clear search
+        {query || genre || workType || status || collection ? (
+          <div className="mt-6 flex items-center justify-center gap-3">
+            {query ? (
+              <Button variant="outline" onClick={clearQuery}>
+                Clear search
+              </Button>
+            ) : null}
+            <Button variant="outline" onClick={clearFilters}>
+              Reset filters
             </Button>
           </div>
         ) : null}
@@ -154,40 +174,189 @@ export function StoriesGrid() {
     <>
       <div className="mb-8 flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {stories.length} {stories.length === 1 ? "Story" : "Stories"}
+          {(catalog?.pagination.totalItems ?? catalog?.total ?? stories.length).toLocaleString()}{" "}
+          {catalog?.pagination.totalItems === 1 || catalog?.total === 1 ? "Story" : "Stories"}
         </p>
-        <div className="flex gap-2">
+        {catalog?.filters.genre ? (
+          <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+            {catalog.filters.genre}
+          </span>
+        ) : catalog?.filters.collection ? (
+          <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+            {catalog.filters.collection.replace(/-/g, " ")}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mb-8 space-y-4">
+        <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => setSortMode("popular")}
+            onClick={() => setGenre(null)}
             className={
-              sortMode === "popular"
+              !genre
                 ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
                 : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
             }
           >
-            Most Popular
+            All Genres
+          </Button>
+          {(catalog?.facets.genres ?? []).slice(0, 6).map((facet) => (
+            <Button
+              key={facet.value}
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setGenre(facet.value)}
+              className={
+                genre === facet.value
+                  ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+                  : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+              }
+            >
+              {facet.label}
+            </Button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+          <span className="mr-1 self-center font-medium">Format</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setWorkType(null)}
+            className={
+              !workType
+                ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+                : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            }
+          >
+            All
           </Button>
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => setSortMode("recent")}
+            onClick={() => setWorkType("ORIGINAL")}
             className={
-              sortMode === "recent"
+              workType === "ORIGINAL"
                 ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
                 : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
             }
           >
-            Recent
+            Original
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setWorkType("TRANSLATION")}
+            className={
+              workType === "TRANSLATION"
+                ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+                : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            }
+          >
+            Translation
           </Button>
         </div>
+
+        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+          <span className="mr-1 self-center font-medium">Status</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setStatus(null)}
+            className={
+              !status
+                ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+                : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            }
+          >
+            All
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setStatus("Ongoing")}
+            className={
+              status === "Ongoing"
+                ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+                : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            }
+          >
+            Ongoing
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setStatus("Completed")}
+            className={
+              status === "Completed"
+                ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+                : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            }
+          >
+            Completed
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setStatus("Hiatus")}
+            className={
+              status === "Hiatus"
+                ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+                : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            }
+          >
+            Hiatus
+          </Button>
+          {genre || workType || status || collection ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            >
+              Clear filters
+            </Button>
+          ) : null}
+        </div>
+
+        {collection ? (
+          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+            <span className="mr-1 self-center font-medium">Collection</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+            >
+              {collection.replace(/-/g, " ")}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setCollection(null)}
+              className="rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            >
+              Clear collection
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {sortedStories.map((story) => {
+        {stories.map((story) => {
           const coverSrc = resolveNovelCoverSrc({
             novelId: story.id,
             coverUrl: story.coverUrl,
@@ -265,6 +434,34 @@ export function StoriesGrid() {
           )
         })}
       </div>
+
+      {catalog?.pagination.totalPages && catalog.pagination.totalPages > 1 ? (
+        <div className="mt-10 flex flex-col gap-3 border-t border-border/40 pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Page {catalog.pagination.page} of {catalog.pagination.totalPages}
+          </p>
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!catalog.pagination.hasPreviousPage}
+              onClick={() => setPage(Math.max(1, page - 1))}
+            >
+              Previous
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!catalog.pagination.hasNextPage}
+              onClick={() => setPage(page + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }

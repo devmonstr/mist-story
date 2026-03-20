@@ -1,66 +1,16 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ChevronRight } from "lucide-react"
-import { loadDiscoverData, type DiscoverCollection } from "./discover-data"
-import { CollectionsSkeleton } from "./collections-skeleton"
 
-export function CollectionsGrid() {
-  const [collections, setCollections] = useState<DiscoverCollection[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+import type { DiscoverCollection } from "./discover-data"
 
-  useEffect(() => {
-    let active = true
+interface CollectionsGridProps {
+  collections: DiscoverCollection[]
+}
 
-    void loadDiscoverData()
-      .then((payload) => {
-        if (!active) {
-          return
-        }
-
-        setCollections(payload.collections)
-      })
-      .catch((loadError) => {
-        if (!active) {
-          return
-        }
-
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : "Failed to load collections."
-        )
-      })
-      .finally(() => {
-        if (active) {
-          setIsLoading(false)
-        }
-      })
-
-    return () => {
-      active = false
-    }
-  }, [])
-
-  if (isLoading) {
-    return <CollectionsSkeleton />
-  }
-
-  if (error) {
-    return (
-      <section className="px-4 py-10 sm:px-6 sm:py-16 lg:px-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="rounded-lg border border-border/40 bg-card p-6 text-sm text-muted-foreground sm:p-8">
-            {error}
-          </div>
-        </div>
-      </section>
-    )
-  }
-
+export function CollectionsGrid({ collections }: CollectionsGridProps) {
   return (
     <section className="px-4 py-10 sm:px-6 sm:py-16 lg:px-8">
       <div className="mx-auto max-w-7xl">

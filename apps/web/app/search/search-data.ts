@@ -7,6 +7,11 @@ export async function loadSearchResults(input: {
   query: string
   filterType: SearchFilterType
   sortBy: SearchSortBy
+  page?: number
+  pageSize?: number
+  genre?: string | null
+  workType?: "ORIGINAL" | "TRANSLATION" | null
+  status?: "Ongoing" | "Completed" | "Hiatus" | null
 }): Promise<SearchResponse> {
   const normalizedQuery = input.query.trim()
 
@@ -16,7 +21,17 @@ export async function loadSearchResults(input: {
       filterType: input.filterType,
       sortBy: input.sortBy,
       total: 0,
+      pagination: {
+        page: input.page ?? 1,
+        pageSize: input.pageSize ?? 20,
+        totalItems: 0,
+        totalPages: 0,
+        hasPreviousPage: false,
+        hasNextPage: false,
+      },
       items: [],
+      activeFilters: undefined,
+      facets: undefined,
     }
   }
 
@@ -24,5 +39,10 @@ export async function loadSearchResults(input: {
     query: normalizedQuery,
     filterType: input.filterType,
     sortBy: input.sortBy,
+    page: input.page ?? 1,
+    pageSize: input.pageSize ?? 20,
+    genre: input.genre ?? null,
+    workType: input.workType ?? null,
+    status: input.status ?? null,
   })
 }

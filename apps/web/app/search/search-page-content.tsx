@@ -1,15 +1,33 @@
 "use client"
 
 import Link from "next/link"
-import { useDeferredValue, useEffect, useState, type FormEvent } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Button } from "@/components/ui/button"
+import type {
+  PublicCatalogFacetCounts,
+  SearchFilterType,
+  SearchSortBy,
+} from "@mist/shared"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { resolveNovelCoverSrc } from "@/lib/novel-cover"
 import { BookOpen, Filter, Loader2, Search, UserRound } from "lucide-react"
-import type { SearchFilterType, SearchSortBy } from "@mist/shared"
 import { loadSearchResults, type SearchResult } from "./search-data"
+
+type WorkTypeFilter = "ORIGINAL" | "TRANSLATION" | null
+type StatusFilter = "Ongoing" | "Completed" | "Hiatus" | null
+const SEARCH_PAGE_SIZE = 20
+
+function normalizeWorkType(value: string | null): WorkTypeFilter {
+  return value === "ORIGINAL" || value === "TRANSLATION" ? value : null
+}
+
+function normalizeStatus(value: string | null): StatusFilter {
+  return value === "Ongoing" || value === "Completed" || value === "Hiatus"
+    ? value
+    : null
+}
 
 function isNovelResult(result: SearchResult) {
   return result.type === "novel"
@@ -22,6 +40,72 @@ function getAuthorInitials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("")
+}
+
+function buildSearchUrl(input: {
+  query: string
+  filterType: SearchFilterType
+  sortBy: SearchSortBy
+  page?: number
+  pageSize?: number
+  genre?: string | null
+  workType?: WorkTypeFilter
+  status?: StatusFilter
+}) {
+  const params = new URLSearchParams()
+
+  if (input.query.trim()) {
+    params.set("q", input.query.trim())
+  }
+  if (input.filterType !== "all") {
+    params.set("type", input.filterType)
+  }
+  if (input.sortBy !== "relevance") {
+    params.set("sort", input.sortBy)
+  }
+  if (input.page && input.page > 1) {
+    params.set("page", String(input.page))
+  }
+  if (input.pageSize && input.pageSize !== SEARCH_PAGE_SIZE) {
+    params.set("pageSize", String(input.pageSize))
+  }
+  if (input.genre?.trim()) {
+    params.set("genre", input.genre.trim())
+  }
+  if (input.workType) {
+    params.set("workType", input.workType)
+  }
+  if (input.status) {
+    params.set("status", input.status)
+  }
+
+  const queryString = params.toString()
+  return queryString ? `/search?${queryString}` : "/search"
+}
+
+function buildLibraryHref(input: {
+  query: string
+  genre?: string | null
+  workType?: WorkTypeFilter
+  status?: StatusFilter
+}) {
+  const params = new URLSearchParams()
+
+  if (input.query.trim()) {
+    params.set("q", input.query.trim())
+  }
+  if (input.genre?.trim()) {
+    params.set("genre", input.genre.trim())
+  }
+  if (input.workType) {
+    params.set("workType", input.workType)
+  }
+  if (input.status) {
+    params.set("status", input.status)
+  }
+
+  const queryString = params.toString()
+  return queryString ? `/library?${queryString}` : "/library"
 }
 
 function SearchResultCard({ result }: { result: SearchResult }) {
@@ -87,11 +171,11 @@ function SearchResultCard({ result }: { result: SearchResult }) {
   return (
     <article className="relative flex h-full flex-col overflow-hidden border border-border/40 bg-card p-4 transition-all hover:border-border/80 hover:shadow-sm">
       {result.avatarUrl ? (
-        <div className="pointer-events-none absolute inset-0 opacity-[0.6]">
+        <div className="pointer-events-none absolute inset-0 opacity-[0.60]">
           <img
             src={result.avatarUrl}
             alt=""
-            className="h-full w-full object-cover blur-sm scale-110"
+            className="h-full w-full scale-110 object-cover blur-sm"
             aria-hidden="true"
           />
         </div>
@@ -100,7 +184,7 @@ function SearchResultCard({ result }: { result: SearchResult }) {
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/40 via-background/75 to-background" />
 
       <div className="relative z-10 flex flex-1 flex-col">
-        <div className="relative mb-4 flex items-start gap-3">
+        <div className="mb-4 flex items-start gap-3">
           <Avatar className="h-12 w-12 border border-border/40 sm:h-14 sm:w-14">
             {result.avatarUrl ? <AvatarImage src={result.avatarUrl} alt={result.name} /> : null}
             <AvatarFallback className="bg-muted text-muted-foreground">
@@ -120,7 +204,7 @@ function SearchResultCard({ result }: { result: SearchResult }) {
           </div>
         </div>
 
-        <div className="relative mt-auto space-y-3 border-t border-border/40 pt-3">
+        <div className="mt-auto space-y-3 border-t border-border/40 pt-3">
           <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
             <span>{result.followersCount.toLocaleString()} followers</span>
             <span>{result.novelsCount} novels</span>
@@ -144,6 +228,32 @@ function ResultsGrid({ results }: { results: SearchResult[] }) {
   )
 }
 
+function ResultsSection({
+  title,
+  count,
+  results,
+}: {
+  title: string
+  count: number
+  results: SearchResult[]
+}) {
+  if (count === 0) {
+    return null
+  }
+
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-serif text-lg font-semibold text-foreground sm:text-xl">
+          {title}
+        </h2>
+        <span className="text-xs text-muted-foreground">{count}</span>
+      </div>
+      <ResultsGrid results={results} />
+    </section>
+  )
+}
+
 function ResultsCount({
   count,
   query,
@@ -158,50 +268,84 @@ function ResultsCount({
   )
 }
 
-function buildSearchUrl(query: string, filterType: SearchFilterType, sortBy: SearchSortBy) {
-  const params = new URLSearchParams()
-
-  if (query.trim()) {
-    params.set("q", query.trim())
-  }
-
-  if (filterType !== "all") {
-    params.set("type", filterType)
-  }
-
-  if (sortBy !== "relevance") {
-    params.set("sort", sortBy)
-  }
-
-  const queryString = params.toString()
-  return queryString ? `/search?${queryString}` : "/search"
-}
-
 export function SearchPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const initialQuery = searchParams.get("q") || ""
-  const initialFilterType = (searchParams.get("type") as SearchFilterType) || "all"
-  const initialSortBy = (searchParams.get("sort") as SearchSortBy) || "relevance"
-  const [query, setQuery] = useState(initialQuery)
-  const deferredQuery = useDeferredValue(query)
-  const [filterType, setFilterType] = useState<SearchFilterType>(initialFilterType)
-  const [sortBy, setSortBy] = useState<SearchSortBy>(initialSortBy)
+  const [isPending, startTransition] = useTransition()
+  const currentSearch = searchParams.toString()
+  const urlQuery = searchParams.get("q") || ""
+  const filterType = (searchParams.get("type") as SearchFilterType) || "all"
+  const sortBy = (searchParams.get("sort") as SearchSortBy) || "relevance"
+  const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10) || 1)
+  const genre = searchParams.get("genre") || ""
+  const workType = normalizeWorkType(searchParams.get("workType"))
+  const status = normalizeStatus(searchParams.get("status"))
+  const [queryInput, setQueryInput] = useState(urlQuery)
   const [results, setResults] = useState<SearchResult[]>([])
+  const [facets, setFacets] = useState<PublicCatalogFacetCounts | null>(null)
+  const [totalResults, setTotalResults] = useState(0)
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pageSize: SEARCH_PAGE_SIZE,
+    totalItems: 0,
+    totalPages: 0,
+    hasPreviousPage: false,
+    hasNextPage: false,
+  })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const lastSyncedSearch = useRef(currentSearch)
 
   useEffect(() => {
-    setQuery(initialQuery)
-    setFilterType(initialFilterType)
-    setSortBy(initialSortBy)
-  }, [initialFilterType, initialQuery, initialSortBy])
+    if (currentSearch !== lastSyncedSearch.current) {
+      setQueryInput(urlQuery)
+    }
+  }, [currentSearch, urlQuery])
 
   useEffect(() => {
-    const normalizedQuery = deferredQuery.trim()
+    const normalizedInput = queryInput.trim()
+    if (normalizedInput === urlQuery.trim()) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      startTransition(() => {
+        const nextUrl = buildSearchUrl({
+          query: queryInput,
+          filterType,
+          sortBy,
+          page: 1,
+          genre,
+          workType,
+          status,
+        })
+        lastSyncedSearch.current = nextUrl.replace(/^\/search\??/, "")
+        router.replace(
+          nextUrl
+        )
+      })
+    }, 220)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [filterType, genre, queryInput, router, sortBy, startTransition, status, urlQuery, workType])
+
+  useEffect(() => {
+    const normalizedQuery = urlQuery.trim()
 
     if (!normalizedQuery) {
       setResults([])
+      setFacets(null)
+      setTotalResults(0)
+      setPagination({
+        page: 1,
+        pageSize: SEARCH_PAGE_SIZE,
+        totalItems: 0,
+        totalPages: 0,
+        hasPreviousPage: false,
+        hasNextPage: false,
+      })
       setIsLoading(false)
       setError(null)
       return
@@ -215,6 +359,11 @@ export function SearchPageContent() {
       query: normalizedQuery,
       filterType,
       sortBy,
+      page,
+      pageSize: SEARCH_PAGE_SIZE,
+      genre,
+      workType,
+      status,
     })
       .then((payload) => {
         if (!active) {
@@ -222,6 +371,9 @@ export function SearchPageContent() {
         }
 
         setResults(payload.items)
+        setFacets(payload.facets ?? null)
+        setTotalResults(payload.total)
+        setPagination(payload.pagination)
       })
       .catch((loadError) => {
         if (!active) {
@@ -229,6 +381,16 @@ export function SearchPageContent() {
         }
 
         setResults([])
+        setFacets(null)
+        setTotalResults(0)
+        setPagination({
+          page: 1,
+          pageSize: SEARCH_PAGE_SIZE,
+          totalItems: 0,
+          totalPages: 0,
+          hasPreviousPage: false,
+          hasNextPage: false,
+        })
         setError(
           loadError instanceof Error
             ? loadError.message
@@ -244,23 +406,59 @@ export function SearchPageContent() {
     return () => {
       active = false
     }
-  }, [deferredQuery, filterType, sortBy])
+  }, [filterType, genre, page, sortBy, status, urlQuery, workType])
 
-  const hasQuery = query.trim().length > 0
+  const hasQuery = urlQuery.trim().length > 0
+  const showNovelFilters = filterType !== "author"
+  const libraryHref = buildLibraryHref({
+    query: queryInput,
+    genre: showNovelFilters ? genre : null,
+    workType: showNovelFilters ? workType : null,
+    status: showNovelFilters ? status : null,
+  })
+  const novelResults = useMemo(
+    () =>
+      results.filter(
+        (result): result is Extract<SearchResult, { type: "novel" }> => result.type === "novel"
+      ),
+    [results]
+  )
+  const authorResults = useMemo(
+    () =>
+      results.filter(
+        (result): result is Extract<SearchResult, { type: "author" }> => result.type === "author"
+      ),
+    [results]
+  )
+
+  const navigateWithFilters = (next: {
+    filterType?: SearchFilterType
+    sortBy?: SearchSortBy
+    page?: number
+    genre?: string | null
+    workType?: WorkTypeFilter
+    status?: StatusFilter
+  }) => {
+    startTransition(() => {
+      const nextUrl = buildSearchUrl({
+        query: queryInput,
+        filterType: next.filterType ?? filterType,
+        sortBy: next.sortBy ?? sortBy,
+        page: next.page ?? page,
+        genre: next.genre ?? genre,
+        workType: next.workType ?? workType,
+        status: next.status ?? status,
+      })
+      lastSyncedSearch.current = nextUrl.replace(/^\/search\??/, "")
+      router.replace(
+        nextUrl
+      )
+    })
+  }
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    router.replace(buildSearchUrl(query, filterType, sortBy))
-  }
-
-  const handleFilterTypeChange = (nextFilterType: SearchFilterType) => {
-    setFilterType(nextFilterType)
-    router.replace(buildSearchUrl(query, nextFilterType, sortBy))
-  }
-
-  const handleSortByChange = (nextSortBy: SearchSortBy) => {
-    setSortBy(nextSortBy)
-    router.replace(buildSearchUrl(query, filterType, nextSortBy))
+    navigateWithFilters({ page: 1 })
   }
 
   return (
@@ -277,13 +475,13 @@ export function SearchPageContent() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:flex-row">
             <div className="relative flex-1">
               <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                value={queryInput}
+                onChange={(event) => setQueryInput(event.target.value)}
                 placeholder="Search novels, authors, genres..."
                 className="h-11 pr-4"
               />
             </div>
-            <Button type="submit" className="h-11 w-full sm:w-auto">
+            <Button type="submit" className="h-11 w-full sm:w-auto" disabled={isPending}>
               Search
             </Button>
           </form>
@@ -291,18 +489,29 @@ export function SearchPageContent() {
       </section>
 
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-        {hasQuery && !isLoading && !error && results.length > 0 && (
+        {hasQuery && !isLoading && !error && results.length > 0 ? (
           <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-            <ResultsCount count={results.length} query={query} />
+            <ResultsCount count={totalResults || results.length} query={urlQuery} />
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3">
+              <Button variant="outline" asChild className="h-10">
+                <Link href={libraryHref}>Browse in Library</Link>
+              </Button>
+
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <select
                   value={filterType}
-                  onChange={(event) =>
-                    handleFilterTypeChange(event.target.value as SearchFilterType)
-                  }
+                  onChange={(event) => {
+                    const nextFilterType = event.target.value as SearchFilterType
+                    navigateWithFilters({
+                      filterType: nextFilterType,
+                      page: 1,
+                      genre: nextFilterType === "author" ? null : genre,
+                      workType: nextFilterType === "author" ? null : workType,
+                      status: nextFilterType === "author" ? null : status,
+                    })
+                  }}
                   className="h-10 min-w-0 flex-1 rounded border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary sm:min-w-[150px]"
                 >
                   <option value="all">All Results</option>
@@ -311,9 +520,67 @@ export function SearchPageContent() {
                 </select>
               </div>
 
+              {showNovelFilters ? (
+                <>
+                  <select
+                    value={genre}
+                    onChange={(event) =>
+                      navigateWithFilters({
+                        page: 1,
+                        genre: event.target.value || null,
+                      })
+                    }
+                    className="h-10 rounded border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary sm:min-w-[150px]"
+                  >
+                    <option value="">All Genres</option>
+                    {(facets?.genres ?? []).map((facet) => (
+                      <option key={facet.value} value={facet.value}>
+                        {facet.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={workType ?? ""}
+                    onChange={(event) =>
+                      navigateWithFilters({
+                        page: 1,
+                        workType: normalizeWorkType(event.target.value || null),
+                      })
+                    }
+                    className="h-10 rounded border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary sm:min-w-[150px]"
+                  >
+                    <option value="">All Work Types</option>
+                    <option value="ORIGINAL">Original</option>
+                    <option value="TRANSLATION">Translation</option>
+                  </select>
+
+                  <select
+                    value={status ?? ""}
+                    onChange={(event) =>
+                      navigateWithFilters({
+                        page: 1,
+                        status: normalizeStatus(event.target.value || null),
+                      })
+                    }
+                    className="h-10 rounded border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary sm:min-w-[150px]"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="Ongoing">Ongoing</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Hiatus">Hiatus</option>
+                  </select>
+                </>
+              ) : null}
+
               <select
                 value={sortBy}
-                onChange={(event) => handleSortByChange(event.target.value as SearchSortBy)}
+                onChange={(event) =>
+                  navigateWithFilters({
+                    page: 1,
+                    sortBy: event.target.value as SearchSortBy,
+                  })
+                }
                 className="h-10 rounded border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary sm:min-w-[150px]"
               >
                 <option value="relevance">Relevance</option>
@@ -322,7 +589,7 @@ export function SearchPageContent() {
               </select>
             </div>
           </div>
-        )}
+        ) : null}
 
         <div>
           {error ? (
@@ -343,6 +610,11 @@ export function SearchPageContent() {
               <p className="text-muted-foreground">
                 Try adjusting your search terms or browse our library
               </p>
+              <div className="mt-6">
+                <Button variant="outline" asChild>
+                  <Link href={libraryHref}>Browse in Library</Link>
+                </Button>
+              </div>
             </div>
           ) : !hasQuery ? (
             <div className="py-12 text-center">
@@ -357,9 +629,42 @@ export function SearchPageContent() {
                 <Link href="/library">Browse Library</Link>
               </Button>
             </div>
+          ) : filterType === "all" ? (
+            <div className="space-y-8">
+              <ResultsSection title="Novels" count={novelResults.length} results={novelResults} />
+              <ResultsSection title="Writers" count={authorResults.length} results={authorResults} />
+            </div>
           ) : (
             <ResultsGrid results={results} />
           )}
+
+          {hasQuery && pagination.totalPages > 1 ? (
+            <div className="mt-10 flex flex-col gap-3 border-t border-border/40 pt-6 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Page {pagination.page} of {pagination.totalPages}
+              </p>
+              <div className="flex items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!pagination.hasPreviousPage || isPending}
+                  onClick={() => navigateWithFilters({ page: Math.max(1, page - 1) })}
+                >
+                  Previous
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!pagination.hasNextPage || isPending}
+                  onClick={() => navigateWithFilters({ page: page + 1 })}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </>
