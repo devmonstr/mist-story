@@ -8,6 +8,7 @@ import type {
   ChapterVersionDto,
   CreateChapterInput,
   CreateNovelInput,
+  DiscoverResponse,
   LibraryCatalogResponse,
   MyLibraryResponse,
   MyProfileResponse,
@@ -22,6 +23,9 @@ import type {
   PublishChapterInput,
   ReorderChaptersInput,
   ReadingProgressState,
+  SearchFilterType,
+  SearchResponse,
+  SearchSortBy,
   SignedNostrEvent,
   UpsertReadingProgressInput,
   UpdateChapterInput,
@@ -321,6 +325,34 @@ export function fetchLibraryCatalog(query?: string) {
     : "/api/v1/library"
 
   return apiFetch<LibraryCatalogResponse>(path)
+}
+
+export function fetchDiscoverData() {
+  return apiFetch<DiscoverResponse>("/api/v1/discover")
+}
+
+export function fetchSearchResults(input: {
+  query: string
+  filterType?: SearchFilterType
+  sortBy?: SearchSortBy
+}) {
+  const searchParams = new URLSearchParams()
+  if (input.query.trim()) {
+    searchParams.set("q", input.query.trim())
+  }
+  if (input.filterType && input.filterType !== "all") {
+    searchParams.set("type", input.filterType)
+  }
+  if (input.sortBy && input.sortBy !== "relevance") {
+    searchParams.set("sort", input.sortBy)
+  }
+
+  const queryString = searchParams.toString()
+  const path = queryString
+    ? `/api/v1/discover/search?${queryString}`
+    : "/api/v1/discover/search"
+
+  return apiFetch<SearchResponse>(path)
 }
 
 export function fetchNovel(novelId: string) {
