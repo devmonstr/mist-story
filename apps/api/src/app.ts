@@ -7,6 +7,7 @@ import { requestLogger } from "./middleware/request-logger"
 import { sessionMiddleware } from "./middleware/session"
 import { authRouter } from "./routes/auth"
 import { chaptersRouter } from "./routes/chapters"
+import { libraryRouter } from "./routes/library"
 import { meRouter } from "./routes/me"
 import { novelsRouter } from "./routes/novels"
 import { profilesRouter } from "./routes/profiles"
@@ -31,6 +32,7 @@ export function createApp() {
   })
 
   app.use("/api/v1/auth", authRouter)
+  app.use("/api/v1/library", libraryRouter)
   app.use("/api/v1/me", meRouter)
   app.use("/api/v1/me/settings", settingsRouter)
   app.use("/api/v1/novels", novelsRouter)
