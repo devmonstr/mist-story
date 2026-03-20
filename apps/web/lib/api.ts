@@ -319,6 +319,8 @@ export function fetchLibraryCatalog(input?: {
   sortBy?: CatalogSortBy
   page?: number
   pageSize?: number
+  cursor?: string | null
+  direction?: "next" | "prev" | null
   genre?: string | null
   workType?: "ORIGINAL" | "TRANSLATION" | null
   status?: "Ongoing" | "Completed" | "Hiatus" | null
@@ -331,6 +333,12 @@ export function fetchLibraryCatalog(input?: {
   }
   if (input?.sortBy && input.sortBy !== "recent") {
     searchParams.set("sort", input.sortBy)
+  }
+  if (input?.cursor) {
+    searchParams.set("cursor", input.cursor)
+  }
+  if (input?.direction) {
+    searchParams.set("direction", input.direction)
   }
   if (input?.page && input.page > 1) {
     searchParams.set("page", String(input.page))
@@ -400,6 +408,8 @@ export function fetchSearchResults(input: {
   sortBy?: SearchSortBy
   page?: number
   pageSize?: number
+  cursor?: string | null
+  direction?: "next" | "prev" | null
   genre?: string | null
   workType?: "ORIGINAL" | "TRANSLATION" | null
   status?: "Ongoing" | "Completed" | "Hiatus" | null
@@ -413,6 +423,12 @@ export function fetchSearchResults(input: {
   }
   if (input.sortBy && input.sortBy !== "relevance") {
     searchParams.set("sort", input.sortBy)
+  }
+  if (input.cursor) {
+    searchParams.set("cursor", input.cursor)
+  }
+  if (input.direction) {
+    searchParams.set("direction", input.direction)
   }
   if (input.page && input.page > 1) {
     searchParams.set("page", String(input.page))

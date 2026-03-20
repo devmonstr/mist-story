@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client"
+import { Prisma } from "@prisma/client"
 import { prisma } from "../client"
 import type { CatalogSortBy } from "@mist/shared"
 
@@ -8,6 +8,12 @@ export type PublicCatalogNovelFilters = {
   workType?: "ORIGINAL" | "TRANSLATION" | "all" | null
   status?: "Ongoing" | "Completed" | "Hiatus" | "all" | null
 }
+
+export type CatalogCollection =
+  | "trending"
+  | "hidden-gems"
+  | "editors-picks"
+  | "new-voices"
 
 export type CatalogPaginationInput = {
   page?: number
@@ -179,6 +185,403 @@ export async function listAllLibraryCatalogNovels(
     orderBy: buildLibraryCatalogOrderBy(sortBy),
     include: libraryCatalogInclude(),
   })
+}
+
+type LibraryCollectionFacetCount = {
+  value: string
+  label: string
+  count: number
+}
+
+type LibraryCollectionFacetCounts = {
+  total: number
+  genres: LibraryCollectionFacetCount[]
+  workTypes: LibraryCollectionFacetCount[]
+  statuses: LibraryCollectionFacetCount[]
+}
+
+function buildPublishedNovelWhereSql(filters: PublicCatalogNovelFilters = {}) {
+  const clauses: Prisma.Sql[] = [Prisma.sql`n."visibility" = 'PUBLISHED'`]
+  const query = filters.query?.trim()
+
+  if (query) {
+    const likeQuery = `%${query}%`
+    clauses.push(Prisma.sql`
+      (
+        n."title" ILIKE ${likeQuery}
+        OR coalesce(n."summary", '') ILIKE ${likeQuery}
+        OR coalesce(n."genre", '') ILIKE ${likeQuery}
+        OR coalesce(n."authorDisplayName", '') ILIKE ${likeQuery}
+        OR coalesce(a."displayName", '') ILIKE ${likeQuery}
+        OR coalesce(a."handle", '') ILIKE ${likeQuery}
+        OR EXISTS (
+          SELECT 1
+          FROM unnest(n."tags") AS tag(value)
+          WHERE value ILIKE ${likeQuery}
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM unnest(n."subgenres") AS subgenre(value)
+          WHERE value ILIKE ${likeQuery}
+        )
+      )
+    `)
+  }
+
+  if (filters.genre?.trim()) {
+    clauses.push(Prisma.sql`n."genre" ILIKE ${filters.genre.trim()}`)
+  }
+
+  if (filters.workType && filters.workType !== "all") {
+    clauses.push(Prisma.sql`n."workType" = ${filters.workType}`)
+  }
+
+  if (filters.status && filters.status !== "all") {
+    clauses.push(Prisma.sql`n."status" = ${filters.status}`)
+  }
+
+  return Prisma.sql`WHERE ${Prisma.join(clauses, " AND ")}`
+}
+
+function buildLibraryCollectionBaseCte(filters: PublicCatalogNovelFilters = {}) {
+  const whereSql = buildPublishedNovelWhereSql(filters)
+
+  return Prisma.sql`
+    WITH catalog_base AS (
+      SELECT
+        n.id,
+        n.slug,
+        n."title",
+        n."summary",
+        n."genre",
+        n."workType",
+        n."status",
+        n."visibility",
+        n."coverUrl",
+        n."coverStorageKey",
+        n."chaptersCount",
+        n.rating::double precision AS rating,
+        n."ratingsCount",
+        n."publishedAt",
+        n."updatedAt",
+        n."authorDisplayName",
+        n."authorId",
+        a."pubkey" AS "authorPubkey",
+        a."displayName" AS "authorName",
+        a.handle AS "authorHandle",
+        a."avatarUrl" AS "authorAvatarUrl",
+        COALESCE(reads."readsCount", 0)::int AS "readsCount",
+        COALESCE(bookmarks."bookmarksCount", 0)::int AS "bookmarksCount",
+        COALESCE(author_novels."publishedNovelsCount", 0)::int AS "authorPublishedNovelsCount"
+      FROM "Novel" n
+      JOIN "User" a ON a.id = n."authorId"
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS "readsCount"
+        FROM "ReadingProgress" rp
+        WHERE rp."novelId" = n.id
+      ) reads ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS "bookmarksCount"
+        FROM "NovelBookmark" nb
+        WHERE nb."novelId" = n.id
+      ) bookmarks ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS "publishedNovelsCount"
+        FROM "Novel" author_novel
+        WHERE author_novel."authorId" = n."authorId"
+          AND author_novel."visibility" = 'PUBLISHED'
+      ) author_novels ON true
+      ${whereSql}
+    )
+  `
+}
+
+function buildLibraryCollectionWhereSql(collection: CatalogCollection) {
+  if (collection === "hidden-gems") {
+    return Prisma.sql`WHERE base."readsCount" <= 25`
+  }
+
+  if (collection === "new-voices") {
+    return Prisma.sql`WHERE base."authorPublishedNovelsCount" <= 1`
+  }
+
+  return Prisma.sql``
+}
+
+function buildLibraryCollectionOrderBySql(collection: CatalogCollection) {
+  if (collection === "trending") {
+    return Prisma.sql`
+      ORDER BY
+        base."readsCount" DESC,
+        base."bookmarksCount" DESC,
+        base."ratingsCount" DESC,
+        coalesce(base."publishedAt", base."updatedAt") DESC,
+        base.id DESC
+    `
+  }
+
+  if (collection === "hidden-gems") {
+    return Prisma.sql`
+      ORDER BY
+        base.rating DESC,
+        base."bookmarksCount" DESC,
+        base."readsCount" DESC,
+        coalesce(base."publishedAt", base."updatedAt") DESC,
+        base.id DESC
+    `
+  }
+
+  if (collection === "editors-picks") {
+    return Prisma.sql`
+      ORDER BY
+        base.rating DESC,
+        base."ratingsCount" DESC,
+        base."readsCount" DESC,
+        coalesce(base."publishedAt", base."updatedAt") DESC,
+        base.id DESC
+    `
+  }
+
+  return Prisma.sql`
+    ORDER BY
+      coalesce(base."publishedAt", base."updatedAt") DESC,
+      base.id DESC
+  `
+}
+
+type LibraryCollectionNovelRow = {
+  id: string
+  slug: string
+  title: string
+  summary: string
+  genre: string
+  workType: "ORIGINAL" | "TRANSLATION"
+  status: "Ongoing" | "Completed" | "Hiatus"
+  visibility: "PUBLISHED" | "HIDDEN"
+  coverUrl: string
+  coverStorageKey: string | null
+  chaptersCount: number
+  rating: number
+  ratingsCount: number
+  publishedAt: Date | null
+  updatedAt: Date
+  authorDisplayName: string | null
+  author: {
+    id: string
+    pubkey: string
+    displayName: string | null
+    handle: string | null
+    avatarUrl: string | null
+  }
+  _count: {
+    readingProgress: number
+    bookmarks: number
+  }
+}
+
+function mapLibraryCollectionNovelRow(row: {
+  id: string
+  slug: string
+  title: string
+  summary: string
+  genre: string
+  workType: "ORIGINAL" | "TRANSLATION"
+  status: "Ongoing" | "Completed" | "Hiatus"
+  visibility: "PUBLISHED" | "HIDDEN"
+  coverUrl: string
+  coverStorageKey: string | null
+  chaptersCount: number
+  rating: number
+  ratingsCount: number
+  publishedAt: Date | null
+  updatedAt: Date
+  authorDisplayName: string | null
+  authorId: string
+  authorPubkey: string
+  authorName: string | null
+  authorHandle: string | null
+  authorAvatarUrl: string | null
+  readsCount: number
+  bookmarksCount: number
+}): LibraryCollectionNovelRow {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    summary: row.summary,
+    genre: row.genre,
+    workType: row.workType,
+    status: row.status,
+    visibility: row.visibility,
+    coverUrl: row.coverUrl,
+    coverStorageKey: row.coverStorageKey ?? null,
+    chaptersCount: row.chaptersCount,
+    rating: row.rating,
+    ratingsCount: row.ratingsCount,
+    publishedAt: row.publishedAt,
+    updatedAt: row.updatedAt,
+    authorDisplayName: row.authorDisplayName,
+    author: {
+      id: row.authorId,
+      pubkey: row.authorPubkey,
+      displayName: row.authorName,
+      handle: row.authorHandle,
+      avatarUrl: row.authorAvatarUrl,
+    },
+    _count: {
+      readingProgress: row.readsCount,
+      bookmarks: row.bookmarksCount,
+    },
+  }
+}
+
+export async function listLibraryCollectionNovels(
+  collection: CatalogCollection,
+  filters: PublicCatalogNovelFilters = {},
+  input: CatalogPaginationInput = {}
+) {
+  const pagination = normalizeCatalogPagination(input)
+  const baseSql = buildLibraryCollectionBaseCte(filters)
+  const collectionWhereSql = buildLibraryCollectionWhereSql(collection)
+  const orderBySql = buildLibraryCollectionOrderBySql(collection)
+
+  const rows = await prisma.$queryRaw<
+    Array<{
+      id: string
+      slug: string
+      title: string
+      summary: string
+      genre: string
+      workType: "ORIGINAL" | "TRANSLATION"
+      status: "Ongoing" | "Completed" | "Hiatus"
+      visibility: "PUBLISHED" | "HIDDEN"
+      coverUrl: string
+      coverStorageKey: string | null
+      chaptersCount: number
+      rating: number
+      ratingsCount: number
+      publishedAt: Date | null
+      updatedAt: Date
+      authorDisplayName: string | null
+      authorId: string
+      authorPubkey: string
+      authorName: string | null
+      authorHandle: string | null
+      authorAvatarUrl: string | null
+      readsCount: number
+      bookmarksCount: number
+    }>
+  >(Prisma.sql`
+    ${baseSql}
+    SELECT
+      base.id,
+      base.slug,
+      base."title",
+      base."summary",
+      base."genre",
+      base."workType",
+      base."status",
+      base."visibility",
+      base."coverUrl",
+      base."coverStorageKey",
+      base."chaptersCount",
+      base.rating,
+      base."ratingsCount",
+      base."publishedAt",
+      base."updatedAt",
+      base."authorDisplayName",
+      base."authorId" AS "authorId",
+      base."authorPubkey" AS "authorPubkey",
+      base."authorName" AS "authorName",
+      base."authorHandle" AS "authorHandle",
+      base."authorAvatarUrl" AS "authorAvatarUrl",
+      base."readsCount" AS "readsCount",
+      base."bookmarksCount" AS "bookmarksCount"
+    FROM catalog_base base
+    ${collectionWhereSql}
+    ${orderBySql}
+    LIMIT ${pagination.take}
+    OFFSET ${pagination.skip}
+  `)
+
+  return rows.map(mapLibraryCollectionNovelRow)
+}
+
+export async function countLibraryCollectionNovels(
+  collection: CatalogCollection,
+  filters: PublicCatalogNovelFilters = {}
+) {
+  const baseSql = buildLibraryCollectionBaseCte(filters)
+  const collectionWhereSql = buildLibraryCollectionWhereSql(collection)
+  const rows = await prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
+    ${baseSql}
+    SELECT COUNT(*)::int AS total
+    FROM catalog_base base
+    ${collectionWhereSql}
+  `)
+
+  return rows[0]?.total ?? 0
+}
+
+export async function listLibraryCollectionFacetCounts(
+  collection: CatalogCollection,
+  filters: PublicCatalogNovelFilters = {}
+): Promise<LibraryCollectionFacetCounts> {
+  const baseSql = buildLibraryCollectionBaseCte(filters)
+  const collectionWhereSql = buildLibraryCollectionWhereSql(collection)
+
+  const [genres, workTypes, statuses, totalRows] = await Promise.all([
+    prisma.$queryRaw<Array<{ value: string; count: number }>>(Prisma.sql`
+      ${baseSql}
+      SELECT base."genre" AS value, COUNT(*)::int AS count
+      FROM catalog_base base
+      ${collectionWhereSql}
+      GROUP BY base."genre"
+      ORDER BY count DESC, value ASC
+      LIMIT 12
+    `),
+    prisma.$queryRaw<Array<{ value: "ORIGINAL" | "TRANSLATION"; count: number }>>(Prisma.sql`
+      ${baseSql}
+      SELECT base."workType" AS value, COUNT(*)::int AS count
+      FROM catalog_base base
+      ${collectionWhereSql}
+      GROUP BY base."workType"
+      ORDER BY count DESC, value ASC
+    `),
+    prisma.$queryRaw<Array<{ value: "Ongoing" | "Completed" | "Hiatus"; count: number }>>(Prisma.sql`
+      ${baseSql}
+      SELECT base."status" AS value, COUNT(*)::int AS count
+      FROM catalog_base base
+      ${collectionWhereSql}
+      GROUP BY base."status"
+      ORDER BY count DESC, value ASC
+    `),
+    prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
+      ${baseSql}
+      SELECT COUNT(*)::int AS total
+      FROM catalog_base base
+      ${collectionWhereSql}
+    `),
+  ])
+
+  return {
+    total: totalRows[0]?.total ?? 0,
+    genres: genres.map((item) => ({
+      value: item.value,
+      label: item.value,
+      count: item.count,
+    })),
+    workTypes: workTypes.map((item) => ({
+      value: item.value,
+      label: item.value === "TRANSLATION" ? "Translation" : "Original",
+      count: item.count,
+    })),
+    statuses: statuses.map((item) => ({
+      value: item.value,
+      label: item.value,
+      count: item.count,
+    })),
+  }
 }
 
 export async function listLibraryCatalogGenreFacets(filters: PublicCatalogNovelFilters = {}) {

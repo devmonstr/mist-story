@@ -34,12 +34,13 @@ export function StoriesGrid() {
     query,
     deferredQuery,
     sortBy,
-    page,
+    cursor,
+    direction,
     genre,
     workType,
     status,
     collection,
-    setPage,
+    setCursorState,
     setGenre,
     setWorkType,
     setStatus,
@@ -63,7 +64,8 @@ export function StoriesGrid() {
       void loadLibraryCatalog({
         query: deferredQuery,
         sortBy,
-        page,
+        cursor,
+        direction,
         pageSize: 18,
         genre,
         workType,
@@ -102,7 +104,7 @@ export function StoriesGrid() {
       isActive = false
       window.clearTimeout(timer)
     }
-  }, [collection, deferredQuery, genre, page, refreshToken, sortBy, status, workType])
+  }, [collection, cursor, deferredQuery, direction, genre, refreshToken, sortBy, status, workType])
 
   if (isLoading) {
     return <StoriesGridSkeleton />
@@ -435,10 +437,10 @@ export function StoriesGrid() {
         })}
       </div>
 
-      {catalog?.pagination.totalPages && catalog.pagination.totalPages > 1 ? (
+      {catalog?.pagination.hasPreviousPage || catalog?.pagination.hasNextPage ? (
         <div className="mt-10 flex flex-col gap-3 border-t border-border/40 pt-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
-            Page {catalog.pagination.page} of {catalog.pagination.totalPages}
+            {catalog.pagination.totalItems.toLocaleString()} Stories
           </p>
           <div className="flex items-center gap-3">
             <Button
@@ -446,7 +448,12 @@ export function StoriesGrid() {
               variant="outline"
               size="sm"
               disabled={!catalog.pagination.hasPreviousPage}
-              onClick={() => setPage(Math.max(1, page - 1))}
+              onClick={() =>
+                setCursorState({
+                  cursor: catalog.pagination.previousCursor,
+                  direction: "prev",
+                })
+              }
             >
               Previous
             </Button>
@@ -455,7 +462,12 @@ export function StoriesGrid() {
               variant="outline"
               size="sm"
               disabled={!catalog.pagination.hasNextPage}
-              onClick={() => setPage(page + 1)}
+              onClick={() =>
+                setCursorState({
+                  cursor: catalog.pagination.nextCursor,
+                  direction: "next",
+                })
+              }
             >
               Next
             </Button>

@@ -1,6 +1,7 @@
 import {
+  countLibraryCollectionNovels,
   hexToNpub,
-  listDiscoverCollectionNovels,
+  listLibraryCollectionNovels,
   listDiscoverGenres,
   listLibraryCatalogFacetCounts,
   normalizeCatalogPagination,
@@ -19,7 +20,7 @@ import type {
   SearchResultItemDto,
   SearchSortBy,
 } from "@mist/shared"
-import { applyCatalogCollection } from "./public-catalog-utils"
+import { encodeCatalogCursor } from "./catalog-cursor"
 
 const GENRE_DESCRIPTIONS: Record<string, string> = {
   Fantasy: "Epic adventures, magic, and otherworldly realms.",
@@ -70,7 +71,7 @@ function buildLibraryHref(input: {
 }
 
 function serializeCollectionPreviewNovels(
-  novels: Awaited<ReturnType<typeof listDiscoverCollectionNovels>>
+  novels: Awaited<ReturnType<typeof listLibraryCollectionNovels>>
 ) {
   return novels.slice(0, 3).map((novel) => ({
     id: novel.id,
@@ -94,6 +95,8 @@ function buildPublicCatalogFilters(input: {
   scope?: "all" | "novel" | "author"
   page?: number
   pageSize?: number
+  cursor?: string | null
+  direction?: "next" | "prev" | null
 }): PublicCatalogQuery {
   return {
     q: input.query?.trim() || undefined,
@@ -105,6 +108,8 @@ function buildPublicCatalogFilters(input: {
     scope: input.scope ?? "all",
     page: input.page,
     pageSize: input.pageSize,
+    cursor: input.cursor ?? undefined,
+    direction: input.direction ?? undefined,
   }
 }
 
@@ -152,17 +157,20 @@ export async function getDiscoverData(input: {
     scope: "all",
   })
 
-  const [genres, novels, facetCounts] = await Promise.all([
+  const [genres, facetCounts, trending, hiddenGems, editorsPicks, newVoices] = await Promise.all([
     listDiscoverGenres(filters),
-    listDiscoverCollectionNovels(filters),
     listLibraryCatalogFacetCounts(filters),
+    listLibraryCollectionNovels("trending", filters, { page: 1, pageSize: 3 }),
+    listLibraryCollectionNovels("hidden-gems", filters, { page: 1, pageSize: 3 }),
+    listLibraryCollectionNovels("editors-picks", filters, { page: 1, pageSize: 3 }),
+    listLibraryCollectionNovels("new-voices", filters, { page: 1, pageSize: 3 }),
   ])
 
-  const [trending, hiddenGems, editorsPicks, newVoices] = await Promise.all([
-    applyCatalogCollection(novels, "trending"),
-    applyCatalogCollection(novels, "hidden-gems"),
-    applyCatalogCollection(novels, "editors-picks"),
-    applyCatalogCollection(novels, "new-voices"),
+  const [trendingCount, hiddenGemsCount, editorsPicksCount, newVoicesCount] = await Promise.all([
+    countLibraryCollectionNovels("trending", filters),
+    countLibraryCollectionNovels("hidden-gems", filters),
+    countLibraryCollectionNovels("editors-picks", filters),
+    countLibraryCollectionNovels("new-voices", filters),
   ])
 
   const discoverGenres: DiscoverGenreDto[] = genres.map((genre) => ({
@@ -184,7 +192,7 @@ export async function getDiscoverData(input: {
       id: "trending",
       title: "Trending This Week",
       description: "The most-read stories gaining popularity right now.",
-      storyCount: trending.length,
+      storyCount: trendingCount,
       curator: "Mist Story Editors",
       href: buildLibraryHref({
         query: input.query,
@@ -199,7 +207,7 @@ export async function getDiscoverData(input: {
       id: "hidden-gems",
       title: "Hidden Gems",
       description: "Underrated stories that deserve more attention.",
-      storyCount: hiddenGems.length,
+      storyCount: hiddenGemsCount,
       curator: "Community",
       href: buildLibraryHref({
         query: input.query,
@@ -214,7 +222,7 @@ export async function getDiscoverData(input: {
       id: "editors-picks",
       title: "Editor's Picks",
       description: "Our favorite stories showcasing exceptional writing.",
-      storyCount: editorsPicks.length,
+      storyCount: editorsPicksCount,
       curator: "Mist Story Team",
       href: buildLibraryHref({
         query: input.query,
@@ -229,7 +237,7 @@ export async function getDiscoverData(input: {
       id: "new-voices",
       title: "New Voices",
       description: "First stories from fresh and exciting writers.",
-      storyCount: newVoices.length,
+      storyCount: newVoicesCount,
       curator: "Community",
       href: buildLibraryHref({
         query: input.query,
@@ -256,6 +264,8 @@ export async function searchCatalog(input: {
   sortBy: SearchSortBy
   page?: number
   pageSize?: number
+  cursor?: string | null
+  direction?: "next" | "prev" | null
   genre?: string | null
   workType?: "ORIGINAL" | "TRANSLATION" | null
   status?: "Ongoing" | "Completed" | "Hiatus" | null
@@ -276,6 +286,8 @@ export async function searchCatalog(input: {
     scope: filterType,
     page: pagination.page,
     pageSize: pagination.pageSize,
+    cursor: input.cursor ?? undefined,
+    direction: input.direction ?? undefined,
   })
 
   if (!query) {
@@ -289,6 +301,9 @@ export async function searchCatalog(input: {
         pageSize: pagination.pageSize,
         totalItems: 0,
         totalPages: 0,
+        currentCursor: null,
+        nextCursor: null,
+        previousCursor: null,
         hasPreviousPage: false,
         hasNextPage: false,
       },
@@ -357,6 +372,9 @@ export async function searchCatalog(input: {
     pageSize: pagination.pageSize,
     totalItems: 0,
     totalPages: 0,
+    currentCursor: null as string | null,
+    nextCursor: null as string | null,
+    previousCursor: null as string | null,
     hasPreviousPage: false,
     hasNextPage: false,
   }
@@ -369,6 +387,13 @@ export async function searchCatalog(input: {
       pageSize: novels.pagination.pageSize,
       totalItems: novels.total,
       totalPages: novels.total > 0 ? Math.ceil(novels.total / novels.pagination.pageSize) : 0,
+      currentCursor: novels.total > 0 ? encodeCatalogCursor(novels.pagination.page) : null,
+      nextCursor:
+        novels.total > novels.pagination.page * novels.pagination.pageSize
+          ? encodeCatalogCursor(novels.pagination.page)
+          : null,
+      previousCursor:
+        novels.pagination.page > 1 ? encodeCatalogCursor(novels.pagination.page) : null,
       hasPreviousPage: novels.pagination.page > 1,
       hasNextPage:
         novels.total > novels.pagination.page * novels.pagination.pageSize,
@@ -381,6 +406,13 @@ export async function searchCatalog(input: {
       pageSize: authors.pagination.pageSize,
       totalItems: authors.total,
       totalPages: authors.total > 0 ? Math.ceil(authors.total / authors.pagination.pageSize) : 0,
+      currentCursor: authors.total > 0 ? encodeCatalogCursor(authors.pagination.page) : null,
+      nextCursor:
+        authors.total > authors.pagination.page * authors.pagination.pageSize
+          ? encodeCatalogCursor(authors.pagination.page)
+          : null,
+      previousCursor:
+        authors.pagination.page > 1 ? encodeCatalogCursor(authors.pagination.page) : null,
       hasPreviousPage: authors.pagination.page > 1,
       hasNextPage:
         authors.total > authors.pagination.page * authors.pagination.pageSize,
@@ -408,6 +440,14 @@ export async function searchCatalog(input: {
         novels.total > 0 ? Math.ceil(novels.total / pagination.pageSize) : 0,
         authors.total > 0 ? Math.ceil(authors.total / pagination.pageSize) : 0
       ),
+      currentCursor: total > 0 ? encodeCatalogCursor(pagination.page) : null,
+      nextCursor:
+        novels.total > pagination.page * pagination.pageSize ||
+        authors.total > pagination.page * pagination.pageSize
+          ? encodeCatalogCursor(pagination.page)
+          : null,
+      previousCursor:
+        pagination.page > 1 ? encodeCatalogCursor(pagination.page) : null,
       hasPreviousPage: pagination.page > 1,
       hasNextPage:
         novels.total > pagination.page * pagination.pageSize ||

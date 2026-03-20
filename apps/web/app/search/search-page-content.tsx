@@ -13,10 +13,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { resolveNovelCoverSrc } from "@/lib/novel-cover"
 import { BookOpen, Filter, Loader2, Search, UserRound } from "lucide-react"
-import { loadSearchResults, type SearchResult } from "./search-data"
+import {
+  loadSearchResults,
+  type SearchPagination,
+  type SearchResult,
+} from "./search-data"
 
 type WorkTypeFilter = "ORIGINAL" | "TRANSLATION" | null
 type StatusFilter = "Ongoing" | "Completed" | "Hiatus" | null
+type CursorDirection = "next" | "prev" | null
 const SEARCH_PAGE_SIZE = 20
 
 function normalizeWorkType(value: string | null): WorkTypeFilter {
@@ -46,7 +51,8 @@ function buildSearchUrl(input: {
   query: string
   filterType: SearchFilterType
   sortBy: SearchSortBy
-  page?: number
+  cursor?: string | null
+  direction?: CursorDirection
   pageSize?: number
   genre?: string | null
   workType?: WorkTypeFilter
@@ -63,8 +69,9 @@ function buildSearchUrl(input: {
   if (input.sortBy !== "relevance") {
     params.set("sort", input.sortBy)
   }
-  if (input.page && input.page > 1) {
-    params.set("page", String(input.page))
+  if (input.cursor && input.direction) {
+    params.set("cursor", input.cursor)
+    params.set("direction", input.direction)
   }
   if (input.pageSize && input.pageSize !== SEARCH_PAGE_SIZE) {
     params.set("pageSize", String(input.pageSize))
@@ -276,7 +283,8 @@ export function SearchPageContent() {
   const urlQuery = searchParams.get("q") || ""
   const filterType = (searchParams.get("type") as SearchFilterType) || "all"
   const sortBy = (searchParams.get("sort") as SearchSortBy) || "relevance"
-  const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10) || 1)
+  const cursor = searchParams.get("cursor") || ""
+  const direction = searchParams.get("direction") as CursorDirection
   const genre = searchParams.get("genre") || ""
   const workType = normalizeWorkType(searchParams.get("workType"))
   const status = normalizeStatus(searchParams.get("status"))
@@ -284,11 +292,11 @@ export function SearchPageContent() {
   const [results, setResults] = useState<SearchResult[]>([])
   const [facets, setFacets] = useState<PublicCatalogFacetCounts | null>(null)
   const [totalResults, setTotalResults] = useState(0)
-  const [pagination, setPagination] = useState({
-    page: 1,
-    pageSize: SEARCH_PAGE_SIZE,
+  const [pagination, setPagination] = useState<SearchPagination>({
+    currentCursor: null,
+    nextCursor: null,
+    previousCursor: null,
     totalItems: 0,
-    totalPages: 0,
     hasPreviousPage: false,
     hasNextPage: false,
   })
@@ -314,7 +322,8 @@ export function SearchPageContent() {
           query: queryInput,
           filterType,
           sortBy,
-          page: 1,
+          cursor: null,
+          direction: null,
           genre,
           workType,
           status,
@@ -339,10 +348,10 @@ export function SearchPageContent() {
       setFacets(null)
       setTotalResults(0)
       setPagination({
-        page: 1,
-        pageSize: SEARCH_PAGE_SIZE,
+        currentCursor: null,
+        nextCursor: null,
+        previousCursor: null,
         totalItems: 0,
-        totalPages: 0,
         hasPreviousPage: false,
         hasNextPage: false,
       })
@@ -359,7 +368,8 @@ export function SearchPageContent() {
       query: normalizedQuery,
       filterType,
       sortBy,
-      page,
+      cursor,
+      direction,
       pageSize: SEARCH_PAGE_SIZE,
       genre,
       workType,
@@ -384,10 +394,10 @@ export function SearchPageContent() {
         setFacets(null)
         setTotalResults(0)
         setPagination({
-          page: 1,
-          pageSize: SEARCH_PAGE_SIZE,
+          currentCursor: null,
+          nextCursor: null,
+          previousCursor: null,
           totalItems: 0,
-          totalPages: 0,
           hasPreviousPage: false,
           hasNextPage: false,
         })
@@ -406,7 +416,7 @@ export function SearchPageContent() {
     return () => {
       active = false
     }
-  }, [filterType, genre, page, sortBy, status, urlQuery, workType])
+  }, [cursor, direction, filterType, genre, sortBy, status, urlQuery, workType])
 
   const hasQuery = urlQuery.trim().length > 0
   const showNovelFilters = filterType !== "author"
@@ -434,7 +444,8 @@ export function SearchPageContent() {
   const navigateWithFilters = (next: {
     filterType?: SearchFilterType
     sortBy?: SearchSortBy
-    page?: number
+    cursor?: string | null
+    direction?: CursorDirection
     genre?: string | null
     workType?: WorkTypeFilter
     status?: StatusFilter
@@ -444,7 +455,8 @@ export function SearchPageContent() {
         query: queryInput,
         filterType: next.filterType ?? filterType,
         sortBy: next.sortBy ?? sortBy,
-        page: next.page ?? page,
+        cursor: next.cursor,
+        direction: next.direction,
         genre: next.genre ?? genre,
         workType: next.workType ?? workType,
         status: next.status ?? status,
@@ -458,7 +470,7 @@ export function SearchPageContent() {
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    navigateWithFilters({ page: 1 })
+    navigateWithFilters({ cursor: null, direction: null })
   }
 
   return (
@@ -506,7 +518,8 @@ export function SearchPageContent() {
                     const nextFilterType = event.target.value as SearchFilterType
                     navigateWithFilters({
                       filterType: nextFilterType,
-                      page: 1,
+                      cursor: null,
+                      direction: null,
                       genre: nextFilterType === "author" ? null : genre,
                       workType: nextFilterType === "author" ? null : workType,
                       status: nextFilterType === "author" ? null : status,
@@ -526,7 +539,8 @@ export function SearchPageContent() {
                     value={genre}
                     onChange={(event) =>
                       navigateWithFilters({
-                        page: 1,
+                        cursor: null,
+                        direction: null,
                         genre: event.target.value || null,
                       })
                     }
@@ -544,7 +558,8 @@ export function SearchPageContent() {
                     value={workType ?? ""}
                     onChange={(event) =>
                       navigateWithFilters({
-                        page: 1,
+                        cursor: null,
+                        direction: null,
                         workType: normalizeWorkType(event.target.value || null),
                       })
                     }
@@ -559,7 +574,8 @@ export function SearchPageContent() {
                     value={status ?? ""}
                     onChange={(event) =>
                       navigateWithFilters({
-                        page: 1,
+                        cursor: null,
+                        direction: null,
                         status: normalizeStatus(event.target.value || null),
                       })
                     }
@@ -577,7 +593,8 @@ export function SearchPageContent() {
                 value={sortBy}
                 onChange={(event) =>
                   navigateWithFilters({
-                    page: 1,
+                    cursor: null,
+                    direction: null,
                     sortBy: event.target.value as SearchSortBy,
                   })
                 }
@@ -638,10 +655,10 @@ export function SearchPageContent() {
             <ResultsGrid results={results} />
           )}
 
-          {hasQuery && pagination.totalPages > 1 ? (
+          {hasQuery && (pagination.hasPreviousPage || pagination.hasNextPage) ? (
             <div className="mt-10 flex flex-col gap-3 border-t border-border/40 pt-6 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted-foreground">
-                Page {pagination.page} of {pagination.totalPages}
+                {pagination.totalItems.toLocaleString()} results
               </p>
               <div className="flex items-center gap-3">
                 <Button
@@ -649,7 +666,12 @@ export function SearchPageContent() {
                   variant="outline"
                   size="sm"
                   disabled={!pagination.hasPreviousPage || isPending}
-                  onClick={() => navigateWithFilters({ page: Math.max(1, page - 1) })}
+                  onClick={() =>
+                    navigateWithFilters({
+                      cursor: pagination.previousCursor,
+                      direction: "prev",
+                    })
+                  }
                 >
                   Previous
                 </Button>
@@ -658,7 +680,12 @@ export function SearchPageContent() {
                   variant="outline"
                   size="sm"
                   disabled={!pagination.hasNextPage || isPending}
-                  onClick={() => navigateWithFilters({ page: page + 1 })}
+                  onClick={() =>
+                    navigateWithFilters({
+                      cursor: pagination.nextCursor,
+                      direction: "next",
+                    })
+                  }
                 >
                   Next
                 </Button>

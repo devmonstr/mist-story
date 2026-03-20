@@ -1,5 +1,4 @@
 import type { CatalogSortBy } from "@mist/shared"
-import * as api from "@/lib/api"
 
 export interface LibraryCatalogNovel {
   id: string
@@ -38,14 +37,15 @@ export interface LibraryCatalogResponse {
     workType: "ORIGINAL" | "TRANSLATION" | null
     status: "Ongoing" | "Completed" | "Hiatus" | null
     collection: "all" | "trending" | "hidden-gems" | "editors-picks" | "new-voices" | null
-    page: number
+    cursor: string | null
+    direction: "next" | "prev" | null
     pageSize: number
   }
   pagination: {
-    page: number
-    pageSize: number
+    currentCursor: string | null
+    nextCursor: string | null
+    previousCursor: string | null
     totalItems: number
-    totalPages: number
     hasPreviousPage: boolean
     hasNextPage: boolean
   }
@@ -56,20 +56,7 @@ export interface LibraryCatalogResponse {
   }
 }
 
-type CatalogApi = typeof api & {
-  fetchLibraryCatalog?: (input?: {
-    query?: string
-    sortBy?: CatalogSortBy
-    page?: number
-    pageSize?: number
-    genre?: string | null
-    workType?: "ORIGINAL" | "TRANSLATION" | null
-    status?: "Ongoing" | "Completed" | "Hiatus" | null
-    collection?: "trending" | "hidden-gems" | "editors-picks" | "new-voices" | null
-  }) => Promise<unknown>
-}
-
-const catalogApi = api as CatalogApi
+type LibraryCatalogDirection = "next" | "prev" | null
 
 function normalizeNumber(value: unknown, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback
@@ -77,6 +64,14 @@ function normalizeNumber(value: unknown, fallback = 0) {
 
 function normalizeString(value: unknown, fallback = "") {
   return typeof value === "string" ? value : fallback
+}
+
+function normalizeCursor(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value : null
+}
+
+function normalizeDirection(value: unknown): LibraryCatalogDirection {
+  return value === "next" || value === "prev" ? value : null
 }
 
 function normalizeFacetItems(value: unknown) {
@@ -164,14 +159,15 @@ export function normalizeLibraryCatalogResponse(
         workType: null,
         status: null,
         collection: null,
-        page: 1,
+        cursor: null,
+        direction: null,
         pageSize: novels.length || 20,
       },
       pagination: {
-        page: 1,
-        pageSize: novels.length || 20,
+        currentCursor: null,
+        nextCursor: null,
+        previousCursor: null,
         totalItems: novels.length,
-        totalPages: novels.length > 0 ? 1 : 0,
         hasPreviousPage: false,
         hasNextPage: false,
       },
@@ -228,9 +224,11 @@ export function normalizeLibraryCatalogResponse(
               | "editors-picks"
               | "new-voices")
           : null,
-      page: normalizeNumber(
-        (response.filters as Record<string, unknown> | undefined)?.page,
-        1
+      cursor: normalizeCursor(
+        (response.filters as Record<string, unknown> | undefined)?.cursor
+      ),
+      direction: normalizeDirection(
+        (response.filters as Record<string, unknown> | undefined)?.direction
       ),
       pageSize: normalizeNumber(
         (response.filters as Record<string, unknown> | undefined)?.pageSize,
@@ -238,21 +236,18 @@ export function normalizeLibraryCatalogResponse(
       ),
     },
     pagination: {
-      page: normalizeNumber(
-        (response.pagination as Record<string, unknown> | undefined)?.page,
-        1
+      currentCursor: normalizeCursor(
+        (response.pagination as Record<string, unknown> | undefined)?.currentCursor
       ),
-      pageSize: normalizeNumber(
-        (response.pagination as Record<string, unknown> | undefined)?.pageSize,
-        novels.length || 20
+      nextCursor: normalizeCursor(
+        (response.pagination as Record<string, unknown> | undefined)?.nextCursor
+      ),
+      previousCursor: normalizeCursor(
+        (response.pagination as Record<string, unknown> | undefined)?.previousCursor
       ),
       totalItems: normalizeNumber(
         (response.pagination as Record<string, unknown> | undefined)?.totalItems,
         total
-      ),
-      totalPages: normalizeNumber(
-        (response.pagination as Record<string, unknown> | undefined)?.totalPages,
-        total > 0 ? 1 : 0
       ),
       hasPreviousPage: Boolean(
         (response.pagination as Record<string, unknown> | undefined)?.hasPreviousPage
@@ -278,27 +273,53 @@ export function normalizeLibraryCatalogResponse(
 export async function loadLibraryCatalog(input: {
   query?: string
   sortBy?: CatalogSortBy
-  page?: number
+  cursor?: string | null
+  direction?: LibraryCatalogDirection
   pageSize?: number
   genre?: string | null
   workType?: "ORIGINAL" | "TRANSLATION" | null
   status?: "Ongoing" | "Completed" | "Hiatus" | null
   collection?: "trending" | "hidden-gems" | "editors-picks" | "new-voices" | null
 } = {}) {
-  if (!catalogApi.fetchLibraryCatalog) {
-    throw new Error("Library catalog API is not available yet.")
+  const normalizedQuery = input.query?.trim() ?? ""
+  const params = new URLSearchParams()
+
+  if (normalizedQuery) {
+    params.set("q", normalizedQuery)
+  }
+  if (input.sortBy) {
+    params.set("sort", input.sortBy)
+  }
+  if (input.cursor) {
+    params.set("cursor", input.cursor)
+  }
+  if (input.direction) {
+    params.set("direction", input.direction)
+  }
+  params.set("pageSize", String(input.pageSize ?? 18))
+  if (input.genre?.trim()) {
+    params.set("genre", input.genre.trim())
+  }
+  if (input.workType) {
+    params.set("workType", input.workType)
+  }
+  if (input.status) {
+    params.set("status", input.status)
+  }
+  if (input.collection) {
+    params.set("collection", input.collection)
   }
 
-  const normalizedQuery = input.query?.trim() ?? ""
-  const payload = await catalogApi.fetchLibraryCatalog({
-    query: normalizedQuery || undefined,
-    sortBy: input.sortBy,
-    page: input.page ?? 1,
-    pageSize: input.pageSize ?? 18,
-    genre: input.genre ?? null,
-    workType: input.workType ?? null,
-    status: input.status ?? null,
-    collection: input.collection ?? null,
-  })
+  const response = await fetch(`/api/v1/library${params.toString() ? `?${params}` : ""}`)
+  const payload = (await response.json().catch(() => null)) as unknown
+
+  if (!response.ok) {
+    const errorMessage =
+      (payload as { error?: string; message?: string } | null)?.error ||
+      (payload as { error?: string; message?: string } | null)?.message ||
+      "Failed to load the library catalog."
+    throw new Error(errorMessage)
+  }
+
   return normalizeLibraryCatalogResponse(payload, normalizedQuery)
 }

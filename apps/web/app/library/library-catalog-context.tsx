@@ -21,19 +21,21 @@ type CollectionFilter =
   | "editors-picks"
   | "new-voices"
   | null
+type CursorDirection = "next" | "prev" | null
 
 interface LibraryCatalogContextValue {
   query: string
   deferredQuery: string
   sortBy: CatalogSortBy
-  page: number
+  cursor: string | null
+  direction: CursorDirection
   genre: string | null
   workType: WorkTypeFilter
   status: StatusFilter
   collection: CollectionFilter
   setQuery: (query: string) => void
   setSortBy: (sortBy: CatalogSortBy) => void
-  setPage: (page: number) => void
+  setCursorState: (state: { cursor: string | null; direction: CursorDirection }) => void
   setGenre: (genre: string | null) => void
   setWorkType: (workType: WorkTypeFilter) => void
   setStatus: (status: StatusFilter) => void
@@ -69,9 +71,12 @@ function normalizeCollection(value: string | null): CollectionFilter {
     : null
 }
 
-function normalizePage(value: string | null) {
-  const page = Number.parseInt(value ?? "", 10)
-  return Number.isFinite(page) && page > 0 ? page : 1
+function normalizeCursor(value: string | null) {
+  return value && value.trim().length > 0 ? value : null
+}
+
+function normalizeCursorDirection(value: string | null): CursorDirection {
+  return value === "next" || value === "prev" ? value : null
 }
 
 export function LibraryCatalogProvider({ children }: { children: ReactNode }) {
@@ -82,7 +87,10 @@ export function LibraryCatalogProvider({ children }: { children: ReactNode }) {
   const [sortBy, setSortBy] = useState<CatalogSortBy>(
     normalizeSortBy(searchParams.get("sort"))
   )
-  const [page, setPage] = useState<number>(normalizePage(searchParams.get("page")))
+  const [cursor, setCursor] = useState<string | null>(normalizeCursor(searchParams.get("cursor")))
+  const [direction, setDirection] = useState<CursorDirection>(
+    normalizeCursorDirection(searchParams.get("direction"))
+  )
   const [genre, setGenre] = useState<string | null>(searchParams.get("genre") || null)
   const [workType, setWorkType] = useState<WorkTypeFilter>(
     normalizeWorkType(searchParams.get("workType"))
@@ -104,7 +112,8 @@ export function LibraryCatalogProvider({ children }: { children: ReactNode }) {
       setQuery(nextQuery)
     }
     setSortBy(normalizeSortBy(searchParams.get("sort")))
-    setPage(normalizePage(searchParams.get("page")))
+    setCursor(normalizeCursor(searchParams.get("cursor")))
+    setDirection(normalizeCursorDirection(searchParams.get("direction")))
     setGenre(searchParams.get("genre") || null)
     setWorkType(normalizeWorkType(searchParams.get("workType")))
     setStatus(normalizeStatus(searchParams.get("status")))
@@ -120,8 +129,9 @@ export function LibraryCatalogProvider({ children }: { children: ReactNode }) {
     if (sortBy !== "recent") {
       params.set("sort", sortBy)
     }
-    if (page > 1) {
-      params.set("page", String(page))
+    if (cursor && direction) {
+      params.set("cursor", cursor)
+      params.set("direction", direction)
     }
     if (genre?.trim()) {
       params.set("genre", genre.trim())
@@ -137,7 +147,7 @@ export function LibraryCatalogProvider({ children }: { children: ReactNode }) {
     }
 
     return params.toString()
-  }, [collection, deferredQuery, genre, page, sortBy, status, workType])
+  }, [collection, cursor, deferredQuery, direction, genre, sortBy, status, workType])
 
   useEffect(() => {
     const currentSearch = searchParams.toString()
@@ -157,39 +167,53 @@ export function LibraryCatalogProvider({ children }: { children: ReactNode }) {
         query,
         deferredQuery,
         sortBy,
-        page,
+        cursor,
+        direction,
         genre,
         workType,
         status,
         collection,
         setQuery: (nextQuery) => {
           setQuery(nextQuery)
-          setPage(1)
+          setCursor(null)
+          setDirection(null)
         },
         setSortBy: (nextSortBy) => {
           setSortBy(nextSortBy)
-          setPage(1)
+          setCursor(null)
+          setDirection(null)
         },
-        setPage,
+        setCursorState: ({
+          cursor: nextCursor,
+          direction: nextDirection,
+        }) => {
+          setCursor(nextCursor)
+          setDirection(nextDirection)
+        },
         setGenre: (nextGenre) => {
           setGenre(nextGenre)
-          setPage(1)
+          setCursor(null)
+          setDirection(null)
         },
         setWorkType: (nextWorkType) => {
           setWorkType(nextWorkType)
-          setPage(1)
+          setCursor(null)
+          setDirection(null)
         },
         setStatus: (nextStatus) => {
           setStatus(nextStatus)
-          setPage(1)
+          setCursor(null)
+          setDirection(null)
         },
         setCollection: (nextCollection) => {
           setCollection(nextCollection)
-          setPage(1)
+          setCursor(null)
+          setDirection(null)
         },
         clearQuery: () => {
           setQuery("")
-          setPage(1)
+          setCursor(null)
+          setDirection(null)
         },
         clearFilters: () => {
           setGenre(null)
@@ -197,7 +221,8 @@ export function LibraryCatalogProvider({ children }: { children: ReactNode }) {
           setStatus(null)
           setCollection(null)
           setSortBy("recent")
-          setPage(1)
+          setCursor(null)
+          setDirection(null)
         },
       }}
     >

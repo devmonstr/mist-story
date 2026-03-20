@@ -36,11 +36,16 @@ export const publicCatalogCollectionFilterSchema = z.enum([
 ])
 export const catalogPageSchema = z.number().int().positive()
 export const catalogPageSizeSchema = z.number().int().positive().max(50)
+export const catalogCursorSchema = z.string().min(1)
+export const catalogCursorDirectionSchema = z.enum(["next", "prev"])
 export const catalogPaginationSchema = z.object({
   page: catalogPageSchema,
   pageSize: catalogPageSizeSchema,
   totalItems: z.number().int().nonnegative(),
   totalPages: z.number().int().nonnegative(),
+  currentCursor: z.string().nullable(),
+  nextCursor: z.string().nullable(),
+  previousCursor: z.string().nullable(),
   hasPreviousPage: z.boolean(),
   hasNextPage: z.boolean(),
 })
@@ -55,6 +60,8 @@ export const publicCatalogQuerySchema = z.object({
   scope: publicCatalogScopeSchema,
   page: catalogPageSchema.optional(),
   pageSize: catalogPageSizeSchema.optional(),
+  cursor: catalogCursorSchema.optional(),
+  direction: catalogCursorDirectionSchema.optional(),
 })
 
 export const publicCatalogFacetBucketSchema = z.object({
@@ -85,6 +92,8 @@ export const libraryCatalogFiltersSchema = z.object({
   collection: publicCatalogCollectionFilterSchema.nullable(),
   page: catalogPageSchema,
   pageSize: catalogPageSizeSchema,
+  cursor: catalogCursorSchema.nullable(),
+  direction: catalogCursorDirectionSchema.nullable(),
 })
 
 export const libraryCatalogNovelSchema = z.object({

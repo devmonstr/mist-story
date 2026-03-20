@@ -1,4 +1,5 @@
 import {
+  countLibraryCollectionNovels,
   countFollowersForUsers,
   countLibraryCatalogNovels,
   countPublishedNovelsForUsers,
@@ -8,7 +9,8 @@ import {
   findPublicChapterForNovelByNumber,
   findPublicNovelByIdOrSlug,
   hexToNpub,
-  listAllLibraryCatalogNovels,
+  listLibraryCollectionFacetCounts,
+  listLibraryCollectionNovels,
   listLibraryCatalogFacetCounts,
   listLibraryCatalogNovels,
   listPublicNovelChapters,
@@ -28,7 +30,7 @@ import type {
   PublicNovelReaderResponse,
   PublicNovelViewerStateDto,
 } from "@mist/shared"
-import { applyCatalogCollection } from "./public-catalog-utils"
+import { encodeCatalogCursor } from "./catalog-cursor"
 import { HttpError } from "../utils/http-error"
 
 function stripHtml(html: string) {
@@ -163,6 +165,8 @@ function buildPublicCatalogFilters(input: {
   status?: "Ongoing" | "Completed" | "Hiatus" | null
   collection?: "trending" | "hidden-gems" | "editors-picks" | "new-voices" | null
   sortBy?: CatalogSortBy | PublicCatalogSortBy
+  page?: number
+  pageSize?: number
 }): PublicCatalogQuery {
   const sort = input.sortBy ?? "recent"
   const normalizedSort =
@@ -176,6 +180,8 @@ function buildPublicCatalogFilters(input: {
     collection: input.collection ?? "all",
     sort: normalizedSort,
     scope: "novel",
+    page: input.page,
+    pageSize: input.pageSize,
   }
 }
 
@@ -349,11 +355,43 @@ function buildNovelDetailDto(input: {
   }
 }
 
+type LibraryCatalogNovelSource = {
+  id: string
+  slug: string
+  title: string
+  summary: string
+  genre: string
+  workType: "ORIGINAL" | "TRANSLATION"
+  status: "Ongoing" | "Completed" | "Hiatus"
+  visibility: "PUBLISHED" | "HIDDEN"
+  coverUrl: string
+  coverStorageKey: string | null
+  authorDisplayName: string | null
+  chaptersCount: number
+  rating: Parameters<typeof decimalToNumber>[0]
+  ratingsCount: number
+  publishedAt: Date | null
+  updatedAt: Date
+  author: {
+    id: string
+    pubkey: string
+    displayName: string | null
+    handle: string | null
+    avatarUrl: string | null
+  }
+  _count: {
+    readingProgress: number
+    bookmarks: number
+  }
+}
+
 export async function listLibraryCatalog(input: {
   query?: string
   sortBy?: CatalogSortBy | PublicCatalogSortBy
   page?: number
   pageSize?: number
+  cursor?: string | null
+  direction?: "next" | "prev" | null
   genre?: string | null
   workType?: "ORIGINAL" | "TRANSLATION" | null
   status?: "Ongoing" | "Completed" | "Hiatus" | null
@@ -377,51 +415,61 @@ export async function listLibraryCatalog(input: {
     status,
   }
 
-  const collectionBaseNovels = collection ? await listAllLibraryCatalogNovels(filters, sortBy) : null
-  const collectionNovels = collection
-    ? await applyCatalogCollection(collectionBaseNovels ?? [], collection)
-    : null
-  const [facetsSource, novels, aggregateFacetCounts, totalSource] = collection
-    ? [collectionNovels ?? [], (collectionNovels ?? []).slice(pagination.skip, pagination.skip + pagination.pageSize), null, (collectionNovels ?? []).length]
-    : await Promise.all([
-        Promise.resolve<Awaited<ReturnType<typeof listLibraryCatalogNovels>>>([]),
-        listLibraryCatalogNovels(filters, {
-          sortBy,
-          page: pagination.page,
-          pageSize: pagination.pageSize,
-        }),
-        listLibraryCatalogFacetCounts(filters),
-        countLibraryCatalogNovels(filters),
-      ])
+  let facetCounts: {
+    total: number
+    genres: Array<{ value: string; label: string; count: number }>
+    workTypes: Array<{ value: string; label: string; count: number }>
+      statuses: Array<{ value: string; label: string; count: number }>
+  }
+  let catalogNovels: LibraryCatalogNovelSource[]
+  let totalItems: number
 
-  const facetCounts = collection
-    ? buildCatalogFacetCounts(facetsSource)
-    : (() => {
-        const counts = aggregateFacetCounts!
+  if (collection) {
+    const [collectionFacets, collectionNovels, collectionTotal] = await Promise.all([
+      listLibraryCollectionFacetCounts(collection, filters),
+      listLibraryCollectionNovels(collection, filters, {
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+      }),
+      countLibraryCollectionNovels(collection, filters),
+    ])
 
-        return {
-          total: counts.total,
-          genres: counts.genres.map((item) => ({
-          value: item.genre,
-          label: item.genre,
-          count: item._count._all,
-          })),
-          workTypes: counts.workTypes.map((item) => ({
-          value: item.workType,
-          label: item.workType === "TRANSLATION" ? "Translation" : "Original",
-          count: item._count._all,
-          })),
-          statuses: counts.statuses.map((item) => ({
-          value: item.status,
-          label: item.status,
-          count: item._count._all,
-          })),
-        }
-      })()
-  const sortedNovels = collection
-    ? novels
-    : sortCatalogNovels(novels, sortBy, normalizedQuery)
-  const totalItems = collection ? (collectionNovels ?? []).length : totalSource
+    facetCounts = collectionFacets
+    catalogNovels = collectionNovels
+    totalItems = collectionTotal
+  } else {
+    const [novels, aggregateFacetCounts, totalSource] = await Promise.all([
+      listLibraryCatalogNovels(filters, {
+        sortBy,
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+      }),
+      listLibraryCatalogFacetCounts(filters),
+      countLibraryCatalogNovels(filters),
+    ])
+
+    facetCounts = {
+      total: aggregateFacetCounts.total,
+      genres: aggregateFacetCounts.genres.map((item) => ({
+        value: item.genre,
+        label: item.genre,
+        count: item._count._all,
+      })),
+      workTypes: aggregateFacetCounts.workTypes.map((item) => ({
+        value: item.workType,
+        label: item.workType === "TRANSLATION" ? "Translation" : "Original",
+        count: item._count._all,
+      })),
+      statuses: aggregateFacetCounts.statuses.map((item) => ({
+        value: item.status,
+        label: item.status,
+        count: item._count._all,
+      })),
+    }
+    catalogNovels = sortCatalogNovels(novels, sortBy, normalizedQuery)
+    totalItems = totalSource
+  }
+
   const totalPages = totalItems > 0 ? Math.ceil(totalItems / pagination.pageSize) : 0
   const publicFilters = buildPublicCatalogFilters({
     query: normalizedQuery,
@@ -430,7 +478,12 @@ export async function listLibraryCatalog(input: {
     status,
     collection,
     sortBy,
+    page: pagination.page,
+    pageSize: pagination.pageSize,
   })
+  const currentCursor = totalItems > 0 ? encodeCatalogCursor(pagination.page) : null
+  const nextCursor = totalPages > pagination.page ? currentCursor : null
+  const previousCursor = pagination.page > 1 ? currentCursor : null
 
   return {
     query: normalizedQuery,
@@ -444,12 +497,17 @@ export async function listLibraryCatalog(input: {
       collection: collection ?? "all",
       page: pagination.page,
       pageSize: pagination.pageSize,
+      cursor: currentCursor,
+      direction: null,
     },
     pagination: {
       page: pagination.page,
       pageSize: pagination.pageSize,
       totalItems,
       totalPages,
+      currentCursor,
+      nextCursor,
+      previousCursor,
       hasPreviousPage: pagination.page > 1,
       hasNextPage: totalPages > pagination.page,
     },
@@ -465,7 +523,7 @@ export async function listLibraryCatalog(input: {
       workTypes: facetCounts.workTypes,
       statuses: facetCounts.statuses,
     },
-    novels: sortedNovels.map((novel) => ({
+    novels: catalogNovels.map((novel) => ({
       id: novel.id,
       slug: novel.slug,
       title: novel.title,
