@@ -13,7 +13,6 @@ import {
   Check,
   Eye,
   FileText,
-  GripVertical,
   Heading1,
   Heading2,
   Italic,
@@ -21,14 +20,11 @@ import {
   ListOrdered,
   Loader2,
   Menu,
-  MoreVertical,
-  Plus,
   Rocket,
   Quote,
   Redo,
   Save,
   Settings,
-  Trash2,
   Type,
   Underline,
   Undo,
@@ -43,13 +39,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
   createChapter,
   deleteChapter,
   fetchNovel,
@@ -63,6 +52,7 @@ import {
   type EditorNovel,
 } from "@/lib/studio"
 import { resolveNovelCoverSrc } from "@/lib/novel-cover"
+import { ChapterPanel } from "./chapter-panel"
 
 function getPlainTextFromHtml(html: string) {
   return html
@@ -106,6 +96,7 @@ export default function NovelEditorPage() {
   const params = useParams()
   const novelId = params.novelId as string
   const editorRef = useRef<HTMLDivElement>(null)
+  const isMountedRef = useRef(true)
   const [novel, setNovel] = useState<EditorNovel | null>(null)
   const [activeChapterId, setActiveChapterId] = useState("")
   const [chapterDrafts, setChapterDrafts] = useState<
@@ -125,13 +116,19 @@ export default function NovelEditorPage() {
   const [isPublishing, setIsPublishing] = useState(false)
   const [isReordering, setIsReordering] = useState(false)
   const [deletingChapterId, setDeletingChapterId] = useState<string | null>(null)
-  const [draggedChapterId, setDraggedChapterId] = useState<string | null>(null)
-  const [dragOverChapterId, setDragOverChapterId] = useState<string | null>(null)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [publishMessage, setPublishMessage] = useState<string | null>(null)
+
+  const novelRef = useRef<EditorNovel | null>(null)
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!user) return
@@ -178,6 +175,55 @@ export default function NovelEditorPage() {
   const activeChapter = useMemo(
     () => novel?.chapters.find((chapter) => chapter.id === activeChapterId) ?? null,
     [activeChapterId, novel]
+  )
+
+  useEffect(() => {
+    novelRef.current = novel
+  }, [novel])
+
+  const refreshEditorChapters = useCallback(async () => {
+    const currentNovelId = novelRef.current?.id ?? novelId
+    const freshChapters = await fetchNovelChapters(currentNovelId)
+    const mappedChapters = freshChapters.map(mapChapterToEditorChapter)
+
+    if (isMountedRef.current) {
+      setNovel((current) =>
+        current
+          ? {
+              ...current,
+              chapters: mappedChapters,
+            }
+          : current
+      )
+    }
+
+    return mappedChapters
+  }, [novelId])
+
+  const waitForPublishedChapter = useCallback(
+    async (chapterId: string) => {
+      const maxAttempts = 20
+
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        try {
+          const chapters = await refreshEditorChapters()
+          const publishedChapter = chapters.find((chapter) => chapter.id === chapterId)
+
+          if (publishedChapter?.status === "PUBLISHED") {
+            return true
+          }
+        } catch (error) {
+          console.warn("Failed to refresh chapter publish state:", error)
+        }
+
+        if (attempt < maxAttempts - 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, 1200))
+        }
+      }
+
+      return false
+    },
+    [refreshEditorChapters]
   )
 
   useEffect(() => {
@@ -333,72 +379,59 @@ export default function NovelEditorPage() {
     }
   }
 
-  const handleReorderChapters = async (targetChapterId: string) => {
-    if (!novel || !draggedChapterId || draggedChapterId === targetChapterId) {
-      setDraggedChapterId(null)
-      setDragOverChapterId(null)
-      return
-    }
+  const handleReorderChapters = useCallback(
+    async (orderedChapterIds: string[]) => {
+      const currentNovel = novelRef.current
+      if (!currentNovel || orderedChapterIds.length !== currentNovel.chapters.length) {
+        return
+      }
 
-    const fromIndex = novel.chapters.findIndex((chapter) => chapter.id === draggedChapterId)
-    const toIndex = novel.chapters.findIndex((chapter) => chapter.id === targetChapterId)
-    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) {
-      setDraggedChapterId(null)
-      setDragOverChapterId(null)
-      return
-    }
+      const chapterMap = new Map(currentNovel.chapters.map((chapter) => [chapter.id, chapter]))
+      const reorderedChapters = orderedChapterIds
+        .map((chapterId) => chapterMap.get(chapterId) ?? null)
+        .filter((chapter): chapter is NonNullable<typeof chapter> => chapter !== null)
 
-    const reorderedChapters = [...novel.chapters]
-    const [movedChapter] = reorderedChapters.splice(fromIndex, 1)
-    reorderedChapters.splice(toIndex, 0, movedChapter)
-
-    setNovel((current) =>
-      current
-        ? {
-            ...current,
-            chapters: reorderedChapters,
-          }
-        : current
-    )
-    setDraggedChapterId(null)
-    setDragOverChapterId(null)
-
-    try {
-      setIsReordering(true)
-      setErrorMessage(null)
-      const chapters = await reorderChapters(novel.id, {
-        orderedChapterIds: reorderedChapters.map((chapter) => chapter.id),
-      })
+      if (reorderedChapters.length !== currentNovel.chapters.length) {
+        return
+      }
 
       setNovel((current) =>
         current
           ? {
               ...current,
-              chapters: chapters.map(mapChapterToEditorChapter),
+              chapters: reorderedChapters,
             }
           : current
       )
-    } catch (error) {
-      console.error("Failed to reorder chapters:", error)
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to reorder chapters."
-      )
 
-      const freshChapters = await fetchNovelChapters(novel.id).catch(() => null)
-      if (freshChapters) {
+      try {
+        setIsReordering(true)
+        setErrorMessage(null)
+        const chapters = await reorderChapters(currentNovel.id, {
+          orderedChapterIds,
+        })
+
         setNovel((current) =>
           current
             ? {
                 ...current,
-                chapters: freshChapters.map(mapChapterToEditorChapter),
+                chapters: chapters.map(mapChapterToEditorChapter),
               }
             : current
         )
+      } catch (error) {
+        console.error("Failed to reorder chapters:", error)
+        setErrorMessage(
+          error instanceof Error ? error.message : "Failed to reorder chapters."
+        )
+
+        await refreshEditorChapters().catch(() => null)
+      } finally {
+        setIsReordering(false)
       }
-    } finally {
-      setIsReordering(false)
-    }
-  }
+    },
+    []
+  )
 
   const handlePublish = async () => {
     if (!activeChapter) return
@@ -411,10 +444,18 @@ export default function NovelEditorPage() {
       if (!didSave) {
         return
       }
+      const chapterId = activeChapter.id
       const previewText = getPlainTextFromHtml(draftContent).slice(0, 280)
-      await publishChapter(activeChapter.id, { previewText })
+      await publishChapter(chapterId, { previewText })
       setPublishMessage(
-        "Publish job queued. The worker will update the chapter status after relay delivery succeeds."
+        "Publish job queued. Waiting for relay confirmation..."
+      )
+
+      const didPublish = await waitForPublishedChapter(chapterId)
+      setPublishMessage(
+        didPublish
+          ? "Chapter published successfully."
+          : "Publish job is still processing. Stay on this page and the chapter status will refresh automatically."
       )
     } catch (error) {
       console.error("Failed to publish chapter:", error)
@@ -446,96 +487,6 @@ export default function NovelEditorPage() {
 
   if (!isAuthenticated || !novel) return null
 
-  const ChaptersList = ({ onSelect }: { onSelect?: () => void }) => (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between p-4">
-        <h2 className="text-sm font-medium text-foreground">Chapters</h2>
-        <Button variant="ghost" size="icon" onClick={() => void addNewChapter()} className="h-8 w-8">
-          <Plus className="h-4 w-4" />
-          <span className="sr-only">Add chapter</span>
-        </Button>
-      </div>
-      <Separator />
-      <div className="flex-1 overflow-y-auto p-2">
-        {novel.chapters.map((chapter, index) => (
-          <div
-            key={chapter.id}
-            onDragOver={(event) => {
-              event.preventDefault()
-              if (draggedChapterId && draggedChapterId !== chapter.id) {
-                setDragOverChapterId(chapter.id)
-              }
-            }}
-            onDrop={(event) => {
-              event.preventDefault()
-              void handleReorderChapters(chapter.id)
-            }}
-            onDragEnd={() => {
-              setDraggedChapterId(null)
-              setDragOverChapterId(null)
-            }}
-            className={`group flex items-center gap-2 rounded-sm px-2 py-2 transition-colors ${
-              chapter.id === activeChapterId
-                ? "bg-muted"
-                : dragOverChapterId === chapter.id
-                  ? "bg-muted/70"
-                  : "hover:bg-muted/50"
-            }`}
-          >
-            <button
-              type="button"
-              draggable={!isReordering}
-              onDragStart={() => {
-                setDraggedChapterId(chapter.id)
-                setDragOverChapterId(chapter.id)
-              }}
-              className="shrink-0 rounded-sm p-1 text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed"
-              disabled={isReordering}
-              aria-label={`Reorder ${chapter.title}`}
-            >
-              <GripVertical className="h-4 w-4 cursor-grab" />
-            </button>
-            <button
-              onClick={() => {
-                setActiveChapterId(chapter.id)
-                onSelect?.()
-              }}
-              className="flex flex-1 items-center gap-2 text-left"
-            >
-              <span className="text-xs text-muted-foreground">{index + 1}.</span>
-              <span className="flex-1 truncate text-sm">{chapter.title}</span>
-            </button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100">
-                  <MoreVertical className="h-3 w-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setActiveChapterId(chapter.id)}>
-                  Open
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-destructive"
-                  onClick={() => void handleDeleteChapter(chapter.id)}
-                  disabled={novel.chapters.length <= 1 || deletingChapterId === chapter.id}
-                >
-                  {deletingChapterId === chapter.id ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="mr-2 h-4 w-4" />
-                  )}
-                  Delete chapter
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-
   return (
     <div className="flex h-screen flex-col bg-background">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border/40 px-4">
@@ -548,7 +499,19 @@ export default function NovelEditorPage() {
             </SheetTrigger>
             <SheetContent side="left" className="w-72 p-0">
               <SheetTitle className="sr-only">Chapters</SheetTitle>
-              <ChaptersList onSelect={() => setIsSidebarOpen(false)} />
+              <ChapterPanel
+                chapters={novel.chapters}
+                activeChapterId={activeChapterId}
+                deletingChapterId={deletingChapterId}
+                isPersistingOrder={isReordering}
+                onAddChapter={() => void addNewChapter()}
+                onDeleteChapter={(chapterId) => void handleDeleteChapter(chapterId)}
+                onSelectChapter={setActiveChapterId}
+                onReorderChapters={(orderedChapterIds) =>
+                  void handleReorderChapters(orderedChapterIds)
+                }
+                onSelectionComplete={() => setIsSidebarOpen(false)}
+              />
             </SheetContent>
           </Sheet>
 
@@ -607,7 +570,18 @@ export default function NovelEditorPage() {
 
       <div className="flex flex-1 overflow-hidden">
         <aside className="hidden w-64 shrink-0 border-r border-border/40 lg:block">
-          <ChaptersList />
+          <ChapterPanel
+            chapters={novel.chapters}
+            activeChapterId={activeChapterId}
+            deletingChapterId={deletingChapterId}
+            isPersistingOrder={isReordering}
+            onAddChapter={() => void addNewChapter()}
+            onDeleteChapter={(chapterId) => void handleDeleteChapter(chapterId)}
+            onSelectChapter={setActiveChapterId}
+            onReorderChapters={(orderedChapterIds) =>
+              void handleReorderChapters(orderedChapterIds)
+            }
+          />
         </aside>
 
         <main className="flex flex-1 flex-col overflow-hidden">

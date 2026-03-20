@@ -1,11 +1,18 @@
 import type { NostrEvent, NostrProfile, NostrUser } from "./nostr-types"
-import { schnorr } from "@noble/secp256k1"
+import { hashes, schnorr } from "@noble/secp256k1"
+import { hmac } from "@noble/hashes/hmac.js"
+import { sha256 } from "@noble/hashes/sha2.js"
 
 type SignedAuthEvent = NostrEvent & {
   pubkey: string
   id: string
   sig: string
 }
+
+hashes.hmacSha256 = (key, message) => hmac(sha256, key, message)
+hashes.sha256 = sha256
+hashes.hmacSha256Async = async (key, message) => hmac(sha256, key, message)
+hashes.sha256Async = async (message) => sha256(message)
 
 // Bech32 character set
 const BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
@@ -175,8 +182,13 @@ export async function signEvent(event: NostrEvent): Promise<NostrEvent | null> {
 
 async function sha256Hex(input: string): Promise<string> {
   const bytes = new TextEncoder().encode(input)
-  const digest = await crypto.subtle.digest("SHA-256", bytes)
-  return bytesToHex(new Uint8Array(digest))
+  const subtle = globalThis.crypto?.subtle
+  if (subtle) {
+    const digest = await subtle.digest("SHA-256", bytes)
+    return bytesToHex(new Uint8Array(digest))
+  }
+
+  return bytesToHex(sha256(bytes))
 }
 
 function serializeEvent(event: NostrEvent & { pubkey: string }) {
@@ -195,7 +207,7 @@ async function buildSignedEvent(
   privateKeyHex: string
 ): Promise<SignedAuthEvent> {
   const id = await sha256Hex(serializeEvent(event))
-  const sigBytes = await schnorr.signAsync(hexToBytes(id), hexToBytes(privateKeyHex))
+  const sigBytes = schnorr.sign(hexToBytes(id), hexToBytes(privateKeyHex))
 
   return {
     ...event,

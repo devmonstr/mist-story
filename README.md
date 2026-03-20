@@ -50,6 +50,7 @@ R2_PUBLIC_BASE_URL=""
 
 ## Environment Notes
 
+- If you access the Next.js dev server from another device on your LAN, set `ALLOWED_DEV_ORIGINS` in `.env.local` to a comma-separated list of extra hostnames or IPs that should be allowed during development.
 - The repository expects `LF` line endings for source files. `.gitattributes` and `.editorconfig` are included to keep Git and editors aligned.
 - On Windows/WSL setups, prefer using one Git environment consistently for the same working copy to avoid noisy `git status` metadata changes.
 - If `pnpm install` fails with a Prisma `EPERM` error on `query_engine-windows.dll.node`, stop any running `pnpm dev`, Prisma Studio, or Node processes that may still be locking the engine file, then run `pnpm install` again.
