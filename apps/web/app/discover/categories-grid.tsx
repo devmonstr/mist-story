@@ -1,65 +1,15 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
 import { ChevronRight } from "lucide-react"
-import { loadDiscoverData, type DiscoverCategory } from "./discover-data"
-import { CategoriesSkeleton } from "./categories-skeleton"
 
-export function CategoriesGrid() {
-  const [categories, setCategories] = useState<DiscoverCategory[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+import type { DiscoverCategory } from "./discover-data"
 
-  useEffect(() => {
-    let active = true
+interface CategoriesGridProps {
+  categories: DiscoverCategory[]
+}
 
-    void loadDiscoverData()
-      .then((payload) => {
-        if (!active) {
-          return
-        }
-
-        setCategories(payload.genres)
-      })
-      .catch((loadError) => {
-        if (!active) {
-          return
-        }
-
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : "Failed to load categories."
-        )
-      })
-      .finally(() => {
-        if (active) {
-          setIsLoading(false)
-        }
-      })
-
-    return () => {
-      active = false
-    }
-  }, [])
-
-  if (isLoading) {
-    return <CategoriesSkeleton />
-  }
-
-  if (error) {
-    return (
-      <section className="border-b border-border/40 px-4 py-10 sm:px-6 sm:py-16 lg:px-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="rounded-lg border border-border/40 bg-card p-6 text-sm text-muted-foreground sm:p-8">
-            {error}
-          </div>
-        </div>
-      </section>
-    )
-  }
-
+export function CategoriesGrid({ categories }: CategoriesGridProps) {
   return (
     <section className="border-b border-border/40 px-4 py-10 sm:px-6 sm:py-16 lg:px-8">
       <div className="mx-auto max-w-7xl">

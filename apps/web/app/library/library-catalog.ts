@@ -1,4 +1,4 @@
-import * as api from "@/lib/api"
+import type { CatalogSortBy } from "@mist/shared"
 
 export interface LibraryCatalogNovel {
   id: string
@@ -30,13 +30,33 @@ export interface LibraryCatalogResponse {
   novels: LibraryCatalogNovel[]
   total: number
   query: string
+  filters: {
+    query: string
+    sortBy: CatalogSortBy
+    genre: string | null
+    workType: "ORIGINAL" | "TRANSLATION" | null
+    status: "Ongoing" | "Completed" | "Hiatus" | null
+    collection: "all" | "trending" | "hidden-gems" | "editors-picks" | "new-voices" | null
+    cursor: string | null
+    direction: "next" | "prev" | null
+    pageSize: number
+  }
+  pagination: {
+    currentCursor: string | null
+    nextCursor: string | null
+    previousCursor: string | null
+    totalItems: number
+    hasPreviousPage: boolean
+    hasNextPage: boolean
+  }
+  facets: {
+    genres: Array<{ value: string; label: string; count: number }>
+    workTypes: Array<{ value: string; label: string; count: number }>
+    statuses: Array<{ value: string; label: string; count: number }>
+  }
 }
 
-type CatalogApi = typeof api & {
-  fetchLibraryCatalog?: (query?: string) => Promise<unknown>
-}
-
-const catalogApi = api as CatalogApi
+type LibraryCatalogDirection = "next" | "prev" | null
 
 function normalizeNumber(value: unknown, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback
@@ -44,6 +64,30 @@ function normalizeNumber(value: unknown, fallback = 0) {
 
 function normalizeString(value: unknown, fallback = "") {
   return typeof value === "string" ? value : fallback
+}
+
+function normalizeCursor(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value : null
+}
+
+function normalizeDirection(value: unknown): LibraryCatalogDirection {
+  return value === "next" || value === "prev" ? value : null
+}
+
+function normalizeFacetItems(value: unknown) {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value.map((item) => {
+    const facet = (item ?? {}) as Record<string, unknown>
+
+    return {
+      value: normalizeString(facet.value),
+      label: normalizeString(facet.label, normalizeString(facet.value)),
+      count: normalizeNumber(facet.count),
+    }
+  })
 }
 
 function normalizeNovel(value: unknown): LibraryCatalogNovel {
@@ -108,6 +152,30 @@ export function normalizeLibraryCatalogResponse(
       novels,
       total: novels.length,
       query,
+      filters: {
+        query,
+        sortBy: "recent",
+        genre: null,
+        workType: null,
+        status: null,
+        collection: null,
+        cursor: null,
+        direction: null,
+        pageSize: novels.length || 20,
+      },
+      pagination: {
+        currentCursor: null,
+        nextCursor: null,
+        previousCursor: null,
+        totalItems: novels.length,
+        hasPreviousPage: false,
+        hasNextPage: false,
+      },
+      facets: {
+        genres: [],
+        workTypes: [],
+        statuses: [],
+      },
     }
   }
 
@@ -128,14 +196,130 @@ export function normalizeLibraryCatalogResponse(
     novels,
     total,
     query: normalizeString(response.query, query),
+    filters: {
+      query: normalizeString((response.filters as Record<string, unknown> | undefined)?.query, query),
+      sortBy:
+        normalizeString(
+          (response.filters as Record<string, unknown> | undefined)?.sortBy,
+          "recent"
+        ) as CatalogSortBy,
+      genre:
+        typeof (response.filters as Record<string, unknown> | undefined)?.genre === "string"
+          ? normalizeString((response.filters as Record<string, unknown>).genre)
+          : null,
+      workType:
+        typeof (response.filters as Record<string, unknown> | undefined)?.workType === "string"
+          ? ((response.filters as Record<string, unknown>).workType as "ORIGINAL" | "TRANSLATION")
+          : null,
+      status:
+        typeof (response.filters as Record<string, unknown> | undefined)?.status === "string"
+          ? ((response.filters as Record<string, unknown>).status as "Ongoing" | "Completed" | "Hiatus")
+          : null,
+      collection:
+        typeof (response.filters as Record<string, unknown> | undefined)?.collection === "string"
+          ? ((response.filters as Record<string, unknown>).collection as
+              | "all"
+              | "trending"
+              | "hidden-gems"
+              | "editors-picks"
+              | "new-voices")
+          : null,
+      cursor: normalizeCursor(
+        (response.filters as Record<string, unknown> | undefined)?.cursor
+      ),
+      direction: normalizeDirection(
+        (response.filters as Record<string, unknown> | undefined)?.direction
+      ),
+      pageSize: normalizeNumber(
+        (response.filters as Record<string, unknown> | undefined)?.pageSize,
+        novels.length || 20
+      ),
+    },
+    pagination: {
+      currentCursor: normalizeCursor(
+        (response.pagination as Record<string, unknown> | undefined)?.currentCursor
+      ),
+      nextCursor: normalizeCursor(
+        (response.pagination as Record<string, unknown> | undefined)?.nextCursor
+      ),
+      previousCursor: normalizeCursor(
+        (response.pagination as Record<string, unknown> | undefined)?.previousCursor
+      ),
+      totalItems: normalizeNumber(
+        (response.pagination as Record<string, unknown> | undefined)?.totalItems,
+        total
+      ),
+      hasPreviousPage: Boolean(
+        (response.pagination as Record<string, unknown> | undefined)?.hasPreviousPage
+      ),
+      hasNextPage: Boolean(
+        (response.pagination as Record<string, unknown> | undefined)?.hasNextPage
+      ),
+    },
+    facets: {
+      genres: normalizeFacetItems(
+        (response.facets as Record<string, unknown> | undefined)?.genres
+      ),
+      workTypes: normalizeFacetItems(
+        (response.facets as Record<string, unknown> | undefined)?.workTypes
+      ),
+      statuses: normalizeFacetItems(
+        (response.facets as Record<string, unknown> | undefined)?.statuses
+      ),
+    },
   }
 }
 
-export async function loadLibraryCatalog(query = "") {
-  if (!catalogApi.fetchLibraryCatalog) {
-    throw new Error("Library catalog API is not available yet.")
+export async function loadLibraryCatalog(input: {
+  query?: string
+  sortBy?: CatalogSortBy
+  cursor?: string | null
+  direction?: LibraryCatalogDirection
+  pageSize?: number
+  genre?: string | null
+  workType?: "ORIGINAL" | "TRANSLATION" | null
+  status?: "Ongoing" | "Completed" | "Hiatus" | null
+  collection?: "trending" | "hidden-gems" | "editors-picks" | "new-voices" | null
+} = {}) {
+  const normalizedQuery = input.query?.trim() ?? ""
+  const params = new URLSearchParams()
+
+  if (normalizedQuery) {
+    params.set("q", normalizedQuery)
+  }
+  if (input.sortBy) {
+    params.set("sort", input.sortBy)
+  }
+  if (input.cursor) {
+    params.set("cursor", input.cursor)
+  }
+  if (input.direction) {
+    params.set("direction", input.direction)
+  }
+  params.set("pageSize", String(input.pageSize ?? 18))
+  if (input.genre?.trim()) {
+    params.set("genre", input.genre.trim())
+  }
+  if (input.workType) {
+    params.set("workType", input.workType)
+  }
+  if (input.status) {
+    params.set("status", input.status)
+  }
+  if (input.collection) {
+    params.set("collection", input.collection)
   }
 
-  const payload = await catalogApi.fetchLibraryCatalog(query.trim() || undefined)
-  return normalizeLibraryCatalogResponse(payload, query.trim())
+  const response = await fetch(`/api/v1/library${params.toString() ? `?${params}` : ""}`)
+  const payload = (await response.json().catch(() => null)) as unknown
+
+  if (!response.ok) {
+    const errorMessage =
+      (payload as { error?: string; message?: string } | null)?.error ||
+      (payload as { error?: string; message?: string } | null)?.message ||
+      "Failed to load the library catalog."
+    throw new Error(errorMessage)
+  }
+
+  return normalizeLibraryCatalogResponse(payload, normalizedQuery)
 }

@@ -5,6 +5,97 @@ import {
   novelWorkTypeSchema,
 } from "./novel.contracts"
 
+export const catalogSortBySchema = z.enum([
+  "relevance",
+  "recent",
+  "popular",
+  "rating",
+  "title",
+])
+
+export const publicCatalogScopeSchema = z.enum(["all", "novel", "author"])
+export const publicCatalogSortBySchema = z.enum(["relevance", "popular", "recent"])
+export const publicCatalogGenreFilterSchema = z.string().trim().min(1).optional()
+export const publicCatalogWorkTypeFilterSchema = z.enum([
+  "all",
+  "ORIGINAL",
+  "TRANSLATION",
+])
+export const publicCatalogStatusFilterSchema = z.enum([
+  "all",
+  "Ongoing",
+  "Completed",
+  "Hiatus",
+])
+export const publicCatalogCollectionFilterSchema = z.enum([
+  "all",
+  "trending",
+  "hidden-gems",
+  "editors-picks",
+  "new-voices",
+])
+export const catalogPageSchema = z.number().int().positive()
+export const catalogPageSizeSchema = z.number().int().positive().max(50)
+export const catalogCursorSchema = z.string().min(1)
+export const catalogCursorDirectionSchema = z.enum(["next", "prev"])
+export const catalogPaginationSchema = z.object({
+  page: catalogPageSchema,
+  pageSize: catalogPageSizeSchema,
+  totalItems: z.number().int().nonnegative(),
+  totalPages: z.number().int().nonnegative(),
+  currentCursor: z.string().nullable(),
+  nextCursor: z.string().nullable(),
+  previousCursor: z.string().nullable(),
+  hasPreviousPage: z.boolean(),
+  hasNextPage: z.boolean(),
+})
+
+export const publicCatalogQuerySchema = z.object({
+  q: z.string().trim().optional(),
+  genre: publicCatalogGenreFilterSchema,
+  workType: publicCatalogWorkTypeFilterSchema,
+  status: publicCatalogStatusFilterSchema,
+  collection: publicCatalogCollectionFilterSchema.optional(),
+  sort: publicCatalogSortBySchema,
+  scope: publicCatalogScopeSchema,
+  page: catalogPageSchema.optional(),
+  pageSize: catalogPageSizeSchema.optional(),
+  cursor: catalogCursorSchema.optional(),
+  direction: catalogCursorDirectionSchema.optional(),
+})
+
+export const publicCatalogFacetBucketSchema = z.object({
+  value: z.string(),
+  label: z.string(),
+  count: z.number().int().nonnegative(),
+})
+
+export const publicCatalogFacetCountsSchema = z.object({
+  total: z.number().int().nonnegative(),
+  genres: z.array(publicCatalogFacetBucketSchema),
+  workTypes: z.array(publicCatalogFacetBucketSchema),
+  statuses: z.array(publicCatalogFacetBucketSchema),
+})
+
+export const libraryCatalogFacetItemSchema = z.object({
+  value: z.string(),
+  label: z.string(),
+  count: z.number().int().nonnegative(),
+})
+
+export const libraryCatalogFiltersSchema = z.object({
+  query: z.string(),
+  sortBy: catalogSortBySchema,
+  genre: z.string().nullable(),
+  workType: novelWorkTypeSchema.nullable(),
+  status: novelStatusSchema.nullable(),
+  collection: publicCatalogCollectionFilterSchema.nullable(),
+  page: catalogPageSchema,
+  pageSize: catalogPageSizeSchema,
+  cursor: catalogCursorSchema.nullable(),
+  direction: catalogCursorDirectionSchema.nullable(),
+})
+
 export const libraryCatalogNovelSchema = z.object({
   id: z.string(),
   slug: z.string(),
@@ -34,7 +125,16 @@ export const libraryCatalogNovelSchema = z.object({
 export const libraryCatalogResponseSchema = z.object({
   query: z.string(),
   total: z.number().int().nonnegative(),
+  filters: libraryCatalogFiltersSchema,
+  pagination: catalogPaginationSchema,
+  facets: z.object({
+    genres: z.array(libraryCatalogFacetItemSchema),
+    workTypes: z.array(libraryCatalogFacetItemSchema),
+    statuses: z.array(libraryCatalogFacetItemSchema),
+  }),
   novels: z.array(libraryCatalogNovelSchema),
+  activeFilters: publicCatalogQuerySchema.optional(),
+  publicFacets: publicCatalogFacetCountsSchema.optional(),
 })
 
 export const publicNovelAuthorSchema = z.object({
@@ -117,6 +217,15 @@ export const publicNovelReaderResponseSchema = z.object({
 })
 
 export type LibraryCatalogNovelDto = z.infer<typeof libraryCatalogNovelSchema>
+export type CatalogSortBy = z.infer<typeof catalogSortBySchema>
+export type PublicCatalogScope = z.infer<typeof publicCatalogScopeSchema>
+export type PublicCatalogSortBy = z.infer<typeof publicCatalogSortBySchema>
+export type CatalogPagination = z.infer<typeof catalogPaginationSchema>
+export type PublicCatalogQuery = z.infer<typeof publicCatalogQuerySchema>
+export type PublicCatalogFacetBucket = z.infer<typeof publicCatalogFacetBucketSchema>
+export type PublicCatalogFacetCounts = z.infer<typeof publicCatalogFacetCountsSchema>
+export type LibraryCatalogFacetItemDto = z.infer<typeof libraryCatalogFacetItemSchema>
+export type LibraryCatalogFiltersDto = z.infer<typeof libraryCatalogFiltersSchema>
 export type LibraryCatalogResponse = z.infer<typeof libraryCatalogResponseSchema>
 export type PublicNovelAuthorDto = z.infer<typeof publicNovelAuthorSchema>
 export type PublicNovelChapterDto = z.infer<typeof publicNovelChapterSchema>

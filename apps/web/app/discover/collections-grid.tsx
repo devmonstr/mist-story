@@ -1,66 +1,17 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { ChevronRight } from "lucide-react"
-import { loadDiscoverData, type DiscoverCollection } from "./discover-data"
-import { CollectionsSkeleton } from "./collections-skeleton"
+import { BookOpen, ChevronRight } from "lucide-react"
+import { resolveNovelCoverSrc } from "@/lib/novel-cover"
 
-export function CollectionsGrid() {
-  const [collections, setCollections] = useState<DiscoverCollection[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+import type { DiscoverCollection } from "./discover-data"
 
-  useEffect(() => {
-    let active = true
+interface CollectionsGridProps {
+  collections: DiscoverCollection[]
+}
 
-    void loadDiscoverData()
-      .then((payload) => {
-        if (!active) {
-          return
-        }
-
-        setCollections(payload.collections)
-      })
-      .catch((loadError) => {
-        if (!active) {
-          return
-        }
-
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : "Failed to load collections."
-        )
-      })
-      .finally(() => {
-        if (active) {
-          setIsLoading(false)
-        }
-      })
-
-    return () => {
-      active = false
-    }
-  }, [])
-
-  if (isLoading) {
-    return <CollectionsSkeleton />
-  }
-
-  if (error) {
-    return (
-      <section className="px-4 py-10 sm:px-6 sm:py-16 lg:px-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="rounded-lg border border-border/40 bg-card p-6 text-sm text-muted-foreground sm:p-8">
-            {error}
-          </div>
-        </div>
-      </section>
-    )
-  }
-
+export function CollectionsGrid({ collections }: CollectionsGridProps) {
   return (
     <section className="px-4 py-10 sm:px-6 sm:py-16 lg:px-8">
       <div className="mx-auto max-w-7xl">
@@ -87,6 +38,38 @@ export function CollectionsGrid() {
                   {collection.description}
                 </p>
               </div>
+              {collection.previewNovels.length > 0 ? (
+                <div className="mt-5 grid grid-cols-3 gap-2 sm:mt-6">
+                  {collection.previewNovels.map((novel) => {
+                    const coverSrc = resolveNovelCoverSrc({
+                      novelId: novel.id,
+                      coverUrl: novel.coverUrl,
+                      coverStorageKey: novel.coverStorageKey,
+                    })
+
+                    return (
+                      <Link
+                        key={novel.id}
+                        href={`/novel/${novel.slug}`}
+                        className="group overflow-hidden border border-border/40 bg-muted/20"
+                        title={`${novel.title} by ${novel.authorName}`}
+                      >
+                        {coverSrc ? (
+                          <img
+                            src={coverSrc}
+                            alt={`${novel.title} cover`}
+                            className="aspect-[3/4] w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="flex aspect-[3/4] w-full items-center justify-center text-muted-foreground">
+                            <BookOpen className="h-5 w-5" />
+                          </div>
+                        )}
+                      </Link>
+                    )
+                  })}
+                </div>
+              ) : null}
               <div className="mt-5 flex flex-col gap-3 border-t border-border/40 pt-4 sm:mt-6 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-xs text-muted-foreground">
                   <p className="font-medium">{collection.curator}</p>

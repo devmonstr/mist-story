@@ -1,17 +1,20 @@
 import {
-  countFollowersForUsers,
-  countPublishedNovelsForUsers,
-  decimalToNumber,
+  countLibraryCollectionNovels,
   hexToNpub,
-  listDiscoverCollectionNovels,
+  listLibraryCollectionNovels,
   listDiscoverGenres,
-  searchAuthors,
-  searchPublishedNovels,
+  listLibraryCatalogFacetCounts,
+  normalizeCatalogPagination,
+  searchAuthorsWithCursor,
+  searchAuthorsWithPagination,
+  searchPublishedNovelsWithCursor,
+  searchPublishedNovelsWithPagination,
 } from "@mist/db"
 import type {
   DiscoverCollectionDto,
   DiscoverGenreDto,
   DiscoverResponse,
+  PublicCatalogQuery,
   SearchAuthorResultDto,
   SearchFilterType,
   SearchNovelResultDto,
@@ -19,6 +22,14 @@ import type {
   SearchResultItemDto,
   SearchSortBy,
 } from "@mist/shared"
+import {
+  decodeCatalogCursor,
+  decodeSearchAuthorCursor,
+  decodeSearchNovelCursor,
+  encodeCatalogCursor,
+  encodeSearchAuthorCursor,
+  encodeSearchNovelCursor,
+} from "./catalog-cursor"
 
 const GENRE_DESCRIPTIONS: Record<string, string> = {
   Fantasy: "Epic adventures, magic, and otherworldly realms.",
@@ -35,81 +46,154 @@ function buildGenreDescription(genre: string) {
   return GENRE_DESCRIPTIONS[genre] ?? "Discover stories and voices in this genre."
 }
 
-function normalizeAuthorName(input: {
-  displayName: string | null
-  handle?: string | null
+function buildLibraryHref(input: {
+  query?: string
+  genre?: string | null
+  workType?: "ORIGINAL" | "TRANSLATION" | null
+  status?: "Ongoing" | "Completed" | "Hiatus" | null
+  collection?: "trending" | "hidden-gems" | "editors-picks" | "new-voices" | null
+  sort?: "relevance" | "popular" | "recent"
 }) {
-  return input.displayName?.trim() || input.handle?.trim() || "Unknown author"
+  const params = new URLSearchParams()
+
+  if (input.query?.trim()) {
+    params.set("q", input.query.trim())
+  }
+  if (input.genre?.trim()) {
+    params.set("genre", input.genre.trim())
+  }
+  if (input.workType) {
+    params.set("workType", input.workType)
+  }
+  if (input.status) {
+    params.set("status", input.status)
+  }
+  if (input.collection) {
+    params.set("collection", input.collection)
+  }
+  if (input.sort && input.sort !== "recent") {
+    params.set("sort", input.sort)
+  }
+
+  const queryString = params.toString()
+  return queryString ? `/library?${queryString}` : "/library"
 }
 
-function scoreTextMatch(query: string, value: string) {
-  const normalizedQuery = query.toLowerCase()
-  const normalizedValue = value.toLowerCase()
-
-  if (normalizedValue === normalizedQuery) {
-    return 120
-  }
-  if (normalizedValue.startsWith(normalizedQuery)) {
-    return 80
-  }
-  if (normalizedValue.includes(normalizedQuery)) {
-    return 40
-  }
-  return 0
+function serializeCollectionPreviewNovels(
+  novels: Awaited<ReturnType<typeof listLibraryCollectionNovels>>
+) {
+  return novels.slice(0, 3).map((novel) => ({
+    id: novel.id,
+    slug: novel.slug,
+    title: novel.title,
+    coverUrl: novel.coverUrl,
+    coverStorageKey: novel.coverStorageKey ?? null,
+    genre: novel.genre,
+    authorName:
+      novel.author.displayName?.trim() || novel.author.handle?.trim() || "Unknown author",
+  }))
 }
 
-export async function getDiscoverData(): Promise<DiscoverResponse> {
-  const [genres, novels] = await Promise.all([
-    listDiscoverGenres(),
-    listDiscoverCollectionNovels(),
+function buildPublicCatalogFilters(input: {
+  query?: string
+  genre?: string | null
+  workType?: "ORIGINAL" | "TRANSLATION" | null
+  status?: "Ongoing" | "Completed" | "Hiatus" | null
+  collection?: "trending" | "hidden-gems" | "editors-picks" | "new-voices" | null
+  sort?: "relevance" | "popular" | "recent"
+  scope?: "all" | "novel" | "author"
+  page?: number
+  pageSize?: number
+  cursor?: string | null
+  direction?: "next" | "prev" | null
+}): PublicCatalogQuery {
+  return {
+    q: input.query?.trim() || undefined,
+    genre: input.genre?.trim() || undefined,
+    workType: input.workType ?? "all",
+    status: input.status ?? "all",
+    collection: input.collection ?? "all",
+    sort: input.sort ?? "recent",
+    scope: input.scope ?? "all",
+    page: input.page,
+    pageSize: input.pageSize,
+    cursor: input.cursor ?? undefined,
+    direction: input.direction ?? undefined,
+  }
+}
+
+function mapFacetCounts(facets: {
+  total: number
+  genres: Array<{ genre: string; _count: { _all: number } }>
+  workTypes: Array<{ workType: string; _count: { _all: number } }>
+  statuses: Array<{ status: string; _count: { _all: number } }>
+}) {
+  return {
+    total: facets.total,
+    genres: facets.genres.map((item) => ({
+      value: item.genre,
+      label: item.genre,
+      count: item._count._all,
+    })),
+    workTypes: facets.workTypes.map((item) => ({
+      value: item.workType,
+      label: item.workType === "TRANSLATION" ? "Translation" : "Original",
+      count: item._count._all,
+    })),
+    statuses: facets.statuses.map((item) => ({
+      value: item.status,
+      label: item.status,
+      count: item._count._all,
+    })),
+  }
+}
+
+export async function getDiscoverData(input: {
+  query?: string
+  genre?: string | null
+  workType?: "ORIGINAL" | "TRANSLATION" | null
+  status?: "Ongoing" | "Completed" | "Hiatus" | null
+  collection?: "trending" | "hidden-gems" | "editors-picks" | "new-voices" | null
+  sort?: "relevance" | "popular" | "recent"
+} = {}): Promise<DiscoverResponse> {
+  const filters = buildPublicCatalogFilters({
+    query: input.query,
+    genre: input.genre,
+    workType: input.workType,
+    status: input.status,
+    collection: input.collection,
+    sort: input.sort,
+    scope: "all",
+  })
+
+  const [genres, facetCounts, trending, hiddenGems, editorsPicks, newVoices] = await Promise.all([
+    listDiscoverGenres(filters),
+    listLibraryCatalogFacetCounts(filters),
+    listLibraryCollectionNovels("trending", filters, { page: 1, pageSize: 3 }),
+    listLibraryCollectionNovels("hidden-gems", filters, { page: 1, pageSize: 3 }),
+    listLibraryCollectionNovels("editors-picks", filters, { page: 1, pageSize: 3 }),
+    listLibraryCollectionNovels("new-voices", filters, { page: 1, pageSize: 3 }),
   ])
 
-  const publishedNovelCounts = await countPublishedNovelsForUsers(
-    novels.map((novel) => novel.authorId)
-  )
-
-  const trending = [...novels]
-    .sort((a, b) => b._count.readingProgress - a._count.readingProgress)
-    .slice(0, 12)
-
-  const hiddenGems = [...novels]
-    .filter((novel) => novel._count.readingProgress <= 25)
-    .sort((a, b) => {
-      if (decimalToNumber(b.rating) !== decimalToNumber(a.rating)) {
-        return decimalToNumber(b.rating) - decimalToNumber(a.rating)
-      }
-
-      return b._count.bookmarks - a._count.bookmarks
-    })
-    .slice(0, 12)
-
-  const editorsPicks = [...novels]
-    .sort((a, b) => {
-      if (decimalToNumber(b.rating) !== decimalToNumber(a.rating)) {
-        return decimalToNumber(b.rating) - decimalToNumber(a.rating)
-      }
-      if (b.ratingsCount !== a.ratingsCount) {
-        return b.ratingsCount - a.ratingsCount
-      }
-      return b._count.readingProgress - a._count.readingProgress
-    })
-    .slice(0, 12)
-
-  const newVoices = [...novels]
-    .filter((novel) => (publishedNovelCounts.get(novel.authorId) ?? 0) <= 1)
-    .sort((a, b) => {
-      const left = new Date(a.publishedAt ?? a.updatedAt).getTime()
-      const right = new Date(b.publishedAt ?? b.updatedAt).getTime()
-      return right - left
-    })
-    .slice(0, 12)
+  const [trendingCount, hiddenGemsCount, editorsPicksCount, newVoicesCount] = await Promise.all([
+    countLibraryCollectionNovels("trending", filters),
+    countLibraryCollectionNovels("hidden-gems", filters),
+    countLibraryCollectionNovels("editors-picks", filters),
+    countLibraryCollectionNovels("new-voices", filters),
+  ])
 
   const discoverGenres: DiscoverGenreDto[] = genres.map((genre) => ({
     id: genre.genre.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
     title: genre.genre,
     description: buildGenreDescription(genre.genre),
     storiesCount: genre._count._all,
-    href: `/search?q=${encodeURIComponent(genre.genre)}&type=novel`,
+    href: buildLibraryHref({
+      query: input.query,
+      genre: genre.genre,
+      workType: input.workType,
+      status: input.status,
+      sort: "popular",
+    }),
   }))
 
   const collections: DiscoverCollectionDto[] = [
@@ -117,110 +201,104 @@ export async function getDiscoverData(): Promise<DiscoverResponse> {
       id: "trending",
       title: "Trending This Week",
       description: "The most-read stories gaining popularity right now.",
-      storyCount: trending.length,
+      storyCount: trendingCount,
       curator: "Mist Story Editors",
-      href: "/search?type=novel&sort=popular",
+      href: buildLibraryHref({
+        query: input.query,
+        genre: input.genre,
+        workType: input.workType,
+        status: input.status,
+        collection: "trending",
+      }),
+      previewNovels: serializeCollectionPreviewNovels(trending),
     },
     {
       id: "hidden-gems",
       title: "Hidden Gems",
       description: "Underrated stories that deserve more attention.",
-      storyCount: hiddenGems.length,
+      storyCount: hiddenGemsCount,
       curator: "Community",
-      href: "/search?type=novel&sort=popular",
+      href: buildLibraryHref({
+        query: input.query,
+        genre: input.genre,
+        workType: input.workType,
+        status: input.status,
+        collection: "hidden-gems",
+      }),
+      previewNovels: serializeCollectionPreviewNovels(hiddenGems),
     },
     {
       id: "editors-picks",
       title: "Editor's Picks",
       description: "Our favorite stories showcasing exceptional writing.",
-      storyCount: editorsPicks.length,
+      storyCount: editorsPicksCount,
       curator: "Mist Story Team",
-      href: "/search?type=novel&sort=popular",
+      href: buildLibraryHref({
+        query: input.query,
+        genre: input.genre,
+        workType: input.workType,
+        status: input.status,
+        collection: "editors-picks",
+      }),
+      previewNovels: serializeCollectionPreviewNovels(editorsPicks),
     },
     {
       id: "new-voices",
       title: "New Voices",
       description: "First stories from fresh and exciting writers.",
-      storyCount: newVoices.length,
+      storyCount: newVoicesCount,
       curator: "Community",
-      href: "/search?type=novel&sort=recent",
+      href: buildLibraryHref({
+        query: input.query,
+        genre: input.genre,
+        workType: input.workType,
+        status: input.status,
+        collection: "new-voices",
+      }),
+      previewNovels: serializeCollectionPreviewNovels(newVoices),
     },
   ]
 
   return {
     genres: discoverGenres,
     collections,
+    activeFilters: filters,
+    facets: mapFacetCounts(facetCounts),
   }
-}
-
-function sortNovelResults(
-  novels: SearchNovelResultDto[],
-  query: string,
-  sortBy: SearchSortBy
-) {
-  const normalizedQuery = query.trim().toLowerCase()
-
-  return [...novels].sort((a, b) => {
-    if (sortBy === "popular") {
-      return b.readsCount - a.readsCount
-    }
-
-    if (sortBy === "recent") {
-      return 0
-    }
-
-    const scoreA =
-      scoreTextMatch(normalizedQuery, a.title) * 3 +
-      scoreTextMatch(normalizedQuery, a.authorName) * 2 +
-      scoreTextMatch(normalizedQuery, a.summary) +
-      scoreTextMatch(normalizedQuery, a.genre)
-    const scoreB =
-      scoreTextMatch(normalizedQuery, b.title) * 3 +
-      scoreTextMatch(normalizedQuery, b.authorName) * 2 +
-      scoreTextMatch(normalizedQuery, b.summary) +
-      scoreTextMatch(normalizedQuery, b.genre)
-
-    if (scoreB !== scoreA) {
-      return scoreB - scoreA
-    }
-
-    return b.readsCount - a.readsCount
-  })
-}
-
-function sortAuthorResults(
-  authors: SearchAuthorResultDto[],
-  query: string,
-  sortBy: SearchSortBy
-) {
-  const normalizedQuery = query.trim().toLowerCase()
-
-  return [...authors].sort((a, b) => {
-    if (sortBy === "popular" || sortBy === "recent") {
-      return b.followersCount - a.followersCount
-    }
-
-    const scoreA =
-      scoreTextMatch(normalizedQuery, a.name) * 3 + scoreTextMatch(normalizedQuery, a.bio)
-    const scoreB =
-      scoreTextMatch(normalizedQuery, b.name) * 3 + scoreTextMatch(normalizedQuery, b.bio)
-
-    if (scoreB !== scoreA) {
-      return scoreB - scoreA
-    }
-
-    return b.followersCount - a.followersCount
-  })
 }
 
 export async function searchCatalog(input: {
   query: string
   filterType: SearchFilterType
   sortBy: SearchSortBy
+  page?: number
+  pageSize?: number
+  cursor?: string | null
+  direction?: "next" | "prev" | null
+  genre?: string | null
+  workType?: "ORIGINAL" | "TRANSLATION" | null
+  status?: "Ongoing" | "Completed" | "Hiatus" | null
 }): Promise<SearchResponse> {
   const query = input.query.trim()
   const filterType = input.filterType
   const sortBy = input.sortBy
+  const direction = input.direction ?? null
+  const pagination = normalizeCatalogPagination({
+    page: input.page,
+    pageSize: input.pageSize,
+  })
+  const filters = buildPublicCatalogFilters({
+    query,
+    genre: input.genre,
+    workType: input.workType,
+    status: input.status,
+    sort: sortBy,
+    scope: filterType,
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+    cursor: input.cursor ?? undefined,
+    direction: input.direction ?? undefined,
+  })
 
   if (!query) {
     return {
@@ -228,63 +306,207 @@ export async function searchCatalog(input: {
       filterType,
       sortBy,
       total: 0,
+      pagination: {
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        totalItems: 0,
+        totalPages: 0,
+        currentCursor: null,
+        nextCursor: null,
+        previousCursor: null,
+        hasPreviousPage: false,
+        hasNextPage: false,
+      },
       items: [],
+      activeFilters: filters,
+      facets: mapFacetCounts({
+        total: 0,
+        genres: [],
+        workTypes: [],
+        statuses: [],
+      }),
     }
   }
 
-  const shouldLoadNovels = filterType === "all" || filterType === "novel"
-  const shouldLoadAuthors = filterType === "all" || filterType === "author"
+  const novelCursor = filterType === "novel" ? decodeSearchNovelCursor(input.cursor) : null
+  const authorCursor = filterType === "author" ? decodeSearchAuthorCursor(input.cursor) : null
+  const mixedCursorPage = filterType === "all" ? decodeCatalogCursor(input.cursor) : null
+  const mixedPagination = normalizeCatalogPagination({
+    page: mixedCursorPage
+      ? Math.max(1, direction === "prev" ? mixedCursorPage - 1 : mixedCursorPage + 1)
+      : input.page,
+    pageSize: input.pageSize,
+  })
 
-  const [novels, authors] = await Promise.all([
-    shouldLoadNovels ? searchPublishedNovels(query) : Promise.resolve([]),
-    shouldLoadAuthors ? searchAuthors(query) : Promise.resolve([]),
-  ])
-
-  const authorFollowerCounts = await countFollowersForUsers(authors.map((author) => author.id))
-  const authorNovelCounts = await countPublishedNovelsForUsers(authors.map((author) => author.id))
-
-  const novelResults: SearchNovelResultDto[] = sortNovelResults(
-    novels.map((novel) => ({
+  if (filterType === "novel") {
+    const novels = await searchPublishedNovelsWithCursor(filters, query, sortBy, {
+      pageSize: pagination.pageSize,
+      cursor: novelCursor,
+      direction,
+    })
+    const novelResults: SearchNovelResultDto[] = novels.items.map((novel) => ({
       id: novel.id,
       type: "novel",
       slug: novel.slug,
       title: novel.title,
-      authorName: normalizeAuthorName(novel.author),
-      authorNpub: hexToNpub(novel.author.pubkey),
+      authorName: novel.authorName,
+      authorNpub: hexToNpub(novel.authorPubkey),
       genre: novel.genre,
       summary: novel.summary,
-      readsCount: novel._count.readingProgress,
+      readsCount: novel.readsCount,
       chaptersCount: novel.chaptersCount,
       coverUrl: novel.coverUrl,
       coverStorageKey: novel.coverStorageKey,
-    })),
-    query,
-    sortBy
-  )
+    }))
+    const firstNovel = novels.items[0]
+    const lastNovel = novels.items[novels.items.length - 1]
+    const hasPreviousPage = direction === "prev" ? novels.hasMore : Boolean(novelCursor)
+    const hasNextPage = direction === "prev" ? Boolean(novelCursor) : novels.hasMore
 
-  const authorResults: SearchAuthorResultDto[] = sortAuthorResults(
-    authors.map((author) => ({
+    return {
+      query,
+      filterType,
+      sortBy,
+      total: novels.total,
+      pagination: {
+        page: pagination.page,
+        pageSize: novels.pageSize,
+        totalItems: novels.total,
+        totalPages: novels.total > 0 ? Math.ceil(novels.total / novels.pageSize) : 0,
+        currentCursor: input.cursor ?? null,
+        nextCursor:
+          hasNextPage && lastNovel
+            ? encodeSearchNovelCursor({
+                sortBy,
+                id: lastNovel.id,
+                readsCount: lastNovel.readsCount,
+                bookmarksCount: lastNovel.bookmarksCount,
+                ratingsCount: lastNovel.ratingsCount,
+                orderDate: (lastNovel.publishedAt ?? lastNovel.updatedAt).toISOString(),
+                rankScore: lastNovel.rankScore,
+                similarityScore: lastNovel.similarityScore,
+              })
+            : null,
+        previousCursor:
+          hasPreviousPage && firstNovel
+            ? encodeSearchNovelCursor({
+                sortBy,
+                id: firstNovel.id,
+                readsCount: firstNovel.readsCount,
+                bookmarksCount: firstNovel.bookmarksCount,
+                ratingsCount: firstNovel.ratingsCount,
+                orderDate: (firstNovel.publishedAt ?? firstNovel.updatedAt).toISOString(),
+                rankScore: firstNovel.rankScore,
+                similarityScore: firstNovel.similarityScore,
+              })
+            : null,
+        hasPreviousPage,
+        hasNextPage,
+      },
+      items: novelResults,
+      activeFilters: filters,
+      facets: mapFacetCounts(await listLibraryCatalogFacetCounts(filters)),
+    }
+  }
+
+  if (filterType === "author") {
+    const authors = await searchAuthorsWithCursor(query, sortBy, {
+      pageSize: pagination.pageSize,
+      cursor: authorCursor,
+      direction,
+    })
+    const authorResults: SearchAuthorResultDto[] = authors.items.map((author) => ({
       id: author.id,
       type: "author",
       npub: hexToNpub(author.pubkey),
-      name: normalizeAuthorName(author),
-      bio: author.about ?? "",
-      followersCount: authorFollowerCounts.get(author.id) ?? 0,
-      novelsCount: authorNovelCounts.get(author.id) ?? 0,
+      name: author.name,
+      bio: author.bio ?? "",
+      followersCount: author.followersCount,
+      novelsCount: author.novelsCount,
       avatarUrl: author.avatarUrl ?? null,
-    })),
-    query,
-    sortBy
-  )
+    }))
+    const firstAuthor = authors.items[0]
+    const lastAuthor = authors.items[authors.items.length - 1]
+    const hasPreviousPage = direction === "prev" ? authors.hasMore : Boolean(authorCursor)
+    const hasNextPage = direction === "prev" ? Boolean(authorCursor) : authors.hasMore
 
-  let items: SearchResultItemDto[] = []
+    return {
+      query,
+      filterType,
+      sortBy,
+      total: authors.total,
+      pagination: {
+        page: pagination.page,
+        pageSize: authors.pageSize,
+        totalItems: authors.total,
+        totalPages: authors.total > 0 ? Math.ceil(authors.total / authors.pageSize) : 0,
+        currentCursor: input.cursor ?? null,
+        nextCursor:
+          hasNextPage && lastAuthor
+            ? encodeSearchAuthorCursor({
+                sortBy,
+                id: lastAuthor.id,
+                followersCount: lastAuthor.followersCount,
+                novelsCount: lastAuthor.novelsCount,
+                updatedAt: lastAuthor.updatedAt.toISOString(),
+                rankScore: lastAuthor.rankScore,
+                similarityScore: lastAuthor.similarityScore,
+              })
+            : null,
+        previousCursor:
+          hasPreviousPage && firstAuthor
+            ? encodeSearchAuthorCursor({
+                sortBy,
+                id: firstAuthor.id,
+                followersCount: firstAuthor.followersCount,
+                novelsCount: firstAuthor.novelsCount,
+                updatedAt: firstAuthor.updatedAt.toISOString(),
+                rankScore: firstAuthor.rankScore,
+                similarityScore: firstAuthor.similarityScore,
+              })
+            : null,
+        hasPreviousPage,
+        hasNextPage,
+      },
+      items: authorResults,
+      activeFilters: filters,
+      facets: undefined,
+    }
+  }
 
-  if (filterType === "novel") {
-    items = novelResults
-  } else if (filterType === "author") {
-    items = authorResults
-  } else {
-    items = [...novelResults, ...authorResults].sort((a, b) => {
+  const [novels, authors, facetCounts] = await Promise.all([
+    searchPublishedNovelsWithPagination(filters, query, sortBy, mixedPagination),
+    searchAuthorsWithPagination(query, sortBy, mixedPagination),
+    listLibraryCatalogFacetCounts(filters),
+  ])
+
+  const novelResults: SearchNovelResultDto[] = novels.items.map((novel) => ({
+    id: novel.id,
+    type: "novel",
+    slug: novel.slug,
+    title: novel.title,
+    authorName: novel.authorName,
+    authorNpub: hexToNpub(novel.authorPubkey),
+    genre: novel.genre,
+    summary: novel.summary,
+    readsCount: novel.readsCount,
+    chaptersCount: novel.chaptersCount,
+    coverUrl: novel.coverUrl,
+    coverStorageKey: novel.coverStorageKey,
+  }))
+
+  const authorResults: SearchAuthorResultDto[] = authors.items.map((author) => ({
+    id: author.id,
+    type: "author",
+    npub: hexToNpub(author.pubkey),
+    name: author.name,
+    bio: author.bio ?? "",
+    followersCount: author.followersCount,
+    novelsCount: author.novelsCount,
+    avatarUrl: author.avatarUrl ?? null,
+  }))
+
+  const items = [...novelResults, ...authorResults].sort((a, b) => {
       if (sortBy === "popular") {
         const aScore = a.type === "novel" ? a.readsCount : a.followersCount
         const bScore = b.type === "novel" ? b.readsCount : b.followersCount
@@ -297,13 +519,36 @@ export async function searchCatalog(input: {
 
       return 0
     })
-  }
+  const total = novels.total + authors.total
 
   return {
     query,
     filterType,
     sortBy,
-    total: items.length,
+    total,
+    pagination: {
+      page: mixedPagination.page,
+      pageSize: mixedPagination.pageSize,
+      totalItems: total,
+      totalPages: Math.max(
+        novels.total > 0 ? Math.ceil(novels.total / mixedPagination.pageSize) : 0,
+        authors.total > 0 ? Math.ceil(authors.total / mixedPagination.pageSize) : 0
+      ),
+      currentCursor: total > 0 ? input.cursor ?? encodeCatalogCursor(mixedPagination.page) : null,
+      nextCursor:
+        novels.total > mixedPagination.page * mixedPagination.pageSize ||
+        authors.total > mixedPagination.page * mixedPagination.pageSize
+          ? encodeCatalogCursor(mixedPagination.page)
+          : null,
+      previousCursor:
+        mixedPagination.page > 1 ? encodeCatalogCursor(mixedPagination.page) : null,
+      hasPreviousPage: mixedPagination.page > 1,
+      hasNextPage:
+        novels.total > mixedPagination.page * mixedPagination.pageSize ||
+        authors.total > mixedPagination.page * mixedPagination.pageSize,
+    },
     items,
+    activeFilters: filters,
+    facets: mapFacetCounts(facetCounts),
   }
 }

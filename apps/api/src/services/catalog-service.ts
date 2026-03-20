@@ -1,5 +1,7 @@
 import {
+  countLibraryCollectionNovels,
   countFollowersForUsers,
+  countLibraryCatalogNovels,
   countPublishedNovelsForUsers,
   decimalToNumber,
   findNovelBookmarkForUser,
@@ -7,12 +9,20 @@ import {
   findPublicChapterForNovelByNumber,
   findPublicNovelByIdOrSlug,
   hexToNpub,
+  listLibraryCatalogNovelsByCursor,
+  listLibraryCollectionFacetCounts,
+  listLibraryCollectionNovels,
+  listLibraryCatalogFacetCounts,
   listLibraryCatalogNovels,
   listPublicNovelChapters,
+  normalizeCatalogPagination,
   toIsoString,
 } from "@mist/db"
 import type {
+  CatalogSortBy,
   LibraryCatalogResponse,
+  PublicCatalogQuery,
+  PublicCatalogSortBy,
   PublicNovelAuthorDto,
   PublicNovelChapterDto,
   PublicNovelDetailDto,
@@ -21,6 +31,10 @@ import type {
   PublicNovelReaderResponse,
   PublicNovelViewerStateDto,
 } from "@mist/shared"
+import {
+  decodeLibraryCatalogCursor,
+  encodeLibraryCatalogCursor,
+} from "./catalog-cursor"
 import { HttpError } from "../utils/http-error"
 
 function stripHtml(html: string) {
@@ -47,6 +61,163 @@ function resolveAuthorDisplayName(author: {
   handle?: string | null
 }) {
   return author.displayName?.trim() || author.handle?.trim() || "Unknown author"
+}
+
+function sortCatalogNovels(
+  novels: Awaited<ReturnType<typeof listLibraryCatalogNovels>>,
+  sortBy: CatalogSortBy | PublicCatalogSortBy,
+  query: string
+) {
+  const items = [...novels]
+
+  if (sortBy === "popular") {
+    return items.sort((a, b) => {
+      if (b._count.readingProgress !== a._count.readingProgress) {
+        return b._count.readingProgress - a._count.readingProgress
+      }
+
+      if (b._count.bookmarks !== a._count.bookmarks) {
+        return b._count.bookmarks - a._count.bookmarks
+      }
+
+      return b.ratingsCount - a.ratingsCount
+    })
+  }
+
+  if (sortBy === "rating") {
+    return items.sort((a, b) => {
+      if (decimalToNumber(b.rating) !== decimalToNumber(a.rating)) {
+        return decimalToNumber(b.rating) - decimalToNumber(a.rating)
+      }
+
+      if (b.ratingsCount !== a.ratingsCount) {
+        return b.ratingsCount - a.ratingsCount
+      }
+
+      return b._count.readingProgress - a._count.readingProgress
+    })
+  }
+
+  if (sortBy === "title") {
+    return items.sort((a, b) => a.title.localeCompare(b.title))
+  }
+
+  if (sortBy === "relevance") {
+    const normalizedQuery = query.trim().toLowerCase()
+
+    if (!normalizedQuery) {
+      return items.sort((a, b) => {
+        const left = new Date(a.publishedAt ?? a.updatedAt).getTime()
+        const right = new Date(b.publishedAt ?? b.updatedAt).getTime()
+        return right - left
+      })
+    }
+
+    return items.sort((a, b) => {
+      const scoreA =
+        scoreTextMatch(normalizedQuery, a.title) * 3 +
+        scoreTextMatch(normalizedQuery, a.summary) * 2 +
+        scoreTextMatch(normalizedQuery, a.genre) +
+        scoreTextMatch(normalizedQuery, a.author.displayName)
+      const scoreB =
+        scoreTextMatch(normalizedQuery, b.title) * 3 +
+        scoreTextMatch(normalizedQuery, b.summary) * 2 +
+        scoreTextMatch(normalizedQuery, b.genre) +
+        scoreTextMatch(normalizedQuery, b.author.displayName)
+
+      if (scoreB !== scoreA) {
+        return scoreB - scoreA
+      }
+
+      if (b._count.readingProgress !== a._count.readingProgress) {
+        return b._count.readingProgress - a._count.readingProgress
+      }
+
+      return b.ratingsCount - a.ratingsCount
+    })
+  }
+
+  return items.sort((a, b) => {
+    const left = new Date(a.publishedAt ?? a.updatedAt).getTime()
+    const right = new Date(b.publishedAt ?? b.updatedAt).getTime()
+    return right - left
+  })
+}
+
+function scoreTextMatch(query: string, value: string | null | undefined) {
+  const normalizedValue = (value ?? "").toLowerCase()
+
+  if (normalizedValue === query) {
+    return 120
+  }
+
+  if (normalizedValue.startsWith(query)) {
+    return 80
+  }
+
+  if (normalizedValue.includes(query)) {
+    return 40
+  }
+
+  return 0
+}
+
+function buildPublicCatalogFilters(input: {
+  query?: string
+  genre?: string | null
+  workType?: "ORIGINAL" | "TRANSLATION" | null
+  status?: "Ongoing" | "Completed" | "Hiatus" | null
+  collection?: "trending" | "hidden-gems" | "editors-picks" | "new-voices" | null
+  sortBy?: CatalogSortBy | PublicCatalogSortBy
+  page?: number
+  pageSize?: number
+}): PublicCatalogQuery {
+  const sort = input.sortBy ?? "recent"
+  const normalizedSort =
+    sort === "popular" || sort === "recent" || sort === "relevance" ? sort : "recent"
+
+  return {
+    q: input.query?.trim() || undefined,
+    genre: input.genre?.trim() || undefined,
+    workType: input.workType ?? "all",
+    status: input.status ?? "all",
+    collection: input.collection ?? "all",
+    sort: normalizedSort,
+    scope: "novel",
+    page: input.page,
+    pageSize: input.pageSize,
+  }
+}
+
+function buildCatalogFacetCounts(
+  novels: Awaited<ReturnType<typeof listLibraryCatalogNovels>>
+) {
+  const genreCounts = new Map<string, number>()
+  const workTypeCounts = new Map<"ORIGINAL" | "TRANSLATION", number>()
+  const statusCounts = new Map<"Ongoing" | "Completed" | "Hiatus", number>()
+
+  for (const novel of novels) {
+    genreCounts.set(novel.genre, (genreCounts.get(novel.genre) ?? 0) + 1)
+    workTypeCounts.set(novel.workType, (workTypeCounts.get(novel.workType) ?? 0) + 1)
+    statusCounts.set(novel.status, (statusCounts.get(novel.status) ?? 0) + 1)
+  }
+
+  return {
+    total: novels.length,
+    genres: [...genreCounts.entries()]
+      .map(([value, count]) => ({ value, label: value, count }))
+      .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label)),
+    workTypes: [...workTypeCounts.entries()]
+      .map(([value, count]) => ({
+        value,
+        label: value === "TRANSLATION" ? "Translation" : "Original",
+        count,
+      }))
+      .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label)),
+    statuses: [...statusCounts.entries()]
+      .map(([value, count]) => ({ value, label: value, count }))
+      .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label)),
+  }
 }
 
 async function getViewerState(
@@ -188,14 +359,236 @@ function buildNovelDetailDto(input: {
   }
 }
 
-export async function listLibraryCatalog(query: string | undefined): Promise<LibraryCatalogResponse> {
-  const normalizedQuery = query?.trim() ?? ""
-  const novels = await listLibraryCatalogNovels(normalizedQuery)
+type LibraryCatalogNovelSource = {
+  id: string
+  slug: string
+  title: string
+  summary: string
+  genre: string
+  workType: "ORIGINAL" | "TRANSLATION"
+  status: "Ongoing" | "Completed" | "Hiatus"
+  visibility: "PUBLISHED" | "HIDDEN"
+  coverUrl: string
+  coverStorageKey: string | null
+  authorDisplayName: string | null
+  chaptersCount: number
+  rating: Parameters<typeof decimalToNumber>[0]
+  ratingsCount: number
+  publishedAt: Date | null
+  updatedAt: Date
+  author: {
+    id: string
+    pubkey: string
+    displayName: string | null
+    handle: string | null
+    avatarUrl: string | null
+  }
+  _count: {
+    readingProgress: number
+    bookmarks: number
+  }
+}
+
+export async function listLibraryCatalog(input: {
+  query?: string
+  sortBy?: CatalogSortBy | PublicCatalogSortBy
+  page?: number
+  pageSize?: number
+  cursor?: string | null
+  direction?: "next" | "prev" | null
+  genre?: string | null
+  workType?: "ORIGINAL" | "TRANSLATION" | null
+  status?: "Ongoing" | "Completed" | "Hiatus" | null
+  collection?: "trending" | "hidden-gems" | "editors-picks" | "new-voices" | null
+}): Promise<LibraryCatalogResponse> {
+  const normalizedQuery = input.query?.trim() ?? ""
+  const sortBy = input.sortBy ?? "recent"
+  const genre = input.genre?.trim() ? input.genre.trim() : null
+  const workType = input.workType ?? null
+  const status = input.status ?? null
+  const collection = input.collection ?? null
+  const supportsKeysetSort =
+    sortBy === "recent" || sortBy === "popular" || sortBy === "rating" || sortBy === "title"
+  const direction = input.direction ?? null
+  const decodedCursor = supportsKeysetSort
+    ? decodeLibraryCatalogCursor(input.cursor ?? undefined)
+    : null
+  const pagination = normalizeCatalogPagination({
+    page: input.page,
+    pageSize: input.pageSize,
+  })
+
+  const filters = {
+    query: normalizedQuery,
+    genre,
+    workType,
+    status,
+  }
+
+  let facetCounts: {
+    total: number
+    genres: Array<{ value: string; label: string; count: number }>
+    workTypes: Array<{ value: string; label: string; count: number }>
+      statuses: Array<{ value: string; label: string; count: number }>
+  }
+  let catalogNovels: LibraryCatalogNovelSource[]
+  let totalItems: number
+  let hasPreviousPage = false
+  let hasNextPage = false
+
+  if (collection) {
+    const [collectionFacets, collectionTotal, collectionPage] = await Promise.all([
+      listLibraryCollectionFacetCounts(collection, filters),
+      countLibraryCollectionNovels(collection, filters),
+      listLibraryCatalogNovelsByCursor(filters, {
+        sortBy,
+        pageSize: pagination.pageSize,
+        cursor: decodedCursor,
+        direction,
+        collection,
+      }),
+    ])
+
+    facetCounts = collectionFacets
+    catalogNovels = collectionPage.items
+    totalItems = collectionTotal
+    hasNextPage =
+      direction === "prev" ? Boolean(decodedCursor) : collectionPage.hasMore
+    hasPreviousPage =
+      direction === "prev" ? collectionPage.hasMore : Boolean(decodedCursor)
+  } else {
+    const [aggregateFacetCounts, totalSource, novelsPage] = await Promise.all([
+      listLibraryCatalogFacetCounts(filters),
+      countLibraryCatalogNovels(filters),
+      supportsKeysetSort
+        ? listLibraryCatalogNovelsByCursor(filters, {
+            sortBy,
+            pageSize: pagination.pageSize,
+            cursor: decodedCursor,
+            direction,
+          })
+        : Promise.resolve(null),
+    ])
+
+    facetCounts = {
+      total: aggregateFacetCounts.total,
+      genres: aggregateFacetCounts.genres.map((item) => ({
+        value: item.genre,
+        label: item.genre,
+        count: item._count._all,
+      })),
+      workTypes: aggregateFacetCounts.workTypes.map((item) => ({
+        value: item.workType,
+        label: item.workType === "TRANSLATION" ? "Translation" : "Original",
+        count: item._count._all,
+      })),
+      statuses: aggregateFacetCounts.statuses.map((item) => ({
+        value: item.status,
+        label: item.status,
+        count: item._count._all,
+      })),
+    }
+    if (novelsPage) {
+      catalogNovels = novelsPage.items
+      hasNextPage =
+        direction === "prev" ? Boolean(decodedCursor) : novelsPage.hasMore
+      hasPreviousPage =
+        direction === "prev" ? novelsPage.hasMore : Boolean(decodedCursor)
+    } else {
+      const novels = await listLibraryCatalogNovels(filters, {
+        sortBy,
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+      })
+      catalogNovels = sortCatalogNovels(novels, sortBy, normalizedQuery)
+      const totalPagesForFallback =
+        totalSource > 0 ? Math.ceil(totalSource / pagination.pageSize) : 0
+      hasPreviousPage = pagination.page > 1
+      hasNextPage = totalPagesForFallback > pagination.page
+    }
+    totalItems = totalSource
+  }
+
+  const totalPages = totalItems > 0 ? Math.ceil(totalItems / pagination.pageSize) : 0
+  const publicFilters = buildPublicCatalogFilters({
+    query: normalizedQuery,
+    genre,
+    workType,
+    status,
+    collection,
+    sortBy,
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+  })
+  const firstNovel = catalogNovels[0]
+  const lastNovel = catalogNovels[catalogNovels.length - 1]
+  const currentCursor = input.cursor ?? null
+  const nextCursor =
+    hasNextPage && lastNovel
+      ? encodeLibraryCatalogCursor({
+          sortBy,
+          id: lastNovel.id,
+          orderDate: (lastNovel.publishedAt ?? lastNovel.updatedAt).toISOString(),
+          readsCount: lastNovel._count.readingProgress,
+          bookmarksCount: lastNovel._count.bookmarks,
+          ratingsCount: lastNovel.ratingsCount,
+          rating: decimalToNumber(lastNovel.rating),
+          title: lastNovel.title,
+        })
+      : null
+  const previousCursor =
+    hasPreviousPage && firstNovel
+      ? encodeLibraryCatalogCursor({
+          sortBy,
+          id: firstNovel.id,
+          orderDate: (firstNovel.publishedAt ?? firstNovel.updatedAt).toISOString(),
+          readsCount: firstNovel._count.readingProgress,
+          bookmarksCount: firstNovel._count.bookmarks,
+          ratingsCount: firstNovel.ratingsCount,
+          rating: decimalToNumber(firstNovel.rating),
+          title: firstNovel.title,
+        })
+      : null
 
   return {
     query: normalizedQuery,
-    total: novels.length,
-    novels: novels.map((novel) => ({
+    total: totalItems,
+    filters: {
+      query: normalizedQuery,
+      sortBy,
+      genre,
+      workType,
+      status,
+      collection: collection ?? "all",
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      cursor: currentCursor,
+      direction,
+    },
+    pagination: {
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      totalItems,
+      totalPages,
+      currentCursor,
+      nextCursor,
+      previousCursor,
+      hasPreviousPage,
+      hasNextPage,
+    },
+    facets: {
+      genres: facetCounts.genres,
+      workTypes: facetCounts.workTypes,
+      statuses: facetCounts.statuses,
+    },
+    activeFilters: publicFilters,
+    publicFacets: {
+      total: facetCounts.total,
+      genres: facetCounts.genres,
+      workTypes: facetCounts.workTypes,
+      statuses: facetCounts.statuses,
+    },
+    novels: catalogNovels.map((novel) => ({
       id: novel.id,
       slug: novel.slug,
       title: novel.title,

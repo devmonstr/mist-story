@@ -7,22 +7,24 @@ export type DiscoverCollection = DiscoverResponse["collections"][number]
 export interface DiscoverData {
   genres: DiscoverCategory[]
   collections: DiscoverCollection[]
+  activeFilters?: DiscoverResponse["activeFilters"]
+  facets?: DiscoverResponse["facets"]
 }
 
-let discoverDataPromise: Promise<DiscoverData> | null = null
+export async function loadDiscoverData(input?: {
+  query?: string
+  genre?: string | null
+  workType?: "ORIGINAL" | "TRANSLATION" | null
+  status?: "Ongoing" | "Completed" | "Hiatus" | null
+  collection?: "trending" | "hidden-gems" | "editors-picks" | "new-voices" | null
+  sortBy?: "relevance" | "popular" | "recent"
+}): Promise<DiscoverData> {
+  const payload = await fetchDiscoverData(input)
 
-export async function loadDiscoverData(): Promise<DiscoverData> {
-  if (!discoverDataPromise) {
-    discoverDataPromise = fetchDiscoverData()
-      .then((payload) => ({
-        genres: payload.genres,
-        collections: payload.collections,
-      }))
-      .catch((error) => {
-        discoverDataPromise = null
-        throw error
-      })
+  return {
+    genres: payload.genres,
+    collections: payload.collections,
+    activeFilters: payload.activeFilters,
+    facets: payload.facets,
   }
-
-  return discoverDataPromise
 }

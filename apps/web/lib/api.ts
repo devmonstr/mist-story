@@ -4,6 +4,7 @@ import type {
   AuthUserDto,
   AuthVerifyResponse,
   BookmarkState,
+  CatalogSortBy,
   ChapterDto,
   ChapterVersionDto,
   CreateChapterInput,
@@ -313,11 +314,49 @@ export function fetchStudioNovels() {
   return apiFetch<NovelDto[]>("/api/v1/novels")
 }
 
-export function fetchLibraryCatalog(query?: string) {
+export function fetchLibraryCatalog(input?: {
+  query?: string
+  sortBy?: CatalogSortBy
+  page?: number
+  pageSize?: number
+  cursor?: string | null
+  direction?: "next" | "prev" | null
+  genre?: string | null
+  workType?: "ORIGINAL" | "TRANSLATION" | null
+  status?: "Ongoing" | "Completed" | "Hiatus" | null
+  collection?: "trending" | "hidden-gems" | "editors-picks" | "new-voices" | null
+}) {
   const searchParams = new URLSearchParams()
 
-  if (query?.trim()) {
-    searchParams.set("q", query.trim())
+  if (input?.query?.trim()) {
+    searchParams.set("q", input.query.trim())
+  }
+  if (input?.sortBy && input.sortBy !== "recent") {
+    searchParams.set("sort", input.sortBy)
+  }
+  if (input?.cursor) {
+    searchParams.set("cursor", input.cursor)
+  }
+  if (input?.direction) {
+    searchParams.set("direction", input.direction)
+  }
+  if (input?.page && input.page > 1) {
+    searchParams.set("page", String(input.page))
+  }
+  if (input?.pageSize && input.pageSize !== 18) {
+    searchParams.set("pageSize", String(input.pageSize))
+  }
+  if (input?.genre?.trim()) {
+    searchParams.set("genre", input.genre.trim())
+  }
+  if (input?.workType) {
+    searchParams.set("workType", input.workType)
+  }
+  if (input?.status) {
+    searchParams.set("status", input.status)
+  }
+  if (input?.collection) {
+    searchParams.set("collection", input.collection)
   }
 
   const path = searchParams.size
@@ -327,14 +366,53 @@ export function fetchLibraryCatalog(query?: string) {
   return apiFetch<LibraryCatalogResponse>(path)
 }
 
-export function fetchDiscoverData() {
-  return apiFetch<DiscoverResponse>("/api/v1/discover")
+export function fetchDiscoverData(input?: {
+  query?: string
+  genre?: string | null
+  workType?: "ORIGINAL" | "TRANSLATION" | null
+  status?: "Ongoing" | "Completed" | "Hiatus" | null
+  collection?: "trending" | "hidden-gems" | "editors-picks" | "new-voices" | null
+  sortBy?: "relevance" | "popular" | "recent"
+}) {
+  const searchParams = new URLSearchParams()
+
+  if (input?.query?.trim()) {
+    searchParams.set("q", input.query.trim())
+  }
+  if (input?.genre?.trim()) {
+    searchParams.set("genre", input.genre.trim())
+  }
+  if (input?.workType) {
+    searchParams.set("workType", input.workType)
+  }
+  if (input?.status) {
+    searchParams.set("status", input.status)
+  }
+  if (input?.collection) {
+    searchParams.set("collection", input.collection)
+  }
+  if (input?.sortBy && input.sortBy !== "recent") {
+    searchParams.set("sort", input.sortBy)
+  }
+
+  const path = searchParams.size
+    ? `/api/v1/discover?${searchParams.toString()}`
+    : "/api/v1/discover"
+
+  return apiFetch<DiscoverResponse>(path)
 }
 
 export function fetchSearchResults(input: {
   query: string
   filterType?: SearchFilterType
   sortBy?: SearchSortBy
+  page?: number
+  pageSize?: number
+  cursor?: string | null
+  direction?: "next" | "prev" | null
+  genre?: string | null
+  workType?: "ORIGINAL" | "TRANSLATION" | null
+  status?: "Ongoing" | "Completed" | "Hiatus" | null
 }) {
   const searchParams = new URLSearchParams()
   if (input.query.trim()) {
@@ -345,6 +423,27 @@ export function fetchSearchResults(input: {
   }
   if (input.sortBy && input.sortBy !== "relevance") {
     searchParams.set("sort", input.sortBy)
+  }
+  if (input.cursor) {
+    searchParams.set("cursor", input.cursor)
+  }
+  if (input.direction) {
+    searchParams.set("direction", input.direction)
+  }
+  if (input.page && input.page > 1) {
+    searchParams.set("page", String(input.page))
+  }
+  if (input.pageSize && input.pageSize !== 20) {
+    searchParams.set("pageSize", String(input.pageSize))
+  }
+  if (input.genre?.trim()) {
+    searchParams.set("genre", input.genre.trim())
+  }
+  if (input.workType) {
+    searchParams.set("workType", input.workType)
+  }
+  if (input.status) {
+    searchParams.set("status", input.status)
   }
 
   const queryString = searchParams.toString()
