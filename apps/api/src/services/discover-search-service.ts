@@ -69,6 +69,21 @@ function buildLibraryHref(input: {
   return queryString ? `/library?${queryString}` : "/library"
 }
 
+function serializeCollectionPreviewNovels(
+  novels: Awaited<ReturnType<typeof listDiscoverCollectionNovels>>
+) {
+  return novels.slice(0, 3).map((novel) => ({
+    id: novel.id,
+    slug: novel.slug,
+    title: novel.title,
+    coverUrl: novel.coverUrl,
+    coverStorageKey: novel.coverStorageKey ?? null,
+    genre: novel.genre,
+    authorName:
+      novel.author.displayName?.trim() || novel.author.handle?.trim() || "Unknown author",
+  }))
+}
+
 function buildPublicCatalogFilters(input: {
   query?: string
   genre?: string | null
@@ -178,6 +193,7 @@ export async function getDiscoverData(input: {
         status: input.status,
         collection: "trending",
       }),
+      previewNovels: serializeCollectionPreviewNovels(trending),
     },
     {
       id: "hidden-gems",
@@ -192,6 +208,7 @@ export async function getDiscoverData(input: {
         status: input.status,
         collection: "hidden-gems",
       }),
+      previewNovels: serializeCollectionPreviewNovels(hiddenGems),
     },
     {
       id: "editors-picks",
@@ -206,6 +223,7 @@ export async function getDiscoverData(input: {
         status: input.status,
         collection: "editors-picks",
       }),
+      previewNovels: serializeCollectionPreviewNovels(editorsPicks),
     },
     {
       id: "new-voices",
@@ -220,6 +238,7 @@ export async function getDiscoverData(input: {
         status: input.status,
         collection: "new-voices",
       }),
+      previewNovels: serializeCollectionPreviewNovels(newVoices),
     },
   ]
 

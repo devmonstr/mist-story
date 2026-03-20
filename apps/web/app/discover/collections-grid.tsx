@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ChevronRight } from "lucide-react"
+import { BookOpen, ChevronRight } from "lucide-react"
+import { resolveNovelCoverSrc } from "@/lib/novel-cover"
 
 import type { DiscoverCollection } from "./discover-data"
 
@@ -37,6 +38,38 @@ export function CollectionsGrid({ collections }: CollectionsGridProps) {
                   {collection.description}
                 </p>
               </div>
+              {collection.previewNovels.length > 0 ? (
+                <div className="mt-5 grid grid-cols-3 gap-2 sm:mt-6">
+                  {collection.previewNovels.map((novel) => {
+                    const coverSrc = resolveNovelCoverSrc({
+                      novelId: novel.id,
+                      coverUrl: novel.coverUrl,
+                      coverStorageKey: novel.coverStorageKey,
+                    })
+
+                    return (
+                      <Link
+                        key={novel.id}
+                        href={`/novel/${novel.slug}`}
+                        className="group overflow-hidden border border-border/40 bg-muted/20"
+                        title={`${novel.title} by ${novel.authorName}`}
+                      >
+                        {coverSrc ? (
+                          <img
+                            src={coverSrc}
+                            alt={`${novel.title} cover`}
+                            className="aspect-[3/4] w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="flex aspect-[3/4] w-full items-center justify-center text-muted-foreground">
+                            <BookOpen className="h-5 w-5" />
+                          </div>
+                        )}
+                      </Link>
+                    )
+                  })}
+                </div>
+              ) : null}
               <div className="mt-5 flex flex-col gap-3 border-t border-border/40 pt-4 sm:mt-6 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-xs text-muted-foreground">
                   <p className="font-medium">{collection.curator}</p>

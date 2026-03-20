@@ -167,6 +167,8 @@ export async function listDiscoverCollectionNovels(filters: PublicCatalogNovelFi
         select: {
           id: true,
           pubkey: true,
+          displayName: true,
+          handle: true,
         },
       },
       _count: {
