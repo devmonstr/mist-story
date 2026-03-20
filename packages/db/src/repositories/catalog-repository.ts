@@ -307,16 +307,16 @@ function buildLibraryCollectionBaseCte(filters: PublicCatalogNovelFilters = {}) 
   `
 }
 
-function buildLibraryCollectionWhereSql(collection: CatalogCollection) {
+function buildLibraryCollectionPredicateSql(collection: CatalogCollection) {
   if (collection === "hidden-gems") {
-    return Prisma.sql`WHERE base."readsCount" <= 25`
+    return Prisma.sql`base."readsCount" <= 25`
   }
 
   if (collection === "new-voices") {
-    return Prisma.sql`WHERE base."authorPublishedNovelsCount" <= 1`
+    return Prisma.sql`base."authorPublishedNovelsCount" <= 1`
   }
 
-  return Prisma.sql``
+  return null
 }
 
 function buildLibraryCollectionOrderBySql(collection: CatalogCollection) {
@@ -453,7 +453,10 @@ export async function listLibraryCollectionNovels(
 ) {
   const pagination = normalizeCatalogPagination(input)
   const baseSql = buildLibraryCollectionBaseCte(filters)
-  const collectionWhereSql = buildLibraryCollectionWhereSql(collection)
+  const collectionPredicateSql = buildLibraryCollectionPredicateSql(collection)
+  const collectionWhereSql = collectionPredicateSql
+    ? Prisma.sql`WHERE ${collectionPredicateSql}`
+    : Prisma.empty
   const orderBySql = buildLibraryCollectionOrderBySql(collection)
 
   const rows = await prisma.$queryRaw<
@@ -523,7 +526,10 @@ export async function countLibraryCollectionNovels(
   filters: PublicCatalogNovelFilters = {}
 ) {
   const baseSql = buildLibraryCollectionBaseCte(filters)
-  const collectionWhereSql = buildLibraryCollectionWhereSql(collection)
+  const collectionPredicateSql = buildLibraryCollectionPredicateSql(collection)
+  const collectionWhereSql = collectionPredicateSql
+    ? Prisma.sql`WHERE ${collectionPredicateSql}`
+    : Prisma.empty
   const rows = await prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
     ${baseSql}
     SELECT COUNT(*)::int AS total
@@ -539,7 +545,10 @@ export async function listLibraryCollectionFacetCounts(
   filters: PublicCatalogNovelFilters = {}
 ): Promise<LibraryCollectionFacetCounts> {
   const baseSql = buildLibraryCollectionBaseCte(filters)
-  const collectionWhereSql = buildLibraryCollectionWhereSql(collection)
+  const collectionPredicateSql = buildLibraryCollectionPredicateSql(collection)
+  const collectionWhereSql = collectionPredicateSql
+    ? Prisma.sql`WHERE ${collectionPredicateSql}`
+    : Prisma.empty
 
   const [genres, workTypes, statuses, totalRows] = await Promise.all([
     prisma.$queryRaw<Array<{ value: string; count: number }>>(Prisma.sql`
@@ -863,8 +872,11 @@ export async function listLibraryCatalogNovelsByCursor(
   )
   const orderBySql = buildLibraryCatalogCursorOrderBySql(sortBy, input.direction)
   const baseSql = buildLibraryCollectionBaseCte(filters)
-  const collectionWhereSql = input.collection
-    ? buildLibraryCollectionWhereSql(input.collection)
+  const collectionPredicateSql = input.collection
+    ? buildLibraryCollectionPredicateSql(input.collection)
+    : null
+  const collectionWhereSql = collectionPredicateSql
+    ? Prisma.sql`AND ${collectionPredicateSql}`
     : Prisma.empty
 
   const rows = await prisma.$queryRaw<
