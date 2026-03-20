@@ -66,6 +66,15 @@ export function isValidNsec(nsec: string): boolean {
   return hex !== null && hex.length === 64
 }
 
+export function getPublicKeyFromNsec(nsec: string): string | null {
+  const privateKeyHex = nsecToHex(nsec)
+  if (!privateKeyHex) {
+    return null
+  }
+
+  return getPublicKeyFromPrivateKey(privateKeyHex)
+}
+
 function hexToBytes(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2)
   for (let i = 0; i < hex.length; i += 2) {

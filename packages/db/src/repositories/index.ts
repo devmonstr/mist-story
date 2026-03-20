@@ -1,3 +1,4 @@
+export * from "./catalog-repository"
 export * from "./chapter-repository"
 export * from "./chapter-version-repository"
 export * from "./library-repository"

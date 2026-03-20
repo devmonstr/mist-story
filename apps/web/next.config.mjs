@@ -30,9 +30,37 @@ function collectAllowedDevOrigins() {
   return [...origins]
 }
 
+function resolveApiOrigin() {
+  const explicitOrigin =
+    process.env.INTERNAL_API_URL ||
+    process.env.API_ORIGIN ||
+    process.env.NEXT_PUBLIC_API_URL
+
+  if (explicitOrigin) {
+    return explicitOrigin.replace(/\/$/, "")
+  }
+
+  const apiPort = process.env.API_PORT || "4000"
+  return `http://127.0.0.1:${apiPort}`
+}
+
+const apiOrigin = resolveApiOrigin()
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   allowedDevOrigins: collectAllowedDevOrigins(),
+  async rewrites() {
+    return [
+      {
+        source: "/api/v1/:path*",
+        destination: `${apiOrigin}/api/v1/:path*`,
+      },
+      {
+        source: "/health",
+        destination: `${apiOrigin}/health`,
+      },
+    ]
+  },
   images: {
     unoptimized: true,
   },

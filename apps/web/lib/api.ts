@@ -8,6 +8,7 @@ import type {
   ChapterVersionDto,
   CreateChapterInput,
   CreateNovelInput,
+  LibraryCatalogResponse,
   MyLibraryResponse,
   MyProfileResponse,
   NotificationDto,
@@ -16,6 +17,8 @@ import type {
   ProfileConnectionsResponse,
   ProfileFollowState,
   ProfilePageResponse,
+  PublicNovelDetailResponse,
+  PublicNovelReaderResponse,
   PublishChapterInput,
   ReorderChaptersInput,
   ReadingProgressState,
@@ -80,8 +83,18 @@ export type CreateApiKeyResponse = {
   token: string
 }
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:4000"
+function getApiBaseUrl() {
+  if (typeof window !== "undefined") {
+    return ""
+  }
+
+  return (
+    process.env.INTERNAL_API_URL?.replace(/\/$/, "") ||
+    process.env.API_ORIGIN?.replace(/\/$/, "") ||
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+    `http://127.0.0.1:${process.env.API_PORT ?? "4000"}`
+  )
+}
 
 class ApiError extends Error {
   constructor(
@@ -94,14 +107,26 @@ class ApiError extends Error {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  })
+  const headers = new Headers(init?.headers)
+  if (init?.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json")
+  }
+
+  let response: Response
+
+  try {
+    response = await fetch(`${getApiBaseUrl()}${path}`, {
+      ...init,
+      credentials: "include",
+      headers,
+    })
+  } catch (error) {
+    throw new Error(
+      error instanceof Error && error.message
+        ? `Unable to reach the API: ${error.message}`
+        : "Unable to reach the API."
+    )
+  }
 
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as { error?: string }
@@ -284,8 +309,32 @@ export function fetchStudioNovels() {
   return apiFetch<NovelDto[]>("/api/v1/novels")
 }
 
+export function fetchLibraryCatalog(query?: string) {
+  const searchParams = new URLSearchParams()
+
+  if (query?.trim()) {
+    searchParams.set("q", query.trim())
+  }
+
+  const path = searchParams.size
+    ? `/api/v1/library?${searchParams.toString()}`
+    : "/api/v1/library"
+
+  return apiFetch<LibraryCatalogResponse>(path)
+}
+
 export function fetchNovel(novelId: string) {
   return apiFetch<NovelDto>(`/api/v1/novels/${novelId}`)
+}
+
+export function fetchPublicNovelDetail(novelId: string) {
+  return apiFetch<PublicNovelDetailResponse>(`/api/v1/library/${novelId}`)
+}
+
+export function fetchPublicNovelChapter(novelId: string, chapterNumber: string) {
+  return apiFetch<PublicNovelReaderResponse>(
+    `/api/v1/library/${novelId}/chapters/${chapterNumber}`
+  )
 }
 
 export function fetchProfilePage(npub: string) {

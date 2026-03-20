@@ -3,6 +3,8 @@ import { Source_Serif_4, Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/context/auth-context'
 import { ThemeProvider } from '@/components/theme-provider'
+import { Toaster } from '@/components/ui/toaster'
+import { buildCanonicalUrl, getConfiguredSiteUrl } from '@/lib/site-url'
 import './globals.css'
 
 const sourceSerif = Source_Serif_4({ 
@@ -18,9 +20,30 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Mist Story — Where Stories Come to Life',
+  metadataBase: getConfiguredSiteUrl(),
+  title: {
+    default: 'Mist Story — Where Stories Come to Life',
+    template: '%s | Mist Story',
+  },
   description: 'A minimalist platform for novel writers and readers. Write, read, and discover extraordinary stories.',
   generator: 'v0.app',
+  alternates: {
+    canonical: buildCanonicalUrl('/'),
+  },
+  openGraph: {
+    type: 'website',
+    url: buildCanonicalUrl('/'),
+    siteName: 'Mist Story',
+    title: 'Mist Story — Where Stories Come to Life',
+    description:
+      'A minimalist platform for novel writers and readers. Write, read, and discover extraordinary stories.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Mist Story — Where Stories Come to Life',
+    description:
+      'A minimalist platform for novel writers and readers. Write, read, and discover extraordinary stories.',
+  },
   icons: {
     icon: [
       {
@@ -58,6 +81,7 @@ export default function RootLayout({
             {children}
           </AuthProvider>
         </ThemeProvider>
+        <Toaster />
         <Analytics />
       </body>
     </html>

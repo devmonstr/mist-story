@@ -1,21 +1,19 @@
 "use client"
 
-import { useState } from "react"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
 import { Search } from "lucide-react"
 import type { ReactNode } from "react"
+import { useLibraryCatalogContext } from "./library-catalog-context"
 
 interface LibraryShellProps {
   children: ReactNode
 }
 
 export function LibraryShell({ children }: LibraryShellProps) {
-  const [searchQuery, setSearchQuery] = useState("")
+  const { query, setQuery } = useLibraryCatalogContext()
 
   return (
     <>
-      {/* Hero Section */}
       <section className="border-b border-border/40 bg-background px-4 py-16 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <div className="mb-8">
@@ -27,20 +25,18 @@ export function LibraryShell({ children }: LibraryShellProps) {
             </p>
           </div>
 
-          {/* Search Bar */}
           <div className="relative max-w-2xl">
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search by title, author, or genre..."
               className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
             />
           </div>
         </div>
       </section>
 
-      {/* Stories Grid */}
       <section className="px-4 py-16 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">{children}</div>
       </section>

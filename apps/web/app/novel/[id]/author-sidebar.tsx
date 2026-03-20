@@ -1,68 +1,100 @@
-import { use } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import {
+  type PublicNovelAuthorDto,
+  type PublicNovelDetailDto,
+} from "@mist/shared"
+import { formatPublishedDate } from "./novel-utils"
 
-const novels: Record<string, {
-  id: string
-  author: string
-  authorBio: string
-  publishedDate: string
-  lastUpdated: string
-}> = {
-  "1": {
-    id: "1",
-    author: "Emma Stone",
-    authorBio: "Emma Stone is a bestselling fantasy author known for her richly detailed worlds and compelling characters. She has been writing for over a decade.",
-    publishedDate: "March 15, 2024",
-    lastUpdated: "January 8, 2026",
-  },
+interface AuthorSidebarProps {
+  novel: PublicNovelDetailDto
+  author: PublicNovelAuthorDto
 }
 
-const defaultNovel = novels["1"]
-
-export function AuthorSidebar({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
-  const novel = novels[id] || defaultNovel
-
-  const totalWords = (novels[id] || defaultNovel).id === "1" ? 41300 : 0
+export function AuthorSidebar({ novel, author }: AuthorSidebarProps) {
+  const avatarFallback = author.displayName.charAt(0).toUpperCase()
+  const hasWebsite = Boolean(author.website)
+  const hasHandle = Boolean(author.handle?.trim())
 
   return (
     <div className="sticky top-8 space-y-8">
-      {/* Author Info */}
       <div className="border border-border/40 bg-card p-6">
         <h3 className="text-sm font-medium text-muted-foreground">About the Author</h3>
         <div className="mt-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-lg font-medium text-muted-foreground">
-            {novel.author.charAt(0)}
+          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-muted text-lg font-medium text-muted-foreground">
+            {author.avatarUrl ? (
+              <img
+                src={author.avatarUrl}
+                alt={author.displayName}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              avatarFallback
+            )}
           </div>
-          <p className="mt-3 font-serif text-lg text-foreground">{novel.author}</p>
+          <p className="mt-3 font-serif text-lg text-foreground">{author.displayName}</p>
+          {hasHandle ? (
+            <p className="mt-1 text-xs text-muted-foreground">@{author.handle}</p>
+          ) : null}
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            {novel.authorBio}
+            {author.about || "This author has not added a bio yet."}
           </p>
-          <Button variant="outline" size="sm" className="mt-4 w-full">
-            View Profile
+          <dl className="mt-4 space-y-2 text-sm">
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Followers</dt>
+              <dd className="text-foreground">{author.followersCount.toLocaleString()}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Novels</dt>
+              <dd className="text-foreground">{author.publishedNovelsCount.toLocaleString()}</dd>
+            </div>
+          </dl>
+          {hasWebsite ? (
+            <p className="mt-4 text-sm text-muted-foreground">
+              <a
+                href={author.website ?? "#"}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-foreground hover:underline"
+              >
+                {author.website}
+              </a>
+            </p>
+          ) : null}
+          <Button variant="outline" size="sm" className="mt-4 w-full" asChild>
+            <Link href={`/profile/${author.npub}`}>View Profile</Link>
           </Button>
         </div>
       </div>
 
-      {/* Story Details */}
       <div className="border border-border/40 bg-card p-6">
         <h3 className="text-sm font-medium text-muted-foreground">Story Details</h3>
         <dl className="mt-4 space-y-3 text-sm">
           <div className="flex justify-between">
             <dt className="text-muted-foreground">Published</dt>
-            <dd className="text-foreground">{novel.publishedDate}</dd>
+            <dd className="text-foreground">{formatPublishedDate(novel.publishedAt)}</dd>
           </div>
           <div className="flex justify-between">
             <dt className="text-muted-foreground">Last Updated</dt>
-            <dd className="text-foreground">{novel.lastUpdated}</dd>
+            <dd className="text-foreground">{formatPublishedDate(novel.updatedAt)}</dd>
           </div>
           <div className="flex justify-between">
             <dt className="text-muted-foreground">Total Words</dt>
-            <dd className="text-foreground">{totalWords.toLocaleString()}</dd>
+            <dd className="text-foreground">{novel.totalWords.toLocaleString()}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-muted-foreground">Chapters</dt>
+            <dd className="text-foreground">{novel.chaptersCount.toLocaleString()}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-muted-foreground">Rating</dt>
+            <dd className="text-foreground">
+              {novel.rating.toFixed(1)} ({novel.ratingsCount.toLocaleString()})
+            </dd>
           </div>
           <div className="flex justify-between">
             <dt className="text-muted-foreground">Status</dt>
-            <dd className="text-foreground">Ongoing</dd>
+            <dd className="text-foreground">{novel.status}</dd>
           </div>
         </dl>
       </div>
