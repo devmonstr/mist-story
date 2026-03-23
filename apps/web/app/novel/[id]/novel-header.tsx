@@ -1,7 +1,7 @@
 import { BookOpen, Clock, Eye, Heart, BookmarkPlus } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { type PublicNovelAuthorDto, type PublicNovelChapterDto, type PublicNovelDetailDto, type PublicNovelViewerStateDto } from "@mist/shared"
+import { type PublicNovelAuthorDto, type PublicNovelDetailDto, type PublicNovelViewerStateDto } from "@mist/shared"
 import { resolveNovelCoverSrc } from "@/lib/novel-cover"
 import { NovelBookmarkButton } from "./novel-bookmark-button"
 import { NovelShareButton } from "./novel-share-button"
@@ -9,19 +9,17 @@ import { NovelShareButton } from "./novel-share-button"
 interface NovelHeaderProps {
   novel: PublicNovelDetailDto
   author: PublicNovelAuthorDto
-  chapters: PublicNovelChapterDto[]
   viewer: PublicNovelViewerStateDto
 }
 
-export function NovelHeader({ novel, author, chapters, viewer }: NovelHeaderProps) {
+export function NovelHeader({ novel, author, viewer }: NovelHeaderProps) {
   const coverSrc = resolveNovelCoverSrc({
     novelId: novel.id,
     coverUrl: novel.coverUrl,
     coverStorageKey: novel.coverStorageKey,
   })
 
-  const firstChapterNumber = chapters[0]?.number ?? 1
-  const startChapterNumber = viewer.currentChapterNumber ?? firstChapterNumber
+  const startChapterNumber = viewer.currentChapterNumber ?? 1
   const likesCount = novel.ratingsCount
   const workTypeLabel = novel.workType === "TRANSLATION" ? "Translation" : "Original"
   const hasTranslator = novel.workType === "TRANSLATION" && novel.translatorName.trim().length > 0

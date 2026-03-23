@@ -23,6 +23,7 @@ type WorkTypeFilter = "ORIGINAL" | "TRANSLATION" | null
 type StatusFilter = "Ongoing" | "Completed" | "Hiatus" | null
 type CursorDirection = "next" | "prev" | null
 const SEARCH_PAGE_SIZE = 20
+const MAX_SEARCH_QUERY_LENGTH = 120
 
 function normalizeWorkType(value: string | null): WorkTypeFilter {
   return value === "ORIGINAL" || value === "TRANSLATION" ? value : null
@@ -60,8 +61,10 @@ function buildSearchUrl(input: {
 }) {
   const params = new URLSearchParams()
 
-  if (input.query.trim()) {
-    params.set("q", input.query.trim())
+  const normalizedQuery = input.query.replace(/\s+/g, " ").trim().slice(0, MAX_SEARCH_QUERY_LENGTH)
+
+  if (normalizedQuery) {
+    params.set("q", normalizedQuery)
   }
   if (input.filterType !== "all") {
     params.set("type", input.filterType)
@@ -264,10 +267,20 @@ function ResultsSection({
 function ResultsCount({
   count,
   query,
+  isApproximate,
 }: {
   count: number
   query: string
+  isApproximate?: boolean
 }) {
+  if (isApproximate) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Showing top matches for "{query.trim()}"
+      </p>
+    )
+  }
+
   return (
     <p className="text-sm text-muted-foreground">
       Found {count} result{count !== 1 ? "s" : ""} for "{query.trim()}"
@@ -292,6 +305,7 @@ export function SearchPageContent() {
   const [results, setResults] = useState<SearchResult[]>([])
   const [facets, setFacets] = useState<PublicCatalogFacetCounts | null>(null)
   const [totalResults, setTotalResults] = useState(0)
+  const [isApproximateTotal, setIsApproximateTotal] = useState(false)
   const [pagination, setPagination] = useState<SearchPagination>({
     currentCursor: null,
     nextCursor: null,
@@ -347,6 +361,7 @@ export function SearchPageContent() {
       setResults([])
       setFacets(null)
       setTotalResults(0)
+      setIsApproximateTotal(false)
       setPagination({
         currentCursor: null,
         nextCursor: null,
@@ -383,6 +398,7 @@ export function SearchPageContent() {
         setResults(payload.items)
         setFacets(payload.facets ?? null)
         setTotalResults(payload.total)
+        setIsApproximateTotal(Boolean(payload.isApproximateTotal))
         setPagination(payload.pagination)
       })
       .catch((loadError) => {
@@ -393,6 +409,7 @@ export function SearchPageContent() {
         setResults([])
         setFacets(null)
         setTotalResults(0)
+        setIsApproximateTotal(false)
         setPagination({
           currentCursor: null,
           nextCursor: null,
@@ -490,6 +507,7 @@ export function SearchPageContent() {
                 value={queryInput}
                 onChange={(event) => setQueryInput(event.target.value)}
                 placeholder="Search novels, authors, genres..."
+                maxLength={MAX_SEARCH_QUERY_LENGTH}
                 className="h-11 pr-4"
               />
             </div>
@@ -503,7 +521,11 @@ export function SearchPageContent() {
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {hasQuery && !isLoading && !error && results.length > 0 ? (
           <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-            <ResultsCount count={totalResults || results.length} query={urlQuery} />
+            <ResultsCount
+              count={totalResults || results.length}
+              query={urlQuery}
+              isApproximate={isApproximateTotal}
+            />
 
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3">
               <Button variant="outline" asChild className="h-10">
@@ -658,7 +680,9 @@ export function SearchPageContent() {
           {hasQuery && (pagination.hasPreviousPage || pagination.hasNextPage) ? (
             <div className="mt-10 flex flex-col gap-3 border-t border-border/40 pt-6 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted-foreground">
-                {pagination.totalItems.toLocaleString()} results
+                {isApproximateTotal
+                  ? "Showing top matches"
+                  : `${pagination.totalItems.toLocaleString()} results`}
               </p>
               <div className="flex items-center gap-3">
                 <Button

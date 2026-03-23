@@ -62,7 +62,8 @@ libraryRouter.get("/:novelId", async (request, response, next) => {
   try {
     const payload = await getPublicNovelDetail(
       String(request.params.novelId),
-      response.locals.user?.id as string | undefined
+      response.locals.user?.id as string | undefined,
+      parsePositiveInt(request.query.chapterPage, 1)
     )
     return response.json(payload)
   } catch (error) {
@@ -79,7 +80,8 @@ libraryRouter.get("/:novelId/chapters/:chapterNumber", async (request, response,
     const payload = await getPublicNovelChapter(
       String(request.params.novelId),
       chapterNumber,
-      response.locals.user?.id as string | undefined
+      response.locals.user?.id as string | undefined,
+      parsePositiveInt(request.query.chapterPage, 0)
     )
     return response.json(payload)
   } catch (error) {

@@ -19,6 +19,7 @@ export interface SearchResponse {
   filterType: SearchFilterType
   sortBy: SearchSortBy
   total: number
+  isApproximateTotal?: boolean
   pagination: SearchPagination
   items: SearchResultItemDto[]
   activeFilters?: {
@@ -38,6 +39,11 @@ export interface SearchResponse {
 export type SearchResult = SearchResponse["items"][number]
 
 type SearchDirection = "next" | "prev" | null
+const MAX_SEARCH_QUERY_LENGTH = 120
+
+function normalizeSearchQuery(value: string) {
+  return value.replace(/\s+/g, " ").trim().slice(0, MAX_SEARCH_QUERY_LENGTH)
+}
 
 function normalizeCursor(value: unknown) {
   return typeof value === "string" && value.trim().length > 0 ? value : null
@@ -79,7 +85,7 @@ export async function loadSearchResults(input: {
   workType?: "ORIGINAL" | "TRANSLATION" | null
   status?: "Ongoing" | "Completed" | "Hiatus" | null
 }): Promise<SearchResponse> {
-  const normalizedQuery = input.query.trim()
+  const normalizedQuery = normalizeSearchQuery(input.query)
   const pageSize = input.pageSize ?? 20
 
   if (!normalizedQuery) {
@@ -87,8 +93,9 @@ export async function loadSearchResults(input: {
       query: "",
       filterType: input.filterType,
       sortBy: input.sortBy,
-      total: 0,
-      pagination: {
+    total: 0,
+    isApproximateTotal: false,
+    pagination: {
         currentCursor: null,
         nextCursor: null,
         previousCursor: null,
@@ -159,6 +166,7 @@ export async function loadSearchResults(input: {
         : input.sortBy,
     total:
       typeof payload?.total === "number" && Number.isFinite(payload.total) ? payload.total : items.length,
+    isApproximateTotal: Boolean(payload?.isApproximateTotal),
     pagination: {
       currentCursor: normalizeCursor(pagination.currentCursor),
       nextCursor: normalizeCursor(pagination.nextCursor),

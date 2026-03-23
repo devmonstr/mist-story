@@ -11,9 +11,15 @@ import { Button } from "@/components/ui/button"
 import { buildCanonicalUrl, resolveMetadataImageUrl } from "@/lib/site-url"
 import Link from "next/link"
 
-async function loadNovelPageData(id: string) {
+function parsePositiveInt(value: string | string[] | undefined, fallback: number) {
+  const raw = Array.isArray(value) ? value[0] : value
+  const parsed = Number.parseInt(raw ?? "", 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+async function loadNovelPageData(id: string, chapterPage = 1) {
   try {
-    const payload = await fetchPublicNovelDetail(id)
+    const payload = await fetchPublicNovelDetail(id, { chapterPage })
     return {
       data: payload,
       error: null,
@@ -77,11 +83,14 @@ export async function generateMetadata({
 
 export default async function NovelDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ chapterPage?: string }>
 }) {
   const { id } = await params
-  const result = await loadNovelPageData(id)
+  const { chapterPage } = await searchParams
+  const result = await loadNovelPageData(id, parsePositiveInt(chapterPage, 1))
 
   if (!result.data) {
     return (
@@ -108,7 +117,7 @@ export default async function NovelDetailPage({
     )
   }
 
-  const { novel, author, chapters, viewer } = result.data
+  const { novel, author, chapterList, chapters, viewer } = result.data
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -118,7 +127,6 @@ export default async function NovelDetailPage({
           <NovelHeader
             novel={novel}
             author={author}
-            chapters={chapters}
             viewer={viewer}
           />
 
@@ -127,7 +135,7 @@ export default async function NovelDetailPage({
               <div className="grid gap-12 lg:grid-cols-3">
                 <div className="lg:col-span-2">
                   <NovelAbout novel={novel} />
-                  <ChapterList novel={novel} chapters={chapters} />
+                  <ChapterList novel={novel} chapters={chapters} chapterList={chapterList} />
                 </div>
 
                 <div className="lg:col-span-1">

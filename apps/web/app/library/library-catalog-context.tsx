@@ -103,21 +103,38 @@ export function LibraryCatalogProvider({ children }: { children: ReactNode }) {
   )
   const deferredQuery = useDeferredValue(query.trim())
   const lastSyncedSearch = useRef<string>(searchParams.toString())
+  const isSyncingFromUrl = useRef(false)
 
   useEffect(() => {
     const currentSearch = searchParams.toString()
     const nextQuery = searchParams.get("q") || ""
+    const nextSortBy = normalizeSortBy(searchParams.get("sort"))
+    const nextCursor = normalizeCursor(searchParams.get("cursor"))
+    const nextDirection = normalizeCursorDirection(searchParams.get("direction"))
+    const nextGenre = searchParams.get("genre") || null
+    const nextWorkType = normalizeWorkType(searchParams.get("workType"))
+    const nextStatus = normalizeStatus(searchParams.get("status"))
+    const nextCollection = normalizeCollection(searchParams.get("collection"))
 
     if (currentSearch !== lastSyncedSearch.current) {
-      setQuery(nextQuery)
+      isSyncingFromUrl.current = true
+      lastSyncedSearch.current = currentSearch
     }
-    setSortBy(normalizeSortBy(searchParams.get("sort")))
-    setCursor(normalizeCursor(searchParams.get("cursor")))
-    setDirection(normalizeCursorDirection(searchParams.get("direction")))
-    setGenre(searchParams.get("genre") || null)
-    setWorkType(normalizeWorkType(searchParams.get("workType")))
-    setStatus(normalizeStatus(searchParams.get("status")))
-    setCollection(normalizeCollection(searchParams.get("collection")))
+
+    setQuery((currentValue) => (currentValue === nextQuery ? currentValue : nextQuery))
+    setSortBy((currentValue) => (currentValue === nextSortBy ? currentValue : nextSortBy))
+    setCursor((currentValue) => (currentValue === nextCursor ? currentValue : nextCursor))
+    setDirection((currentValue) =>
+      currentValue === nextDirection ? currentValue : nextDirection
+    )
+    setGenre((currentValue) => (currentValue === nextGenre ? currentValue : nextGenre))
+    setWorkType((currentValue) =>
+      currentValue === nextWorkType ? currentValue : nextWorkType
+    )
+    setStatus((currentValue) => (currentValue === nextStatus ? currentValue : nextStatus))
+    setCollection((currentValue) =>
+      currentValue === nextCollection ? currentValue : nextCollection
+    )
   }, [searchParams])
 
   const nextSearch = useMemo(() => {
@@ -151,6 +168,14 @@ export function LibraryCatalogProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const currentSearch = searchParams.toString()
+
+    if (isSyncingFromUrl.current) {
+      if (nextSearch === currentSearch) {
+        isSyncingFromUrl.current = false
+        lastSyncedSearch.current = currentSearch
+      }
+      return
+    }
 
     if (nextSearch === currentSearch) {
       lastSyncedSearch.current = currentSearch

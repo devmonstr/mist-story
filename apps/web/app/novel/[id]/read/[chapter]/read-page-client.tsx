@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { use } from "react"
 import {
@@ -32,6 +32,7 @@ import { useAuth } from "@/context/auth-context"
 import { buildSignInPath } from "@/lib/auth-routes"
 import {
   addBookmark,
+  fetchPublicNovelDetail,
   fetchPublicNovelChapter,
   removeBookmark,
   updateReadingProgress,
@@ -39,7 +40,11 @@ import {
 import { npubToHex } from "@/lib/nostr-utils"
 import { ZapPaywall } from "@/components/zap-paywall"
 import { isChapterUnlocked, storeZapReceipt } from "@/lib/zap-utils"
-import { type PublicNovelReaderResponse } from "@mist/shared"
+import {
+  type PublicNovelChapterDto,
+  type PublicNovelChapterListDto,
+  type PublicNovelReaderResponse,
+} from "@mist/shared"
 
 const READER_SETTINGS_KEY = "mist-story-reader-settings"
 const READING_PROGRESS_KEY = "mist-story-reading-progress"
@@ -79,6 +84,10 @@ function getDefaultThemeStyles(readerTheme: "light" | "dark" | "sepia") {
   }[readerTheme]
 }
 
+function getGroupPageForChapter(chapterNumber: number, pageSize: number) {
+  return Math.max(1, Math.ceil(chapterNumber / pageSize))
+}
+
 export function ReadPageClient({
   params,
 }: {
@@ -87,6 +96,7 @@ export function ReadPageClient({
   const { id, chapter } = use(params)
   const router = useRouter()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { user, isLoading: isAuthLoading } = useAuth()
 
   const [fontSize, setFontSize] = useState(18)
@@ -100,7 +110,26 @@ export function ReadPageClient({
   const [isBookmarkSubmitting, setIsBookmarkSubmitting] = useState(false)
   const [readingProgress, setReadingProgress] = useState(0)
   const [isUnlocked, setIsUnlocked] = useState(true)
+  const [openGroupPage, setOpenGroupPage] = useState<number | null>(null)
+  const [loadingGroupPage, setLoadingGroupPage] = useState<number | null>(null)
+  const [chapterGroupCache, setChapterGroupCache] = useState<
+    Record<
+      number,
+      {
+        chapters: PublicNovelChapterDto[]
+        chapterList: PublicNovelChapterListDto
+      }
+    >
+  >({})
+  const chapterGroupRefs = useRef<Record<number, HTMLDivElement | null>>({})
   const theme = getDefaultThemeStyles(readerTheme)
+  const chapterPage = Number.parseInt(searchParams.get("chapterPage") ?? "", 10)
+
+  useEffect(() => {
+    setOpenGroupPage(null)
+    setLoadingGroupPage(null)
+    setChapterGroupCache({})
+  }, [id])
 
   useEffect(() => {
     try {
@@ -146,7 +175,10 @@ export function ReadPageClient({
       setError(null)
 
       try {
-        const payload = await fetchPublicNovelChapter(id, chapter)
+        const payload = await fetchPublicNovelChapter(id, chapter, {
+          chapterPage:
+            Number.isFinite(chapterPage) && chapterPage > 1 ? chapterPage : undefined,
+        })
         if (cancelled) {
           return
         }
@@ -176,7 +208,7 @@ export function ReadPageClient({
     return () => {
       cancelled = true
     }
-  }, [chapter, id])
+  }, [chapter, chapterPage, id])
 
   useEffect(() => {
     if (!data) {
@@ -184,6 +216,14 @@ export function ReadPageClient({
     }
 
     setIsBookmarked(data.viewer.isBookmarked)
+    setOpenGroupPage(data.chapterList.currentPage)
+    setChapterGroupCache((previous) => ({
+      ...previous,
+      [data.chapterList.currentPage]: {
+        chapters: data.chapters,
+        chapterList: data.chapterList,
+      },
+    }))
   }, [data])
 
   useEffect(() => {
@@ -280,9 +320,42 @@ export function ReadPageClient({
 
   const chapters = data?.chapters ?? []
   const currentChapter = data?.chapter ?? null
+  const chapterList = data?.chapterList ?? null
   const novel = data?.novel ?? null
   const author = data?.author ?? null
   const authorPubkey = useMemo(() => (author ? npubToHex(author.npub) : null), [author])
+  const chapterGroups = useMemo(() => {
+    if (!chapterList) {
+      return []
+    }
+
+    return Array.from({ length: chapterList.totalPages }, (_, index) => {
+      const page = index + 1
+      const start = (page - 1) * chapterList.pageSize + 1
+      const end = Math.min(page * chapterList.pageSize, chapterList.maxChapterNumber)
+      return {
+        page,
+        start,
+        end,
+      }
+    })
+  }, [chapterList])
+
+  useEffect(() => {
+    if (!isChapterListOpen || openGroupPage === null) {
+      return
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      chapterGroupRefs.current[openGroupPage]?.scrollIntoView({
+        block: "nearest",
+        inline: "nearest",
+        behavior: "smooth",
+      })
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [isChapterListOpen, openGroupPage])
 
   if (isFetching) {
     return (
@@ -356,29 +429,125 @@ export function ReadPageClient({
                 <SheetHeader>
                   <SheetTitle className={theme.sheetText}>Chapters</SheetTitle>
                 </SheetHeader>
-                <div className="mt-6 space-y-1">
-                  {chapters.map((ch) => (
-                    <Link
-                      key={ch.id}
-                      href={`/novel/${id}/read/${ch.number}`}
-                      onClick={() => setIsChapterListOpen(false)}
-                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
-                        ch.number === currentChapter.number
-                          ? readerTheme === "light"
-                            ? "bg-muted text-foreground"
-                            : "bg-[#333] text-white"
-                          : `${theme.mutedText} hover:opacity-80`
-                      }`}
-                    >
-                      <span className="flex h-6 w-6 items-center justify-center rounded text-xs font-medium">
-                        {ch.number}
-                      </span>
-                      <span className="line-clamp-1">{ch.title}</span>
-                      {ch.isPaid && ch.priceSats ? (
-                        <span className="ml-auto text-xs opacity-80">{ch.priceSats} sats</span>
-                      ) : null}
-                    </Link>
-                  ))}
+                <div className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto px-1 pb-6">
+                  {chapterGroups.map((group) => {
+                    const isCurrentGroup = chapterList?.currentPage === group.page
+                    const isOpen = openGroupPage === group.page
+                    const groupData = chapterGroupCache[group.page] ?? null
+
+                    return (
+                      <div
+                        key={group.page}
+                        ref={(node) => {
+                          chapterGroupRefs.current[group.page] = node
+                        }}
+                        className="overflow-hidden rounded-xl border border-border/40"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isOpen) {
+                              setOpenGroupPage(null)
+                              return
+                            }
+
+                            setOpenGroupPage(group.page)
+
+                            if (chapterGroupCache[group.page]) {
+                              return
+                            }
+
+                            setLoadingGroupPage(group.page)
+                            void fetchPublicNovelDetail(id, {
+                              chapterPage: group.page,
+                            })
+                              .then((payload) => {
+                                setChapterGroupCache((previous) => ({
+                                  ...previous,
+                                  [group.page]: {
+                                    chapters: payload.chapters,
+                                    chapterList: payload.chapterList,
+                                  },
+                                }))
+                              })
+                              .catch((error) => {
+                                console.error("Failed to load chapter group:", error)
+                              })
+                              .finally(() => {
+                                setLoadingGroupPage((previous) =>
+                                  previous === group.page ? null : previous
+                                )
+                              })
+                          }}
+                          className={`flex w-full items-center justify-between gap-3 px-3 py-3 text-left text-sm ${
+                            isCurrentGroup || isOpen
+                              ? readerTheme === "light"
+                                ? "bg-muted text-foreground"
+                                : "bg-[#333] text-white"
+                              : `${theme.mutedText} hover:opacity-80`
+                          }`}
+                        >
+                          <div>
+                            <p className="font-medium">
+                              Chapters {group.start.toLocaleString()}-{group.end.toLocaleString()}
+                            </p>
+                            <p className="text-xs opacity-80">
+                              Group {group.page} of {chapterList?.totalPages ?? 0}
+                              {isCurrentGroup ? " · current" : ""}
+                              {isOpen && !isCurrentGroup ? " · open" : ""}
+                            </p>
+                          </div>
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+
+                        {isOpen ? (
+                          <div className="border-t border-border/30">
+                            {groupData ? (
+                              <>
+                                <div className={`px-3 py-2 text-xs ${theme.mutedText}`}>
+                                  Loaded chapters {groupData.chapterList.visibleFrom.toLocaleString()}-
+                                  {groupData.chapterList.visibleTo.toLocaleString()} of{" "}
+                                  {groupData.chapterList.maxChapterNumber.toLocaleString()}
+                                </div>
+                                <div className="space-y-1 px-2 pb-2">
+                                  {groupData.chapters.map((ch) => (
+                                    <Link
+                                      key={ch.id}
+                                      href={`/novel/${id}/read/${ch.number}?chapterPage=${group.page}`}
+                                      onClick={() => setIsChapterListOpen(false)}
+                                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                                        ch.number === currentChapter.number
+                                          ? readerTheme === "light"
+                                            ? "bg-muted text-foreground"
+                                            : "bg-[#333] text-white"
+                                          : `${theme.mutedText} hover:opacity-80`
+                                      }`}
+                                    >
+                                      <span className="flex h-6 w-6 items-center justify-center rounded text-xs font-medium">
+                                        {ch.number}
+                                      </span>
+                                      <span className="line-clamp-1">{ch.title}</span>
+                                      {ch.isPaid && ch.priceSats ? (
+                                        <span className="ml-auto text-xs opacity-80">
+                                          {ch.priceSats} sats
+                                        </span>
+                                      ) : null}
+                                    </Link>
+                                  ))}
+                                </div>
+                              </>
+                            ) : (
+                              <div className={`px-3 py-4 text-sm ${theme.mutedText}`}>
+                                {loadingGroupPage === group.page
+                                  ? "Loading chapters..."
+                                  : "Unable to load this chapter group right now."}
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
+                    )
+                  })}
                 </div>
               </SheetContent>
             </Sheet>
@@ -606,7 +775,12 @@ export function ReadPageClient({
         <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4">
           {currentChapter.previousChapterNumber ? (
             <Button variant="ghost" asChild>
-              <Link href={`/novel/${id}/read/${currentChapter.previousChapterNumber}`}>
+              <Link
+                href={`/novel/${id}/read/${currentChapter.previousChapterNumber}?chapterPage=${getGroupPageForChapter(
+                  currentChapter.previousChapterNumber,
+                  chapterList?.pageSize ?? 100
+                )}`}
+              >
                 <ChevronLeft className="mr-2 h-4 w-4" />
                 Previous
               </Link>
@@ -616,9 +790,9 @@ export function ReadPageClient({
           )}
 
           <div className="flex flex-col items-center gap-1">
-            <span className={`text-sm ${theme.mutedText}`}>
-              {currentChapter.number} / {chapters.length}
-            </span>
+              <span className={`text-sm ${theme.mutedText}`}>
+              {currentChapter.number} / {novel.chaptersCount}
+              </span>
             {readingProgress > 0 ? (
               <span className={`text-xs ${theme.mutedText}`}>
                 {Math.round(readingProgress)}% read
@@ -628,7 +802,12 @@ export function ReadPageClient({
 
           {currentChapter.nextChapterNumber ? (
             <Button variant="ghost" asChild>
-              <Link href={`/novel/${id}/read/${currentChapter.nextChapterNumber}`}>
+              <Link
+                href={`/novel/${id}/read/${currentChapter.nextChapterNumber}?chapterPage=${getGroupPageForChapter(
+                  currentChapter.nextChapterNumber,
+                  chapterList?.pageSize ?? 100
+                )}`}
+              >
                 Next
                 <ChevronRight className="ml-2 h-4 w-4" />
               </Link>

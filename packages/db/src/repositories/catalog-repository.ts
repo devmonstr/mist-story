@@ -244,11 +244,11 @@ function buildPublishedNovelWhereSql(filters: PublicCatalogNovelFilters = {}) {
   }
 
   if (filters.workType && filters.workType !== "all") {
-    clauses.push(Prisma.sql`n."workType" = ${filters.workType}`)
+    clauses.push(Prisma.sql`n."workType"::text = ${filters.workType}`)
   }
 
   if (filters.status && filters.status !== "all") {
-    clauses.push(Prisma.sql`n."status" = ${filters.status}`)
+    clauses.push(Prisma.sql`n."status"::text = ${filters.status}`)
   }
 
   return Prisma.sql`WHERE ${Prisma.join(clauses, " AND ")}`
@@ -258,7 +258,23 @@ function buildLibraryCollectionBaseCte(filters: PublicCatalogNovelFilters = {}) 
   const whereSql = buildPublishedNovelWhereSql(filters)
 
   return Prisma.sql`
-    WITH catalog_base AS (
+    WITH reading_counts AS (
+      SELECT rp."novelId", COUNT(*)::int AS "readsCount"
+      FROM "ReadingProgress" rp
+      GROUP BY rp."novelId"
+    ),
+    bookmark_counts AS (
+      SELECT nb."novelId", COUNT(*)::int AS "bookmarksCount"
+      FROM "NovelBookmark" nb
+      GROUP BY nb."novelId"
+    ),
+    author_published_counts AS (
+      SELECT author_novel."authorId", COUNT(*)::int AS "publishedNovelsCount"
+      FROM "Novel" author_novel
+      WHERE author_novel."visibility" = 'PUBLISHED'
+      GROUP BY author_novel."authorId"
+    ),
+    catalog_base AS (
       SELECT
         n.id,
         n.slug,
@@ -281,27 +297,14 @@ function buildLibraryCollectionBaseCte(filters: PublicCatalogNovelFilters = {}) 
         a."displayName" AS "authorName",
         a.handle AS "authorHandle",
         a."avatarUrl" AS "authorAvatarUrl",
-        COALESCE(reads."readsCount", 0)::int AS "readsCount",
-        COALESCE(bookmarks."bookmarksCount", 0)::int AS "bookmarksCount",
-        COALESCE(author_novels."publishedNovelsCount", 0)::int AS "authorPublishedNovelsCount"
+        COALESCE(reading_counts."readsCount", 0)::int AS "readsCount",
+        COALESCE(bookmark_counts."bookmarksCount", 0)::int AS "bookmarksCount",
+        COALESCE(author_published_counts."publishedNovelsCount", 0)::int AS "authorPublishedNovelsCount"
       FROM "Novel" n
       JOIN "User" a ON a.id = n."authorId"
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*)::int AS "readsCount"
-        FROM "ReadingProgress" rp
-        WHERE rp."novelId" = n.id
-      ) reads ON true
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*)::int AS "bookmarksCount"
-        FROM "NovelBookmark" nb
-        WHERE nb."novelId" = n.id
-      ) bookmarks ON true
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*)::int AS "publishedNovelsCount"
-        FROM "Novel" author_novel
-        WHERE author_novel."authorId" = n."authorId"
-          AND author_novel."visibility" = 'PUBLISHED'
-      ) author_novels ON true
+      LEFT JOIN reading_counts ON reading_counts."novelId" = n.id
+      LEFT JOIN bookmark_counts ON bookmark_counts."novelId" = n.id
+      LEFT JOIN author_published_counts ON author_published_counts."authorId" = n."authorId"
       ${whereSql}
     )
   `
@@ -1049,11 +1052,47 @@ export async function findPublicNovelByIdOrSlug(identifier: string) {
   })
 }
 
-export async function listPublicNovelChapters(novelId: string) {
+export async function countPublicNovelChapters(novelId: string) {
+  return prisma.chapter.count({
+    where: {
+      novelId,
+      status: "PUBLISHED",
+    },
+  })
+}
+
+export async function getPublicNovelChapterBounds(novelId: string) {
+  const aggregate = await prisma.chapter.aggregate({
+    where: {
+      novelId,
+      status: "PUBLISHED",
+    },
+    _max: {
+      number: true,
+    },
+  })
+
+  return {
+    maxChapterNumber: aggregate._max.number ?? 0,
+  }
+}
+
+export async function listPublicNovelChaptersPage(
+  novelId: string,
+  page: number,
+  pageSize: number
+) {
+  const rangeStart = Math.max(1, (page - 1) * pageSize + 1)
+  const rangeEnd = rangeStart + pageSize - 1
+
   return prisma.chapter.findMany({
     where: {
       novelId,
       status: "PUBLISHED",
+      number: {
+        gte: rangeStart,
+        lte: rangeEnd,
+      },
     },
     orderBy: { number: "asc" },
     include: {
@@ -1066,6 +1105,49 @@ export async function listPublicNovelChapters(novelId: string) {
       },
     },
   })
+}
+
+export async function findAdjacentPublicChapterNumbers(
+  novelId: string,
+  chapterNumber: number
+) {
+  const [previousChapter, nextChapter] = await Promise.all([
+    prisma.chapter.findFirst({
+      where: {
+        novelId,
+        status: "PUBLISHED",
+        number: {
+          lt: chapterNumber,
+        },
+      },
+      orderBy: {
+        number: "desc",
+      },
+      select: {
+        number: true,
+      },
+    }),
+    prisma.chapter.findFirst({
+      where: {
+        novelId,
+        status: "PUBLISHED",
+        number: {
+          gt: chapterNumber,
+        },
+      },
+      orderBy: {
+        number: "asc",
+      },
+      select: {
+        number: true,
+      },
+    }),
+  ])
+
+  return {
+    previousChapterNumber: previousChapter?.number ?? null,
+    nextChapterNumber: nextChapter?.number ?? null,
+  }
 }
 
 export async function findPublicChapterForNovelByNumber(

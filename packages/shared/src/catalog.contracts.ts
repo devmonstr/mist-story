@@ -167,6 +167,18 @@ export const publicNovelViewerStateSchema = z.object({
   currentChapterNumber: z.number().int().positive().nullable(),
 })
 
+export const publicNovelChapterListSchema = z.object({
+  totalChapters: z.number().int().nonnegative(),
+  maxChapterNumber: z.number().int().nonnegative(),
+  currentPage: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  totalPages: z.number().int().nonnegative(),
+  visibleFrom: z.number().int().nonnegative(),
+  visibleTo: z.number().int().nonnegative(),
+  hasPreviousPage: z.boolean(),
+  hasNextPage: z.boolean(),
+})
+
 export const publicNovelDetailSchema = z.object({
   id: z.string(),
   slug: z.string(),
@@ -198,6 +210,7 @@ export const publicNovelDetailSchema = z.object({
 export const publicNovelDetailResponseSchema = z.object({
   novel: publicNovelDetailSchema,
   author: publicNovelAuthorSchema,
+  chapterList: publicNovelChapterListSchema,
   chapters: z.array(publicNovelChapterSchema),
   viewer: publicNovelViewerStateSchema,
 })
@@ -212,6 +225,7 @@ export const publicNovelReaderResponseSchema = z.object({
   novel: publicNovelDetailSchema,
   author: publicNovelAuthorSchema,
   chapter: publicNovelReaderChapterSchema,
+  chapterList: publicNovelChapterListSchema,
   chapters: z.array(publicNovelChapterSchema),
   viewer: publicNovelViewerStateSchema,
 })
@@ -229,6 +243,7 @@ export type LibraryCatalogFiltersDto = z.infer<typeof libraryCatalogFiltersSchem
 export type LibraryCatalogResponse = z.infer<typeof libraryCatalogResponseSchema>
 export type PublicNovelAuthorDto = z.infer<typeof publicNovelAuthorSchema>
 export type PublicNovelChapterDto = z.infer<typeof publicNovelChapterSchema>
+export type PublicNovelChapterListDto = z.infer<typeof publicNovelChapterListSchema>
 export type PublicNovelViewerStateDto = z.infer<typeof publicNovelViewerStateSchema>
 export type PublicNovelDetailDto = z.infer<typeof publicNovelDetailSchema>
 export type PublicNovelDetailResponse = z.infer<typeof publicNovelDetailResponseSchema>

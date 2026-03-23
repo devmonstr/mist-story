@@ -9,6 +9,10 @@ import {
   type PublicCatalogNovelFilters,
 } from "./catalog-repository"
 
+type SearchQueryOptions = {
+  includeTotal?: boolean
+}
+
 export type SearchNovelKeysetCursor = {
   sortBy: "relevance" | "popular" | "recent"
   id: string
@@ -43,6 +47,89 @@ function buildNovelSearchDocumentSql() {
   `
 }
 
+function buildPublishedNovelFilterClauses(
+  filters: PublicCatalogNovelFilters,
+  alias: Prisma.Sql = Prisma.sql`n`
+) {
+  const clauses: Prisma.Sql[] = [Prisma.sql`${alias}."visibility" = 'PUBLISHED'`]
+
+  if (filters.genre?.trim()) {
+    clauses.push(Prisma.sql`lower(${alias}."genre") = lower(${filters.genre.trim()})`)
+  }
+
+  if (filters.workType && filters.workType !== "all") {
+    clauses.push(Prisma.sql`${alias}."workType"::text = ${filters.workType}`)
+  }
+
+  if (filters.status && filters.status !== "all") {
+    clauses.push(Prisma.sql`${alias}."status"::text = ${filters.status}`)
+  }
+
+  return clauses
+}
+
+function buildNovelSearchCandidatesCte(filters: PublicCatalogNovelFilters, query: string) {
+  const baseClauses = buildPublishedNovelFilterClauses(filters)
+  const baseWhereSql = Prisma.sql`WHERE ${Prisma.join(baseClauses, " AND ")}`
+  const searchDocument = buildNovelSearchDocumentSql()
+
+  return Prisma.sql`
+    WITH novel_search_candidates AS (
+      SELECT DISTINCT candidate.id
+      FROM (
+        SELECT id
+        FROM (
+          SELECT
+            n.id,
+            ts_rank_cd(${searchDocument}, websearch_to_tsquery('simple', ${query})) AS rank_score,
+            coalesce(n."publishedAt", n."updatedAt") AS order_date
+          FROM "Novel" n
+          ${baseWhereSql}
+            AND ${searchDocument} @@ websearch_to_tsquery('simple', ${query})
+          ORDER BY rank_score DESC, order_date DESC, n.id DESC
+          LIMIT 400
+        ) fts_candidates
+        UNION ALL
+        SELECT id
+        FROM (
+          SELECT
+            n.id,
+            similarity(coalesce(n."title", ''), ${query}) AS similarity_score,
+            coalesce(n."publishedAt", n."updatedAt") AS order_date
+          FROM "Novel" n
+          ${baseWhereSql}
+            AND coalesce(n."title", '') % ${query}
+          ORDER BY similarity_score DESC, order_date DESC, n.id DESC
+          LIMIT 200
+        ) title_candidates
+        UNION ALL
+        SELECT id
+        FROM (
+          SELECT
+            n.id,
+            similarity(coalesce(n."authorDisplayName", ''), ${query}) AS similarity_score,
+            coalesce(n."publishedAt", n."updatedAt") AS order_date
+          FROM "Novel" n
+          ${baseWhereSql}
+            AND coalesce(n."authorDisplayName", '') % ${query}
+          ORDER BY similarity_score DESC, order_date DESC, n.id DESC
+          LIMIT 120
+        ) author_candidates
+      ) candidate
+    ),
+    reading_counts AS (
+      SELECT rp."novelId", COUNT(*)::int AS "readsCount"
+      FROM "ReadingProgress" rp
+      GROUP BY rp."novelId"
+    ),
+    bookmark_counts AS (
+      SELECT nb."novelId", COUNT(*)::int AS "bookmarksCount"
+      FROM "NovelBookmark" nb
+      GROUP BY nb."novelId"
+    )
+  `
+}
+
 function buildAuthorSearchDocumentSql() {
   return Prisma.sql`
     mist_user_search_document(
@@ -62,11 +149,11 @@ function buildNovelSearchWhereSql(filters: PublicCatalogNovelFilters, query: str
   }
 
   if (filters.workType && filters.workType !== "all") {
-    clauses.push(Prisma.sql`n."workType" = ${filters.workType}`)
+    clauses.push(Prisma.sql`n."workType"::text = ${filters.workType}`)
   }
 
   if (filters.status && filters.status !== "all") {
-    clauses.push(Prisma.sql`n."status" = ${filters.status}`)
+    clauses.push(Prisma.sql`n."status"::text = ${filters.status}`)
   }
 
   const searchDocument = buildNovelSearchDocumentSql()
@@ -75,8 +162,6 @@ function buildNovelSearchWhereSql(filters: PublicCatalogNovelFilters, query: str
       ${searchDocument} @@ websearch_to_tsquery('simple', ${query})
       OR coalesce(n."title", '') % ${query}
       OR coalesce(n."authorDisplayName", '') % ${query}
-      OR coalesce(n."summary", '') % ${query}
-      OR coalesce(n."genre", '') % ${query}
     )
   `)
 
@@ -125,8 +210,7 @@ function buildNovelSearchOrderBySql(sortBy: "relevance" | "popular" | "recent", 
       ts_rank_cd(${searchDocument}, websearch_to_tsquery('simple', ${query})) DESC,
       GREATEST(
         similarity(coalesce(n."title", ''), ${query}),
-        similarity(coalesce(n."authorDisplayName", ''), ${query}),
-        similarity(coalesce(n."genre", ''), ${query})
+        similarity(coalesce(n."authorDisplayName", ''), ${query})
       ) DESC,
       "readsCount" DESC,
       n."ratingsCount" DESC,
@@ -612,67 +696,71 @@ export async function searchPublishedNovelsWithPagination(
   filters: PublicCatalogNovelFilters,
   query: string,
   sortBy: "relevance" | "popular" | "recent",
-  paginationInput: CatalogPaginationInput = {}
+  paginationInput: CatalogPaginationInput = {},
+  options: SearchQueryOptions = {}
 ) {
   const pagination = normalizeCatalogPagination(paginationInput)
-  const whereSql = buildNovelSearchWhereSql(filters, query)
   const orderBySql = buildNovelSearchOrderBySql(sortBy, query)
+  const includeTotal = options.includeTotal ?? true
+
+  const itemsPromise = prisma.$queryRaw<Array<{
+    id: string
+    slug: string
+    title: string
+    summary: string
+    genre: string
+    authorName: string
+    authorPubkey: string
+    chaptersCount: number
+    readsCount: number
+    bookmarksCount: number
+    coverUrl: string
+    coverStorageKey: string | null
+  }>>(Prisma.sql`
+    ${buildNovelSearchCandidatesCte(filters, query)}
+    SELECT
+      n.id,
+      n.slug,
+      n."title",
+      n."summary",
+      n."genre",
+      coalesce(a."displayName", a."handle", 'Unknown author') AS "authorName",
+      a."pubkey" AS "authorPubkey",
+      n."chaptersCount",
+      COALESCE(reading_counts."readsCount", 0)::int AS "readsCount",
+      COALESCE(bookmark_counts."bookmarksCount", 0)::int AS "bookmarksCount",
+      n."coverUrl",
+      n."coverStorageKey"
+    FROM novel_search_candidates candidate
+    JOIN "Novel" n ON n.id = candidate.id
+    JOIN "User" a ON a.id = n."authorId"
+    LEFT JOIN reading_counts ON reading_counts."novelId" = n.id
+    LEFT JOIN bookmark_counts ON bookmark_counts."novelId" = n.id
+    ${orderBySql}
+    LIMIT ${pagination.take + 1}
+    OFFSET ${pagination.skip}
+  `)
+
+  const countPromise = includeTotal
+    ? prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
+        ${buildNovelSearchCandidatesCte(filters, query)}
+        SELECT COUNT(*)::int AS total
+        FROM novel_search_candidates
+      `)
+    : Promise.resolve(null)
 
   const [items, countRows] = await Promise.all([
-    prisma.$queryRaw<Array<{
-      id: string
-      slug: string
-      title: string
-      summary: string
-      genre: string
-      authorName: string
-      authorPubkey: string
-      chaptersCount: number
-      readsCount: number
-      bookmarksCount: number
-      coverUrl: string
-      coverStorageKey: string | null
-    }>>(Prisma.sql`
-      SELECT
-        n.id,
-        n.slug,
-        n."title",
-        n."summary",
-        n."genre",
-        coalesce(a."displayName", a."handle", 'Unknown author') AS "authorName",
-        a."pubkey" AS "authorPubkey",
-        n."chaptersCount",
-        COALESCE(reads."readsCount", 0)::int AS "readsCount",
-        COALESCE(bookmarks."bookmarksCount", 0)::int AS "bookmarksCount",
-        n."coverUrl",
-        n."coverStorageKey"
-      FROM "Novel" n
-      JOIN "User" a ON a.id = n."authorId"
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*)::int AS "readsCount"
-        FROM "ReadingProgress" rp
-        WHERE rp."novelId" = n.id
-      ) reads ON true
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*)::int AS "bookmarksCount"
-        FROM "NovelBookmark" nb
-        WHERE nb."novelId" = n.id
-      ) bookmarks ON true
-      ${whereSql}
-      ${orderBySql}
-      LIMIT ${pagination.take}
-      OFFSET ${pagination.skip}
-    `),
-    prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
-      SELECT COUNT(*)::int AS total
-      FROM "Novel" n
-      ${whereSql}
-    `),
+    itemsPromise,
+    countPromise,
   ])
 
+  const hasMore = items.length > pagination.take
+  const slicedItems = hasMore ? items.slice(0, pagination.take) : items
+
   return {
-    items,
-    total: countRows[0]?.total ?? 0,
+    items: slicedItems,
+    total: countRows?.[0]?.total ?? null,
+    hasMore,
     pagination,
   }
 }
@@ -685,13 +773,13 @@ export async function searchPublishedNovelsWithCursor(
     pageSize?: number
     cursor?: SearchNovelKeysetCursor | null
     direction?: "next" | "prev" | null
-  } = {}
+  } = {},
+  options: SearchQueryOptions = {}
 ) {
   const pageSize =
     Number.isFinite(input.pageSize) && (input.pageSize ?? 0) > 0
       ? Math.min(MAX_CATALOG_PAGE_SIZE, Math.floor(input.pageSize!))
       : DEFAULT_LIBRARY_PAGE_SIZE
-  const whereSql = buildNovelSearchWhereSql(filters, query)
   const cursorWhereSql = buildSearchNovelCursorWhereSql(
     sortBy,
     query,
@@ -699,9 +787,9 @@ export async function searchPublishedNovelsWithCursor(
     input.direction
   )
   const orderBySql = buildSearchNovelCursorOrderBySql(sortBy, input.direction)
+  const includeTotal = options.includeTotal ?? true
 
-  const [items, countRows] = await Promise.all([
-    prisma.$queryRaw<Array<{
+  const itemsPromise = prisma.$queryRaw<Array<{
       id: string
       slug: string
       title: string
@@ -720,6 +808,7 @@ export async function searchPublishedNovelsWithCursor(
       rankScore: number
       similarityScore: number
     }>>(Prisma.sql`
+      ${buildNovelSearchCandidatesCte(filters, query)}
       SELECT
         n.id,
         n.slug,
@@ -729,8 +818,8 @@ export async function searchPublishedNovelsWithCursor(
         coalesce(a."displayName", a."handle", 'Unknown author') AS "authorName",
         a."pubkey" AS "authorPubkey",
         n."chaptersCount",
-        COALESCE(reads."readsCount", 0)::int AS "readsCount",
-        COALESCE(bookmarks."bookmarksCount", 0)::int AS "bookmarksCount",
+        COALESCE(reading_counts."readsCount", 0)::int AS "readsCount",
+        COALESCE(bookmark_counts."bookmarksCount", 0)::int AS "bookmarksCount",
         n."coverUrl",
         n."coverStorageKey",
         n."ratingsCount",
@@ -739,32 +828,28 @@ export async function searchPublishedNovelsWithCursor(
         ts_rank_cd(${buildNovelSearchDocumentSql()}, websearch_to_tsquery('simple', ${query}))::double precision AS "rankScore",
         GREATEST(
           similarity(coalesce(n."title", ''), ${query}),
-          similarity(coalesce(n."authorDisplayName", ''), ${query}),
-          similarity(coalesce(n."genre", ''), ${query})
+          similarity(coalesce(n."authorDisplayName", ''), ${query})
         )::double precision AS "similarityScore"
-      FROM "Novel" n
+      FROM novel_search_candidates candidate
+      JOIN "Novel" n ON n.id = candidate.id
       JOIN "User" a ON a.id = n."authorId"
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*)::int AS "readsCount"
-        FROM "ReadingProgress" rp
-        WHERE rp."novelId" = n.id
-      ) reads ON true
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*)::int AS "bookmarksCount"
-        FROM "NovelBookmark" nb
-        WHERE nb."novelId" = n.id
-      ) bookmarks ON true
-      ${whereSql}
+      LEFT JOIN reading_counts ON reading_counts."novelId" = n.id
+      LEFT JOIN bookmark_counts ON bookmark_counts."novelId" = n.id
+      WHERE 1 = 1
       ${cursorWhereSql}
       ${orderBySql}
       LIMIT ${pageSize + 1}
-    `),
-    prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
-      SELECT COUNT(*)::int AS total
-      FROM "Novel" n
-      ${whereSql}
-    `),
-  ])
+    `)
+
+  const countPromise = includeTotal
+    ? prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
+        ${buildNovelSearchCandidatesCte(filters, query)}
+        SELECT COUNT(*)::int AS total
+        FROM novel_search_candidates
+      `)
+    : Promise.resolve(null)
+
+  const [items, countRows] = await Promise.all([itemsPromise, countPromise])
 
   const hasMore = items.length > pageSize
   const slicedItems = hasMore ? items.slice(0, pageSize) : items
@@ -772,7 +857,7 @@ export async function searchPublishedNovelsWithCursor(
 
   return {
     items: orderedItems,
-    total: countRows[0]?.total ?? 0,
+    total: countRows?.[0]?.total ?? null,
     hasMore,
     pageSize,
   }
@@ -781,57 +866,71 @@ export async function searchPublishedNovelsWithCursor(
 export async function searchAuthorsWithPagination(
   query: string,
   sortBy: "relevance" | "popular" | "recent",
-  paginationInput: CatalogPaginationInput = {}
+  paginationInput: CatalogPaginationInput = {},
+  options: SearchQueryOptions = {}
 ) {
   const pagination = normalizeCatalogPagination(paginationInput)
   const whereSql = buildAuthorSearchWhereSql(query)
   const orderBySql = buildAuthorSearchOrderBySql(sortBy, query)
+  const includeTotal = options.includeTotal ?? true
+
+  const itemsPromise = prisma.$queryRaw<Array<{
+    id: string
+    pubkey: string
+    name: string
+    bio: string
+    avatarUrl: string | null
+    followersCount: number
+    novelsCount: number
+  }>>(Prisma.sql`
+    WITH follower_counts AS (
+      SELECT uf."followingId" AS "userId", COUNT(*)::int AS "followersCount"
+      FROM "UserFollow" uf
+      GROUP BY uf."followingId"
+    ),
+    published_novel_counts AS (
+      SELECT n."authorId" AS "userId", COUNT(*)::int AS "novelsCount"
+      FROM "Novel" n
+      WHERE n."visibility" = 'PUBLISHED'
+      GROUP BY n."authorId"
+    )
+    SELECT
+      u.id,
+      u."pubkey",
+      coalesce(u."displayName", u."handle", 'Unknown author') AS name,
+      coalesce(u."about", '') AS bio,
+      u."avatarUrl",
+      COALESCE(follower_counts."followersCount", 0)::int AS "followersCount",
+      COALESCE(published_novel_counts."novelsCount", 0)::int AS "novelsCount"
+    FROM "User" u
+    LEFT JOIN follower_counts ON follower_counts."userId" = u.id
+    LEFT JOIN published_novel_counts ON published_novel_counts."userId" = u.id
+    ${whereSql}
+    ${orderBySql}
+    LIMIT ${pagination.take + 1}
+    OFFSET ${pagination.skip}
+  `)
+
+  const countPromise = includeTotal
+    ? prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
+        SELECT COUNT(*)::int AS total
+        FROM "User" u
+        ${whereSql}
+      `)
+    : Promise.resolve(null)
 
   const [items, countRows] = await Promise.all([
-    prisma.$queryRaw<Array<{
-      id: string
-      pubkey: string
-      name: string
-      bio: string
-      avatarUrl: string | null
-      followersCount: number
-      novelsCount: number
-    }>>(Prisma.sql`
-      SELECT
-        u.id,
-        u."pubkey",
-        coalesce(u."displayName", u."handle", 'Unknown author') AS name,
-        coalesce(u."about", '') AS bio,
-        u."avatarUrl",
-        COALESCE(followers."followersCount", 0)::int AS "followersCount",
-        COALESCE(novels."novelsCount", 0)::int AS "novelsCount"
-      FROM "User" u
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*)::int AS "followersCount"
-        FROM "UserFollow" uf
-        WHERE uf."followingId" = u.id
-      ) followers ON true
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*)::int AS "novelsCount"
-        FROM "Novel" n
-        WHERE n."authorId" = u.id
-          AND n."visibility" = 'PUBLISHED'
-      ) novels ON true
-      ${whereSql}
-      ${orderBySql}
-      LIMIT ${pagination.take}
-      OFFSET ${pagination.skip}
-    `),
-    prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
-      SELECT COUNT(*)::int AS total
-      FROM "User" u
-      ${whereSql}
-    `),
+    itemsPromise,
+    countPromise,
   ])
 
+  const hasMore = items.length > pagination.take
+  const slicedItems = hasMore ? items.slice(0, pagination.take) : items
+
   return {
-    items,
-    total: countRows[0]?.total ?? 0,
+    items: slicedItems,
+    total: countRows?.[0]?.total ?? null,
+    hasMore,
     pagination,
   }
 }
@@ -843,7 +942,8 @@ export async function searchAuthorsWithCursor(
     pageSize?: number
     cursor?: SearchAuthorKeysetCursor | null
     direction?: "next" | "prev" | null
-  } = {}
+  } = {},
+  options: SearchQueryOptions = {}
 ) {
   const pageSize =
     Number.isFinite(input.pageSize) && (input.pageSize ?? 0) > 0
@@ -857,9 +957,9 @@ export async function searchAuthorsWithCursor(
     input.direction
   )
   const orderBySql = buildSearchAuthorCursorOrderBySql(sortBy, input.direction)
+  const includeTotal = options.includeTotal ?? true
 
-  const [items, countRows] = await Promise.all([
-    prisma.$queryRaw<Array<{
+  const itemsPromise = prisma.$queryRaw<Array<{
       id: string
       pubkey: string
       name: string
@@ -871,6 +971,17 @@ export async function searchAuthorsWithCursor(
       rankScore: number
       similarityScore: number
     }>>(Prisma.sql`
+      WITH follower_counts AS (
+        SELECT uf."followingId" AS "userId", COUNT(*)::int AS "followersCount"
+        FROM "UserFollow" uf
+        GROUP BY uf."followingId"
+      ),
+      published_novel_counts AS (
+        SELECT n."authorId" AS "userId", COUNT(*)::int AS "novelsCount"
+        FROM "Novel" n
+        WHERE n."visibility" = 'PUBLISHED'
+        GROUP BY n."authorId"
+      )
       SELECT
         u.id,
         u."pubkey",
@@ -878,8 +989,8 @@ export async function searchAuthorsWithCursor(
         coalesce(u."about", '') AS bio,
         u."avatarUrl",
         u."updatedAt",
-        COALESCE(followers."followersCount", 0)::int AS "followersCount",
-        COALESCE(novels."novelsCount", 0)::int AS "novelsCount",
+        COALESCE(follower_counts."followersCount", 0)::int AS "followersCount",
+        COALESCE(published_novel_counts."novelsCount", 0)::int AS "novelsCount",
         ts_rank_cd(${buildAuthorSearchDocumentSql()}, websearch_to_tsquery('simple', ${query}))::double precision AS "rankScore",
         GREATEST(
           similarity(coalesce(u."displayName", ''), ${query}),
@@ -887,28 +998,23 @@ export async function searchAuthorsWithCursor(
           similarity(coalesce(u."nip05", ''), ${query})
         )::double precision AS "similarityScore"
       FROM "User" u
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*)::int AS "followersCount"
-        FROM "UserFollow" uf
-        WHERE uf."followingId" = u.id
-      ) followers ON true
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*)::int AS "novelsCount"
-        FROM "Novel" n
-        WHERE n."authorId" = u.id
-          AND n."visibility" = 'PUBLISHED'
-      ) novels ON true
+      LEFT JOIN follower_counts ON follower_counts."userId" = u.id
+      LEFT JOIN published_novel_counts ON published_novel_counts."userId" = u.id
       ${whereSql}
       ${cursorWhereSql}
       ${orderBySql}
       LIMIT ${pageSize + 1}
-    `),
-    prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
-      SELECT COUNT(*)::int AS total
-      FROM "User" u
-      ${whereSql}
-    `),
-  ])
+    `)
+
+  const countPromise = includeTotal
+    ? prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
+        SELECT COUNT(*)::int AS total
+        FROM "User" u
+        ${whereSql}
+      `)
+    : Promise.resolve(null)
+
+  const [items, countRows] = await Promise.all([itemsPromise, countPromise])
 
   const hasMore = items.length > pageSize
   const slicedItems = hasMore ? items.slice(0, pageSize) : items
@@ -916,7 +1022,7 @@ export async function searchAuthorsWithCursor(
 
   return {
     items: orderedItems,
-    total: countRows[0]?.total ?? 0,
+    total: countRows?.[0]?.total ?? null,
     hasMore,
     pageSize,
   }

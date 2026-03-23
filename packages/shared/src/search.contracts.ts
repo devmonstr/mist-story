@@ -44,6 +44,7 @@ export const searchResponseSchema = z.object({
   filterType: searchFilterTypeSchema,
   sortBy: searchSortBySchema,
   total: z.number().int().nonnegative(),
+  isApproximateTotal: z.boolean().optional(),
   pagination: catalogPaginationSchema,
   items: z.array(searchResultItemSchema),
   activeFilters: publicCatalogQuerySchema.optional(),

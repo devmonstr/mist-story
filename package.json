@@ -19,6 +19,7 @@
     "db:migrate": "dotenv -e ./.env.local -- pnpm --filter @mist/db db:migrate",
     "db:prepare-catalog-search": "dotenv -e ./.env.local -- pnpm --filter @mist/db db:prepare-catalog-search",
     "db:studio": "dotenv -e ./.env.local -- pnpm --filter @mist/db db:studio",
+    "db:seed:sample-catalog": "dotenv -e ./.env.local -- pnpm --filter @mist/db db:seed:sample-catalog",
     "infra:up": "docker compose up -d postgres redis",
     "infra:down": "docker compose down"
   },

@@ -31,6 +31,12 @@ import {
   encodeSearchNovelCursor,
 } from "./catalog-cursor"
 
+const MAX_SEARCH_QUERY_LENGTH = 120
+
+function normalizeSearchQuery(query: string) {
+  return query.replace(/\s+/g, " ").trim().slice(0, MAX_SEARCH_QUERY_LENGTH)
+}
+
 const GENRE_DESCRIPTIONS: Record<string, string> = {
   Fantasy: "Epic adventures, magic, and otherworldly realms.",
   Romance: "Love stories that touch the heart and inspire.",
@@ -279,7 +285,7 @@ export async function searchCatalog(input: {
   workType?: "ORIGINAL" | "TRANSLATION" | null
   status?: "Ongoing" | "Completed" | "Hiatus" | null
 }): Promise<SearchResponse> {
-  const query = input.query.trim()
+  const query = normalizeSearchQuery(input.query)
   const filterType = input.filterType
   const sortBy = input.sortBy
   const direction = input.direction ?? null
@@ -343,7 +349,7 @@ export async function searchCatalog(input: {
       pageSize: pagination.pageSize,
       cursor: novelCursor,
       direction,
-    })
+    }, { includeTotal: false })
     const novelResults: SearchNovelResultDto[] = novels.items.map((novel) => ({
       id: novel.id,
       type: "novel",
@@ -367,12 +373,13 @@ export async function searchCatalog(input: {
       query,
       filterType,
       sortBy,
-      total: novels.total,
+      total: novelResults.length,
+      isApproximateTotal: true,
       pagination: {
         page: pagination.page,
         pageSize: novels.pageSize,
-        totalItems: novels.total,
-        totalPages: novels.total > 0 ? Math.ceil(novels.total / novels.pageSize) : 0,
+        totalItems: novelResults.length,
+        totalPages: 0,
         currentCursor: input.cursor ?? null,
         nextCursor:
           hasNextPage && lastNovel
@@ -434,12 +441,13 @@ export async function searchCatalog(input: {
       query,
       filterType,
       sortBy,
-      total: authors.total,
+      total: authors.total ?? authorResults.length,
       pagination: {
         page: pagination.page,
         pageSize: authors.pageSize,
-        totalItems: authors.total,
-        totalPages: authors.total > 0 ? Math.ceil(authors.total / authors.pageSize) : 0,
+        totalItems: authors.total ?? authorResults.length,
+        totalPages:
+          authors.total && authors.total > 0 ? Math.ceil(authors.total / authors.pageSize) : 0,
         currentCursor: input.cursor ?? null,
         nextCursor:
           hasNextPage && lastAuthor
@@ -475,8 +483,12 @@ export async function searchCatalog(input: {
   }
 
   const [novels, authors, facetCounts] = await Promise.all([
-    searchPublishedNovelsWithPagination(filters, query, sortBy, mixedPagination),
-    searchAuthorsWithPagination(query, sortBy, mixedPagination),
+    searchPublishedNovelsWithPagination(filters, query, sortBy, mixedPagination, {
+      includeTotal: false,
+    }),
+    searchAuthorsWithPagination(query, sortBy, mixedPagination, {
+      includeTotal: false,
+    }),
     listLibraryCatalogFacetCounts(filters),
   ])
 
@@ -519,33 +531,28 @@ export async function searchCatalog(input: {
 
       return 0
     })
-  const total = novels.total + authors.total
+  const approximateTotal = items.length
 
   return {
     query,
     filterType,
     sortBy,
-    total,
+    total: approximateTotal,
+    isApproximateTotal: true,
     pagination: {
       page: mixedPagination.page,
       pageSize: mixedPagination.pageSize,
-      totalItems: total,
-      totalPages: Math.max(
-        novels.total > 0 ? Math.ceil(novels.total / mixedPagination.pageSize) : 0,
-        authors.total > 0 ? Math.ceil(authors.total / mixedPagination.pageSize) : 0
-      ),
-      currentCursor: total > 0 ? input.cursor ?? encodeCatalogCursor(mixedPagination.page) : null,
+      totalItems: approximateTotal,
+      totalPages: 0,
+      currentCursor: approximateTotal > 0 ? input.cursor ?? encodeCatalogCursor(mixedPagination.page) : null,
       nextCursor:
-        novels.total > mixedPagination.page * mixedPagination.pageSize ||
-        authors.total > mixedPagination.page * mixedPagination.pageSize
+        novels.hasMore || authors.hasMore
           ? encodeCatalogCursor(mixedPagination.page)
           : null,
       previousCursor:
         mixedPagination.page > 1 ? encodeCatalogCursor(mixedPagination.page) : null,
       hasPreviousPage: mixedPagination.page > 1,
-      hasNextPage:
-        novels.total > mixedPagination.page * mixedPagination.pageSize ||
-        authors.total > mixedPagination.page * mixedPagination.pageSize,
+      hasNextPage: novels.hasMore || authors.hasMore,
     },
     items,
     activeFilters: filters,

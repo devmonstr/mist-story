@@ -458,14 +458,37 @@ export function fetchNovel(novelId: string) {
   return apiFetch<NovelDto>(`/api/v1/novels/${novelId}`)
 }
 
-export function fetchPublicNovelDetail(novelId: string) {
-  return apiFetch<PublicNovelDetailResponse>(`/api/v1/library/${novelId}`)
+export function fetchPublicNovelDetail(
+  novelId: string,
+  input?: { chapterPage?: number }
+) {
+  const searchParams = new URLSearchParams()
+  if (input?.chapterPage && input.chapterPage > 1) {
+    searchParams.set("chapterPage", String(input.chapterPage))
+  }
+
+  const path = searchParams.size
+    ? `/api/v1/library/${novelId}?${searchParams.toString()}`
+    : `/api/v1/library/${novelId}`
+
+  return apiFetch<PublicNovelDetailResponse>(path)
 }
 
-export function fetchPublicNovelChapter(novelId: string, chapterNumber: string) {
-  return apiFetch<PublicNovelReaderResponse>(
-    `/api/v1/library/${novelId}/chapters/${chapterNumber}`
-  )
+export function fetchPublicNovelChapter(
+  novelId: string,
+  chapterNumber: string,
+  input?: { chapterPage?: number }
+) {
+  const searchParams = new URLSearchParams()
+  if (input?.chapterPage && input.chapterPage > 1) {
+    searchParams.set("chapterPage", String(input.chapterPage))
+  }
+
+  const path = searchParams.size
+    ? `/api/v1/library/${novelId}/chapters/${chapterNumber}?${searchParams.toString()}`
+    : `/api/v1/library/${novelId}/chapters/${chapterNumber}`
+
+  return apiFetch<PublicNovelReaderResponse>(path)
 }
 
 export function fetchProfilePage(npub: string) {

@@ -2,6 +2,15 @@ import { Router } from "express"
 import { getDiscoverData, searchCatalog } from "../services/discover-search-service"
 
 export const discoverRouter = Router()
+const MAX_SEARCH_QUERY_LENGTH = 120
+
+function normalizeSearchQuery(value: unknown) {
+  if (typeof value !== "string") {
+    return ""
+  }
+
+  return value.replace(/\s+/g, " ").trim().slice(0, MAX_SEARCH_QUERY_LENGTH)
+}
 
 function parsePositiveInt(value: unknown, fallback: number) {
   const parsed = Number.parseInt(typeof value === "string" ? value : "", 10)
@@ -45,7 +54,7 @@ discoverRouter.get("/", async (request, response, next) => {
 
 discoverRouter.get("/search", async (request, response, next) => {
   try {
-    const query = typeof request.query.q === "string" ? request.query.q : ""
+    const query = normalizeSearchQuery(request.query.q)
     const filterType =
       request.query.type === "novel" || request.query.type === "author"
         ? request.query.type

@@ -2,19 +2,22 @@ import {
   countLibraryCollectionNovels,
   countFollowersForUsers,
   countLibraryCatalogNovels,
+  countPublicNovelChapters,
   countPublishedNovelsForUsers,
   decimalToNumber,
+  findAdjacentPublicChapterNumbers,
   findNovelBookmarkForUser,
   findReadingProgressForUserAndNovel,
   findPublicChapterForNovelByNumber,
   findPublicNovelByIdOrSlug,
+  getPublicNovelChapterBounds,
   hexToNpub,
   listLibraryCatalogNovelsByCursor,
   listLibraryCollectionFacetCounts,
   listLibraryCollectionNovels,
   listLibraryCatalogFacetCounts,
   listLibraryCatalogNovels,
-  listPublicNovelChapters,
+  listPublicNovelChaptersPage,
   normalizeCatalogPagination,
   toIsoString,
 } from "@mist/db"
@@ -25,6 +28,7 @@ import type {
   PublicCatalogSortBy,
   PublicNovelAuthorDto,
   PublicNovelChapterDto,
+  PublicNovelChapterListDto,
   PublicNovelDetailDto,
   PublicNovelDetailResponse,
   PublicNovelReaderChapterDto,
@@ -298,6 +302,48 @@ function serializePublicChapter(chapter: {
   }
 }
 
+const PUBLIC_CHAPTER_LIST_PAGE_SIZE = 100
+
+function normalizeChapterPage(page: number | undefined) {
+  return Number.isFinite(page) && (page ?? 0) > 0 ? Math.floor(page as number) : 1
+}
+
+function resolveChapterListPage(chapterNumber: number, pageSize: number) {
+  return Math.max(1, Math.ceil(chapterNumber / pageSize))
+}
+
+function buildPublicChapterListDto(input: {
+  totalChapters: number
+  currentPage: number
+  pageSize: number
+  maxChapterNumber: number
+}): PublicNovelChapterListDto {
+  const totalPages =
+    input.maxChapterNumber === 0
+      ? 0
+      : Math.max(1, Math.ceil(input.maxChapterNumber / input.pageSize))
+  const safeCurrentPage =
+    totalPages === 0 ? 1 : Math.min(Math.max(1, input.currentPage), totalPages)
+  const visibleFrom =
+    input.maxChapterNumber === 0 ? 0 : (safeCurrentPage - 1) * input.pageSize + 1
+  const visibleTo =
+    input.maxChapterNumber === 0
+      ? 0
+      : Math.min(input.maxChapterNumber, safeCurrentPage * input.pageSize)
+
+  return {
+    totalChapters: input.totalChapters,
+    maxChapterNumber: input.maxChapterNumber,
+    currentPage: safeCurrentPage,
+    pageSize: input.pageSize,
+    totalPages,
+    visibleFrom,
+    visibleTo,
+    hasPreviousPage: totalPages > 0 && safeCurrentPage > 1,
+    hasNextPage: totalPages > 0 && safeCurrentPage < totalPages,
+  }
+}
+
 function buildNovelDetailDto(input: {
   novel: {
     id: string
@@ -326,9 +372,16 @@ function buildNovelDetailDto(input: {
       readingProgress: number
     }
   }
+  publishedChapterCount: number
   chapters: PublicNovelChapterDto[]
 }): PublicNovelDetailDto {
-  const totalWords = input.chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0)
+  const sampledWords = input.chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0)
+  const totalWords =
+    input.chapters.length === 0
+      ? 0
+      : input.chapters.length >= input.publishedChapterCount
+        ? sampledWords
+        : Math.round((sampledWords / input.chapters.length) * input.publishedChapterCount)
 
   return {
     id: input.novel.id,
@@ -347,7 +400,7 @@ function buildNovelDetailDto(input: {
     updateNote: input.novel.updateNote,
     coverUrl: input.novel.coverUrl,
     coverStorageKey: input.novel.coverStorageKey ?? null,
-    chaptersCount: input.novel.chaptersCount,
+    chaptersCount: input.publishedChapterCount,
     readsCount: input.novel._count.readingProgress,
     bookmarksCount: input.novel._count.bookmarks,
     rating: decimalToNumber(input.novel.rating),
@@ -619,15 +672,32 @@ export async function listLibraryCatalog(input: {
 
 export async function getPublicNovelDetail(
   identifier: string,
-  viewerUserId?: string
+  viewerUserId?: string,
+  chapterPage?: number
 ): Promise<PublicNovelDetailResponse> {
   const novel = await findPublicNovelByIdOrSlug(identifier)
   if (!novel) {
     throw new HttpError(404, "Novel not found")
   }
 
+  const currentPage = normalizeChapterPage(chapterPage)
+  const [publishedChapterCount, chapterBounds] = await Promise.all([
+    countPublicNovelChapters(novel.id),
+    getPublicNovelChapterBounds(novel.id),
+  ])
+  const chapterList = buildPublicChapterListDto({
+    totalChapters: publishedChapterCount,
+    currentPage,
+    pageSize: PUBLIC_CHAPTER_LIST_PAGE_SIZE,
+    maxChapterNumber: chapterBounds.maxChapterNumber,
+  })
+
   const [chapters, author, viewer] = await Promise.all([
-    listPublicNovelChapters(novel.id),
+    listPublicNovelChaptersPage(
+      novel.id,
+      chapterList.currentPage,
+      PUBLIC_CHAPTER_LIST_PAGE_SIZE
+    ),
     buildAuthorDto(novel.author),
     getViewerState(viewerUserId, novel.id),
   ])
@@ -637,9 +707,11 @@ export async function getPublicNovelDetail(
   return {
     novel: buildNovelDetailDto({
       novel,
+      publishedChapterCount,
       chapters: serializedChapters,
     }),
     author,
+    chapterList,
     chapters: serializedChapters,
     viewer,
   }
@@ -648,18 +720,39 @@ export async function getPublicNovelDetail(
 export async function getPublicNovelChapter(
   identifier: string,
   chapterNumber: number,
-  viewerUserId?: string
+  viewerUserId?: string,
+  chapterPage?: number
 ): Promise<PublicNovelReaderResponse> {
   const novel = await findPublicNovelByIdOrSlug(identifier)
   if (!novel) {
     throw new HttpError(404, "Novel not found")
   }
 
-  const [chapters, chapter, author, viewer] = await Promise.all([
-    listPublicNovelChapters(novel.id),
+  const resolvedPage =
+    chapterPage && chapterPage > 0
+      ? normalizeChapterPage(chapterPage)
+      : resolveChapterListPage(chapterNumber, PUBLIC_CHAPTER_LIST_PAGE_SIZE)
+  const [publishedChapterCount, chapterBounds] = await Promise.all([
+    countPublicNovelChapters(novel.id),
+    getPublicNovelChapterBounds(novel.id),
+  ])
+  const chapterList = buildPublicChapterListDto({
+    totalChapters: publishedChapterCount,
+    currentPage: resolvedPage,
+    pageSize: PUBLIC_CHAPTER_LIST_PAGE_SIZE,
+    maxChapterNumber: chapterBounds.maxChapterNumber,
+  })
+
+  const [chapters, chapter, author, viewer, adjacentChapters] = await Promise.all([
+    listPublicNovelChaptersPage(
+      novel.id,
+      chapterList.currentPage,
+      PUBLIC_CHAPTER_LIST_PAGE_SIZE
+    ),
     findPublicChapterForNovelByNumber(novel.id, chapterNumber),
     buildAuthorDto(novel.author),
     getViewerState(viewerUserId, novel.id),
+    findAdjacentPublicChapterNumbers(novel.id, chapterNumber),
   ])
 
   if (!chapter?.latestPublishedVersion?.ciphertext) {
@@ -667,29 +760,23 @@ export async function getPublicNovelChapter(
   }
 
   const serializedChapters = chapters.map(serializePublicChapter)
-  const currentIndex = serializedChapters.findIndex((item) => item.number === chapter.number)
-
-  if (currentIndex < 0) {
-    throw new HttpError(404, "Chapter not found")
-  }
-
-  const currentChapter = serializedChapters[currentIndex]
+  const serializedCurrentChapter = serializePublicChapter(chapter)
   const readerChapter: PublicNovelReaderChapterDto = {
-    ...currentChapter,
+    ...serializedCurrentChapter,
     contentHtml: chapter.latestPublishedVersion.ciphertext,
-    previousChapterNumber:
-      serializedChapters[currentIndex - 1]?.number ?? null,
-    nextChapterNumber:
-      serializedChapters[currentIndex + 1]?.number ?? null,
+    previousChapterNumber: adjacentChapters.previousChapterNumber,
+    nextChapterNumber: adjacentChapters.nextChapterNumber,
   }
 
   return {
     novel: buildNovelDetailDto({
       novel,
+      publishedChapterCount,
       chapters: serializedChapters,
     }),
     author,
     chapter: readerChapter,
+    chapterList,
     chapters: serializedChapters,
     viewer,
   }

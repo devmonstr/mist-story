@@ -8,6 +8,14 @@ interface NovelAboutProps {
 }
 
 export function NovelAbout({ novel }: NovelAboutProps) {
+  const uniqueTags = Array.from(
+    new Set(
+      [...novel.subgenres, ...novel.tags]
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+    )
+  )
+
   return (
     <>
       <div>
@@ -27,8 +35,8 @@ export function NovelAbout({ novel }: NovelAboutProps) {
       <div className="mt-8">
         <h3 className="text-sm font-medium text-foreground">Tags</h3>
         <div className="mt-3 flex flex-wrap gap-2">
-          {[...novel.subgenres, ...novel.tags].length > 0 ? (
-            [...novel.subgenres, ...novel.tags].map((tag) => (
+          {uniqueTags.length > 0 ? (
+            uniqueTags.map((tag) => (
               <span
                 key={tag}
                 className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground"
