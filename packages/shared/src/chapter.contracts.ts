@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { publicNovelChapterListSchema } from "./catalog.contracts"
 
 export const chapterStatusSchema = z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"])
 export const chapterPublishStateSchema = z.enum(["PENDING", "PUBLISHED", "FAILED"])
@@ -52,7 +53,13 @@ export const publishChapterInputSchema = z.object({
 })
 
 export const reorderChaptersInputSchema = z.object({
+  chapterPage: z.number().int().positive(),
   orderedChapterIds: z.array(z.string()).min(1),
+})
+
+export const studioChapterListResponseSchema = z.object({
+  chapters: z.array(chapterSchema),
+  chapterList: publicNovelChapterListSchema,
 })
 
 export type ChapterDto = z.infer<typeof chapterSchema>
@@ -61,3 +68,4 @@ export type CreateChapterInput = z.infer<typeof createChapterInputSchema>
 export type UpdateChapterInput = z.infer<typeof updateChapterInputSchema>
 export type PublishChapterInput = z.infer<typeof publishChapterInputSchema>
 export type ReorderChaptersInput = z.infer<typeof reorderChaptersInputSchema>
+export type StudioChapterListResponse = z.infer<typeof studioChapterListResponseSchema>

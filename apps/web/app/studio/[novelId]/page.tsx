@@ -20,9 +20,9 @@ import {
   ListOrdered,
   Loader2,
   Menu,
-  Rocket,
   Quote,
   Redo,
+  Rocket,
   Save,
   Settings,
   Type,
@@ -49,6 +49,8 @@ import {
 } from "@/lib/api"
 import {
   mapChapterToEditorChapter,
+  type EditorChapter,
+  type EditorChapterList,
   type EditorNovel,
 } from "@/lib/studio"
 import { resolveNovelCoverSrc } from "@/lib/novel-cover"
@@ -92,12 +94,27 @@ function ToolbarButton({
 }
 
 export default function NovelEditorPage() {
-  const { user, isLoading, isAuthenticated } = useRequireAuth()
+  const { isLoading, isAuthenticated } = useRequireAuth()
   const params = useParams()
   const novelId = params.novelId as string
   const editorRef = useRef<HTMLDivElement>(null)
   const isMountedRef = useRef(true)
+  const novelRef = useRef<EditorNovel | null>(null)
+  const chapterListRef = useRef<EditorChapterList | null>(null)
+  const activeChapterIdRef = useRef("")
+  const chapterDraftsRef = useRef<
+    Record<
+      string,
+      {
+        title: string
+        content: string
+        wordCount: number
+      }
+    >
+  >({})
   const [novel, setNovel] = useState<EditorNovel | null>(null)
+  const [chapters, setChapters] = useState<EditorChapter[]>([])
+  const [chapterList, setChapterList] = useState<EditorChapterList | null>(null)
   const [activeChapterId, setActiveChapterId] = useState("")
   const [chapterDrafts, setChapterDrafts] = useState<
     Record<
@@ -115,6 +132,7 @@ export default function NovelEditorPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [isReordering, setIsReordering] = useState(false)
+  const [isLoadingChapterPage, setIsLoadingChapterPage] = useState(false)
   const [deletingChapterId, setDeletingChapterId] = useState<string | null>(null)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -122,26 +140,102 @@ export default function NovelEditorPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [publishMessage, setPublishMessage] = useState<string | null>(null)
 
-  const novelRef = useRef<EditorNovel | null>(null)
-
   useEffect(() => {
+    isMountedRef.current = true
     return () => {
       isMountedRef.current = false
     }
   }, [])
 
   useEffect(() => {
-    if (!user) return
+    novelRef.current = novel
+  }, [novel])
+
+  useEffect(() => {
+    chapterListRef.current = chapterList
+  }, [chapterList])
+
+  useEffect(() => {
+    activeChapterIdRef.current = activeChapterId
+  }, [activeChapterId])
+
+  useEffect(() => {
+    chapterDraftsRef.current = chapterDrafts
+  }, [chapterDrafts])
+
+  const loadChapterPage = useCallback(
+    async (page: number, options?: { selectedChapterId?: string }) => {
+      const currentNovelId = novelRef.current?.id ?? novelId
+      setIsLoadingChapterPage(true)
+
+      try {
+        const response = await fetchNovelChapters(currentNovelId, {
+          chapterPage: page,
+        })
+        const mappedChapters = response.chapters.map(mapChapterToEditorChapter)
+
+        if (isMountedRef.current) {
+          setChapters(mappedChapters)
+          setChapterList(response.chapterList)
+          setActiveChapterId((current) => {
+            const requestedChapterId = options?.selectedChapterId ?? current
+
+            if (
+              requestedChapterId &&
+              mappedChapters.some((chapter) => chapter.id === requestedChapterId)
+            ) {
+              return requestedChapterId
+            }
+
+            return mappedChapters[0]?.id ?? ""
+          })
+        }
+
+        return mappedChapters
+      } finally {
+        if (isMountedRef.current) {
+          setIsLoadingChapterPage(false)
+        }
+      }
+    },
+    [novelId]
+  )
+
+  const refreshEditorChapters = useCallback(
+    async (selectedChapterId?: string) => {
+      const currentPage = chapterListRef.current?.currentPage ?? 1
+      return loadChapterPage(currentPage, { selectedChapterId })
+    },
+    [loadChapterPage]
+  )
+
+  useEffect(() => {
+    if (isLoading) return
+
+    if (!isAuthenticated) {
+      if (isMountedRef.current) {
+        setIsLoaded(true)
+      }
+      return
+    }
 
     const loadEditor = async () => {
       try {
-        setErrorMessage(null)
-        const [novelData, chapters] = await Promise.all([
+        if (isMountedRef.current) {
+          setIsLoaded(false)
+          setErrorMessage(null)
+        }
+        const [novelData, chapterResponse] = await Promise.all([
           fetchNovel(novelId),
-          fetchNovelChapters(novelId),
+          fetchNovelChapters(novelId, { chapterPage: 1 }),
         ])
 
-        const mappedChapters = chapters.map(mapChapterToEditorChapter)
+        const mappedChapters = chapterResponse.chapters.map(mapChapterToEditorChapter)
+
+        if (!isMountedRef.current) {
+          return
+        }
+
         setNovel({
           id: novelData.id,
           title: novelData.title,
@@ -151,54 +245,46 @@ export default function NovelEditorPage() {
             coverUrl: novelData.coverUrl,
             coverStorageKey: novelData.coverStorageKey,
           }),
+          chaptersCount: novelData.chaptersCount,
           visibility: novelData.visibility,
           workType: novelData.workType,
           status: novelData.status,
-          chapters: mappedChapters,
         })
-        setActiveChapterId(mappedChapters[0]?.id || "")
+        setChapters(mappedChapters)
+        setChapterList(chapterResponse.chapterList)
+        setActiveChapterId(mappedChapters[0]?.id ?? "")
       } catch (error) {
         console.error("Failed to load editor:", error)
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "We could not load this novel editor right now."
-        )
+        if (isMountedRef.current) {
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "We could not load this novel editor right now."
+          )
+        }
       } finally {
-        setIsLoaded(true)
+        if (isMountedRef.current) {
+          setIsLoaded(true)
+        }
       }
     }
 
     void loadEditor()
-  }, [novelId, user])
+  }, [isAuthenticated, isLoading, novelId])
 
   const activeChapter = useMemo(
-    () => novel?.chapters.find((chapter) => chapter.id === activeChapterId) ?? null,
-    [activeChapterId, novel]
+    () => chapters.find((chapter) => chapter.id === activeChapterId) ?? null,
+    [activeChapterId, chapters]
   )
 
-  useEffect(() => {
-    novelRef.current = novel
-  }, [novel])
-
-  const refreshEditorChapters = useCallback(async () => {
-    const currentNovelId = novelRef.current?.id ?? novelId
-    const freshChapters = await fetchNovelChapters(currentNovelId)
-    const mappedChapters = freshChapters.map(mapChapterToEditorChapter)
-
-    if (isMountedRef.current) {
-      setNovel((current) =>
-        current
-          ? {
-              ...current,
-              chapters: mappedChapters,
-            }
-          : current
+  const updateChapterState = useCallback(
+    (chapterId: string, updater: (chapter: EditorChapter) => EditorChapter) => {
+      setChapters((current) =>
+        current.map((chapter) => (chapter.id === chapterId ? updater(chapter) : chapter))
       )
-    }
-
-    return mappedChapters
-  }, [novelId])
+    },
+    []
+  )
 
   const waitForPublishedChapter = useCallback(
     async (chapterId: string) => {
@@ -206,8 +292,10 @@ export default function NovelEditorPage() {
 
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         try {
-          const chapters = await refreshEditorChapters()
-          const publishedChapter = chapters.find((chapter) => chapter.id === chapterId)
+          const refreshedChapters = await refreshEditorChapters(chapterId)
+          const publishedChapter = refreshedChapters.find(
+            (chapter) => chapter.id === chapterId
+          )
 
           if (publishedChapter?.status === "PUBLISHED") {
             return true
@@ -229,7 +317,7 @@ export default function NovelEditorPage() {
   useEffect(() => {
     if (!activeChapter) return
 
-    const draft = chapterDrafts[activeChapter.id]
+    const draft = chapterDraftsRef.current[activeChapter.id]
     const nextTitle = draft?.title ?? activeChapter.title
     const nextContent =
       draft?.content ?? activeChapter.content ?? "<p>Start writing...</p>"
@@ -242,7 +330,7 @@ export default function NovelEditorPage() {
     if (editorRef.current) {
       editorRef.current.innerHTML = nextContent
     }
-  }, [activeChapterId])
+  }, [activeChapter])
 
   const handleContentChange = () => {
     if (!editorRef.current || !activeChapter) return
@@ -276,23 +364,13 @@ export default function NovelEditorPage() {
         contentDraft: draftContent,
       })
       setLastSaved(new Date())
-      setNovel((current) => {
-        if (!current) return current
-        return {
-          ...current,
-          chapters: current.chapters.map((chapter) =>
-            chapter.id === activeChapter.id
-              ? {
-                  ...chapter,
-                  title: draftTitle,
-                  content: draftContent,
-                  wordCount: draftWordCount,
-                  lastEdited: new Date().toISOString(),
-                }
-              : chapter
-          ),
-        }
-      })
+      updateChapterState(activeChapter.id, (chapter) => ({
+        ...chapter,
+        title: draftTitle,
+        content: draftContent,
+        wordCount: draftWordCount,
+        lastEdited: new Date().toISOString(),
+      }))
       setChapterDrafts((current) => {
         const next = { ...current }
         delete next[activeChapter.id]
@@ -308,7 +386,7 @@ export default function NovelEditorPage() {
     } finally {
       setIsSaving(false)
     }
-  }, [activeChapter, draftContent, draftTitle, draftWordCount])
+  }, [activeChapter, draftContent, draftTitle, draftWordCount, updateChapterState])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -328,21 +406,26 @@ export default function NovelEditorPage() {
     try {
       setErrorMessage(null)
       const created = await createChapter(novel.id, {
-        title: `Chapter ${novel.chapters.length + 1}`,
+        title: `Chapter ${novel.chaptersCount + 1}`,
         note: "",
         contentDraft: "<p>Start writing...</p>",
       })
 
-      const editorChapter = mapChapterToEditorChapter(created)
       setNovel((current) =>
         current
           ? {
               ...current,
-              chapters: [...current.chapters, editorChapter],
+              chaptersCount: current.chaptersCount + 1,
             }
           : current
       )
-      setActiveChapterId(editorChapter.id)
+
+      const nextChapterCount = novel.chaptersCount + 1
+      const pageSize = chapterListRef.current?.pageSize ?? 100
+      const targetPage = Math.max(1, Math.ceil(nextChapterCount / pageSize))
+      await loadChapterPage(targetPage, {
+        selectedChapterId: created.id,
+      })
     } catch (error) {
       console.error("Failed to create chapter:", error)
       setErrorMessage(
@@ -352,23 +435,33 @@ export default function NovelEditorPage() {
   }
 
   const handleDeleteChapter = async (chapterId: string) => {
-    if (!novel || novel.chapters.length <= 1) return
+    if (!novel || novel.chaptersCount <= 1) return
 
     try {
       setDeletingChapterId(chapterId)
       setErrorMessage(null)
       await deleteChapter(chapterId)
-      setNovel((current) => {
-        if (!current) return current
-        const nextChapters = current.chapters.filter((chapter) => chapter.id !== chapterId)
-        if (chapterId === activeChapterId) {
-          setActiveChapterId(nextChapters[0]?.id || "")
-        }
-        return {
-          ...current,
-          chapters: nextChapters,
-        }
+      setChapterDrafts((current) => {
+        const next = { ...current }
+        delete next[chapterId]
+        return next
       })
+      setNovel((current) =>
+        current
+          ? {
+              ...current,
+              chaptersCount: current.chaptersCount - 1,
+            }
+          : current
+      )
+
+      const nextChapterCount = novel.chaptersCount - 1
+      const pageSize = chapterListRef.current?.pageSize ?? 100
+      const currentPage = chapterListRef.current?.currentPage ?? 1
+      const totalPages = Math.max(1, Math.ceil(nextChapterCount / pageSize))
+      const targetPage = Math.min(currentPage, totalPages)
+
+      await loadChapterPage(targetPage)
     } catch (error) {
       console.error("Failed to delete chapter:", error)
       setErrorMessage(
@@ -382,55 +475,75 @@ export default function NovelEditorPage() {
   const handleReorderChapters = useCallback(
     async (orderedChapterIds: string[]) => {
       const currentNovel = novelRef.current
-      if (!currentNovel || orderedChapterIds.length !== currentNovel.chapters.length) {
+      const currentPage = chapterListRef.current
+      const currentChapters = chapters
+      if (
+        !currentNovel ||
+        !currentPage ||
+        orderedChapterIds.length !== currentChapters.length
+      ) {
         return
       }
 
-      const chapterMap = new Map(currentNovel.chapters.map((chapter) => [chapter.id, chapter]))
-      const reorderedChapters = orderedChapterIds
-        .map((chapterId) => chapterMap.get(chapterId) ?? null)
-        .filter((chapter): chapter is NonNullable<typeof chapter> => chapter !== null)
-
-      if (reorderedChapters.length !== currentNovel.chapters.length) {
-        return
-      }
-
-      setNovel((current) =>
-        current
-          ? {
-              ...current,
-              chapters: reorderedChapters,
-            }
-          : current
+      const chapterMap = new Map(
+        currentChapters.map((chapter) => [chapter.id, chapter] as const)
       )
+      const optimisticChapters = orderedChapterIds
+        .map((chapterId) => chapterMap.get(chapterId) ?? null)
+        .filter((chapter): chapter is EditorChapter => chapter !== null)
+
+      if (optimisticChapters.length !== currentChapters.length) {
+        return
+      }
+
+      setChapters(optimisticChapters)
 
       try {
         setIsReordering(true)
         setErrorMessage(null)
-        const chapters = await reorderChapters(currentNovel.id, {
+        const reorderedResponse = await reorderChapters(currentNovel.id, {
+          chapterPage: currentPage.currentPage,
           orderedChapterIds,
         })
+        const reorderedChapters = reorderedResponse.chapters.map(mapChapterToEditorChapter)
 
-        setNovel((current) =>
-          current
-            ? {
-                ...current,
-                chapters: chapters.map(mapChapterToEditorChapter),
-              }
-            : current
-        )
+        if (!isMountedRef.current) {
+          return
+        }
+
+        const selectedChapterId = activeChapterIdRef.current
+        setChapters(reorderedChapters)
+        setChapterList(reorderedResponse.chapterList)
+
+        try {
+          await loadChapterPage(currentPage.currentPage, { selectedChapterId })
+        } catch (refreshError) {
+          console.error("Failed to refresh reordered chapter page:", refreshError)
+          if (isMountedRef.current) {
+            setErrorMessage(
+              refreshError instanceof Error
+                ? refreshError.message
+                : "Chapter order was saved, but the chapter list could not refresh."
+            )
+          }
+        }
       } catch (error) {
         console.error("Failed to reorder chapters:", error)
-        setErrorMessage(
-          error instanceof Error ? error.message : "Failed to reorder chapters."
-        )
+        if (isMountedRef.current) {
+          setChapters(currentChapters)
+          setErrorMessage(
+            error instanceof Error ? error.message : "Failed to reorder chapters."
+          )
+        }
 
-        await refreshEditorChapters().catch(() => null)
+        await refreshEditorChapters(activeChapterIdRef.current).catch(() => null)
       } finally {
-        setIsReordering(false)
+        if (isMountedRef.current) {
+          setIsReordering(false)
+        }
       }
     },
-    []
+    [chapters, loadChapterPage, refreshEditorChapters]
   )
 
   const handlePublish = async () => {
@@ -447,9 +560,7 @@ export default function NovelEditorPage() {
       const chapterId = activeChapter.id
       const previewText = getPlainTextFromHtml(draftContent).slice(0, 280)
       await publishChapter(chapterId, { previewText })
-      setPublishMessage(
-        "Publish job queued. Waiting for relay confirmation..."
-      )
+      setPublishMessage("Publish job queued. Waiting for relay confirmation...")
 
       const didPublish = await waitForPublishedChapter(chapterId)
       setPublishMessage(
@@ -477,6 +588,13 @@ export default function NovelEditorPage() {
     execCommand("formatBlock", `<${tag}>`)
   }
 
+  const openChapterPage = useCallback(
+    (page: number) => {
+      void loadChapterPage(page)
+    },
+    [loadChapterPage]
+  )
+
   if (isLoading || !isLoaded) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -500,13 +618,16 @@ export default function NovelEditorPage() {
             <SheetContent side="left" className="w-72 p-0">
               <SheetTitle className="sr-only">Chapters</SheetTitle>
               <ChapterPanel
-                chapters={novel.chapters}
+                chapters={chapters}
+                chapterList={chapterList}
                 activeChapterId={activeChapterId}
                 deletingChapterId={deletingChapterId}
+                isLoadingPage={isLoadingChapterPage}
                 isPersistingOrder={isReordering}
                 onAddChapter={() => void addNewChapter()}
                 onDeleteChapter={(chapterId) => void handleDeleteChapter(chapterId)}
                 onSelectChapter={setActiveChapterId}
+                onOpenChapterPage={openChapterPage}
                 onReorderChapters={(orderedChapterIds) =>
                   void handleReorderChapters(orderedChapterIds)
                 }
@@ -545,7 +666,12 @@ export default function NovelEditorPage() {
             <Save className="mr-2 h-4 w-4" />
             <span className="hidden sm:inline">Save</span>
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => void handlePublish()} disabled={isSaving || isPublishing}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void handlePublish()}
+            disabled={isSaving || isPublishing}
+          >
             {isPublishing ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -571,13 +697,16 @@ export default function NovelEditorPage() {
       <div className="flex flex-1 overflow-hidden">
         <aside className="hidden w-64 shrink-0 border-r border-border/40 lg:block">
           <ChapterPanel
-            chapters={novel.chapters}
+            chapters={chapters}
+            chapterList={chapterList}
             activeChapterId={activeChapterId}
             deletingChapterId={deletingChapterId}
+            isLoadingPage={isLoadingChapterPage}
             isPersistingOrder={isReordering}
             onAddChapter={() => void addNewChapter()}
             onDeleteChapter={(chapterId) => void handleDeleteChapter(chapterId)}
             onSelectChapter={setActiveChapterId}
+            onOpenChapterPage={openChapterPage}
             onReorderChapters={(orderedChapterIds) =>
               void handleReorderChapters(orderedChapterIds)
             }
@@ -612,14 +741,16 @@ export default function NovelEditorPage() {
                     </span>
                   </div>
                   <p className="max-w-2xl text-sm text-muted-foreground">
-                    {novel.description || "Add a synopsis in settings to give your writing desk more context."}
+                    {novel.description ||
+                      "Add a synopsis in settings to give your writing desk more context."}
                   </p>
                 </div>
               </div>
 
               <div className="text-xs text-muted-foreground">
-                {novel.chapters.length} chapter{novel.chapters.length === 1 ? "" : "s"}
-                {isReordering ? " • Reordering..." : ""}
+                {novel.chaptersCount.toLocaleString()} chapter
+                {novel.chaptersCount === 1 ? "" : "s"}
+                {isReordering ? " . Reordering..." : ""}
               </div>
             </div>
             {errorMessage ? (

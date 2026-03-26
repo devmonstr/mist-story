@@ -7,6 +7,35 @@ export async function listChaptersForNovel(novelId: string) {
   })
 }
 
+export async function listChaptersForNovelPage(input: {
+  novelId: string
+  page: number
+  pageSize: number
+  status?: "DRAFT" | "PUBLISHED" | "ARCHIVED"
+}) {
+  return prisma.chapter.findMany({
+    where: {
+      novelId: input.novelId,
+      ...(input.status ? { status: input.status } : {}),
+    },
+    orderBy: { number: "asc" },
+    skip: (input.page - 1) * input.pageSize,
+    take: input.pageSize,
+  })
+}
+
+export async function countChaptersForNovel(input: {
+  novelId: string
+  status?: "DRAFT" | "PUBLISHED" | "ARCHIVED"
+}) {
+  return prisma.chapter.count({
+    where: {
+      novelId: input.novelId,
+      ...(input.status ? { status: input.status } : {}),
+    },
+  })
+}
+
 export async function findChapterById(chapterId: string) {
   return prisma.chapter.findUnique({
     where: { id: chapterId },
@@ -129,6 +158,66 @@ export async function reorderChaptersForNovel(
     return tx.chapter.findMany({
       where: { novelId },
       orderBy: { number: "asc" },
+    })
+  })
+}
+
+export async function reorderChapterPageForNovel(input: {
+  novelId: string
+  page: number
+  pageSize: number
+  totalChapters: number
+  orderedChapterIds: string[]
+}) {
+  return prisma.$transaction(async (tx) => {
+    const pageChapters = await tx.chapter.findMany({
+      where: { novelId: input.novelId },
+      orderBy: { number: "asc" },
+      skip: (input.page - 1) * input.pageSize,
+      take: input.pageSize,
+      select: { id: true },
+    })
+
+    if (pageChapters.length === 0 || pageChapters.length !== input.orderedChapterIds.length) {
+      throw new Error("Invalid chapter ordering payload")
+    }
+
+    const existingIds = new Set(pageChapters.map((chapter) => chapter.id))
+    const payloadIds = new Set(input.orderedChapterIds)
+
+    if (
+      existingIds.size !== payloadIds.size ||
+      pageChapters.some((chapter) => !payloadIds.has(chapter.id))
+    ) {
+      throw new Error("Invalid chapter ordering payload")
+    }
+
+    const pageStart = (input.page - 1) * input.pageSize + 1
+    const temporaryOffset = Math.max(input.totalChapters, pageStart + pageChapters.length)
+
+    for (let index = 0; index < input.orderedChapterIds.length; index += 1) {
+      await tx.chapter.update({
+        where: { id: input.orderedChapterIds[index] },
+        data: {
+          number: temporaryOffset + index + 1,
+        },
+      })
+    }
+
+    for (let index = 0; index < input.orderedChapterIds.length; index += 1) {
+      await tx.chapter.update({
+        where: { id: input.orderedChapterIds[index] },
+        data: {
+          number: pageStart + index,
+        },
+      })
+    }
+
+    return tx.chapter.findMany({
+      where: { novelId: input.novelId },
+      orderBy: { number: "asc" },
+      skip: (input.page - 1) * input.pageSize,
+      take: input.pageSize,
     })
   })
 }

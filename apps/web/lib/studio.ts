@@ -1,4 +1,9 @@
-import type { ChapterDto, CreateNovelInput, NovelDto } from "@mist/shared"
+import type {
+  ChapterDto,
+  CreateNovelInput,
+  NovelDto,
+  StudioChapterListResponse,
+} from "@mist/shared"
 import { resolveNovelCoverSrc } from "./novel-cover"
 
 export interface StudioNovelCard {
@@ -43,11 +48,13 @@ export interface EditorNovel {
   title: string
   description: string
   coverImage: string | null
+  chaptersCount: number
   visibility: NovelDto["visibility"]
   workType: NovelDto["workType"]
   status: NovelDto["status"]
-  chapters: EditorChapter[]
 }
+
+export type EditorChapterList = StudioChapterListResponse["chapterList"]
 
 export function mapNovelToCard(novel: NovelDto): StudioNovelCard {
   return {
