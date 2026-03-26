@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@mist/db": "workspace:*",
+    "@mist/media": "workspace:*",
     "@mist/queue": "workspace:*",
     "@mist/redis": "workspace:*",
     "@mist/shared": "workspace:*",

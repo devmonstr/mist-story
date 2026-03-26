@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { profileImageAssetTypeSchema } from "./profile.contracts"
 
 export const chapterPublishJobPayloadSchema = z.object({
   chapterVersionId: z.string(),
@@ -13,6 +14,18 @@ export const profileSyncJobPayloadSchema = z.object({
   pubkey: z.string().min(1),
 })
 
+export const profileImageOptimizeJobPayloadSchema = z.object({
+  userId: z.string().min(1),
+  assetType: profileImageAssetTypeSchema,
+  assetId: z.string().min(1),
+  sourceKey: z.string().min(1),
+  publicKey: z.string().min(1),
+  sourceMimeType: z.string().min(1),
+})
+
 export type ChapterPublishJobPayload = z.infer<typeof chapterPublishJobPayloadSchema>
 export type NotificationDispatchJobPayload = z.infer<typeof notificationDispatchJobPayloadSchema>
 export type ProfileSyncJobPayload = z.infer<typeof profileSyncJobPayloadSchema>
+export type ProfileImageOptimizeJobPayload = z.infer<
+  typeof profileImageOptimizeJobPayloadSchema
+>

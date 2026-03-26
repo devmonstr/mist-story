@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, use } from "react"
+import { useEffect, useState, use } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Loader2, X } from "lucide-react"
@@ -25,6 +25,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  NovelCoverImageField,
+  type NovelCoverImageSelection,
+} from "@/components/novel/novel-cover-image-field"
 import { useRequireAuth } from "@/hooks/use-require-auth"
 import { fetchNovel, updateNovel } from "@/lib/api"
 import {
@@ -58,9 +62,6 @@ const WORK_TYPE_OPTIONS = [
   { value: "TRANSLATION", label: "Translation" },
 ] as const
 
-const MAX_COVER_FILE_SIZE_BYTES = 5 * 1024 * 1024
-const ALLOWED_COVER_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
-
 export default function NovelSettingsPage({
   params,
 }: {
@@ -69,7 +70,6 @@ export default function NovelSettingsPage({
   const { novelId } = use(params)
   const { user, isLoading, isAuthenticated } = useRequireAuth()
   const router = useRouter()
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState<StudioNovelFormData>({
     title: "",
     description: "",
@@ -112,6 +112,13 @@ export default function NovelSettingsPage({
     value: StudioNovelFormData[K]
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleCoverImageChange = (coverImage: NovelCoverImageSelection | null) => {
+    updateField("coverImage", coverImage?.dataUrl ?? null)
+    updateField("coverImageName", coverImage?.fileName ?? null)
+    updateField("coverImageMimeType", coverImage?.mimeType ?? null)
+    updateField("coverImageSizeBytes", coverImage?.fileSizeBytes ?? null)
   }
 
   const handleSave = async (event: React.FormEvent) => {
@@ -330,67 +337,6 @@ export default function NovelSettingsPage({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Cover Image</Label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0]
-                      if (!file) return
-                      if (!ALLOWED_COVER_MIME_TYPES.has(file.type)) {
-                        setCoverError("Please choose a JPG, PNG, or WEBP image.")
-                        return
-                      }
-                      if (file.size > MAX_COVER_FILE_SIZE_BYTES) {
-                        setCoverError("Cover image must be 5MB or smaller.")
-                        return
-                      }
-                      setCoverError(null)
-                      const reader = new FileReader()
-                      reader.onload = (loadEvent) => {
-                        updateField("coverImage", loadEvent.target?.result as string)
-                        updateField("coverImageName", file.name)
-                        updateField("coverImageMimeType", file.type)
-                        updateField("coverImageSizeBytes", file.size)
-                      }
-                      reader.readAsDataURL(file)
-                    }}
-                    className="block w-full text-sm"
-                  />
-                  {coverError ? (
-                    <p className="text-xs text-destructive">{coverError}</p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Uploads are stored in Cloudflare R2 and linked to this novel in PostgreSQL.
-                    </p>
-                  )}
-                  {formData.coverImage && (
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={formData.coverImage}
-                        alt=""
-                        className="h-20 w-14 rounded object-cover"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          updateField("coverImage", null)
-                          updateField("coverImageName", null)
-                          updateField("coverImageMimeType", null)
-                          updateField("coverImageSizeBytes", null)
-                          setCoverError(null)
-                          if (fileInputRef.current) fileInputRef.current.value = ""
-                        }}
-                      >
-                        Remove image
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
                   <Label>Content Warning</Label>
                   <Textarea
                     value={formData.contentWarning}
@@ -403,6 +349,14 @@ export default function NovelSettingsPage({
                 </div>
               </CardContent>
             </Card>
+
+            <NovelCoverImageField
+              coverImage={formData.coverImage}
+              coverImageName={formData.coverImageName}
+              error={coverError}
+              onErrorChange={setCoverError}
+              onChange={handleCoverImageChange}
+            />
 
             {submitError ? (
               <div className="rounded-2xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">

@@ -26,6 +26,7 @@ import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import { useTheme } from 'next-themes'
+import { useToast } from '@/hooks/use-toast'
 import { useRequireAuth } from '@/hooks/use-require-auth'
 import {
   createApiKey,
@@ -46,6 +47,7 @@ import {
   type IntegrationsSettingsDto,
   type NotificationSettingsDto,
   type SecuritySettingsDto,
+  type UploadProfileImageResponse,
 } from '@/lib/api'
 import {
   DEFAULT_NOSTR_PROFILE_RELAYS,
@@ -253,6 +255,44 @@ function parseExtraMetadata(input: string) {
   return parsed as Record<string, unknown>
 }
 
+function buildProfileImageOptimizationToastPayload(
+  results: UploadProfileImageResponse[]
+) {
+  if (results.length === 0) {
+    return null
+  }
+
+  const queuedCount = results.filter(
+    (result) => result.optimization.state === 'queued'
+  ).length
+  const skippedCount = results.length - queuedCount
+
+  if (skippedCount === 0) {
+    return {
+      title: queuedCount === 1 ? 'Image optimization queued' : 'Image optimizations queued',
+      description:
+        queuedCount === 1
+          ? 'Your uploaded profile image is being converted to WebP in the background.'
+          : 'Your uploaded profile images are being converted to WebP in the background.',
+    }
+  }
+
+  if (queuedCount === 0) {
+    return {
+      title: 'Images uploaded',
+      description:
+        skippedCount === 1
+          ? 'Your image upload succeeded, but background WebP optimization was unavailable this time.'
+          : 'Your image uploads succeeded, but background WebP optimization was unavailable this time.',
+    }
+  }
+
+  return {
+    title: 'Images uploaded',
+    description: `Background optimization queued for ${queuedCount} image${queuedCount === 1 ? '' : 's'} and skipped for ${skippedCount}.`,
+  }
+}
+
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
@@ -389,6 +429,7 @@ export default function SettingsPage() {
   const { user, signOut, isLoading, isAuthenticated, isExtensionAvailable, refreshProfile } =
     useRequireAuth()
   const { setTheme } = useTheme()
+  const { toast } = useToast()
   const [activeTab, setActiveTab] = useState('profile')
   const [profileData, setProfileData] = useState<MyProfilePayload | null>(null)
   const [profileError, setProfileError] = useState<string | null>(null)
@@ -908,19 +949,44 @@ export default function SettingsPage() {
 
     try {
       const nextProfileForm = { ...profileForm }
+      const imageUploadTasks: Array<
+        Promise<{
+          assetType: ProfileImageAssetType
+          response: UploadProfileImageResponse
+        }>
+      > = []
 
       if (avatarImageSelection) {
-        const uploadedAvatar = await uploadMyProfileImage('avatar', {
-          image: avatarImageSelection,
-        })
-        nextProfileForm.picture = uploadedAvatar.url
+        imageUploadTasks.push(
+          uploadMyProfileImage('avatar', {
+            image: avatarImageSelection,
+          }).then((response) => ({
+            assetType: 'avatar',
+            response,
+          }))
+        )
       }
 
       if (bannerImageSelection) {
-        const uploadedBanner = await uploadMyProfileImage('banner', {
-          image: bannerImageSelection,
-        })
-        nextProfileForm.banner = uploadedBanner.url
+        imageUploadTasks.push(
+          uploadMyProfileImage('banner', {
+            image: bannerImageSelection,
+          }).then((response) => ({
+            assetType: 'banner',
+            response,
+          }))
+        )
+      }
+
+      const imageUploadResponses = await Promise.all(imageUploadTasks)
+
+      for (const upload of imageUploadResponses) {
+        if (upload.assetType === 'avatar') {
+          nextProfileForm.picture = upload.response.url
+          continue
+        }
+
+        nextProfileForm.banner = upload.response.url
       }
 
       const profile = buildEditableProfileMetadata(nextProfileForm)
@@ -944,6 +1010,13 @@ export default function SettingsPage() {
         throw new Error(
           'All relay publishes failed. Your new profile metadata was not accepted by any relay.'
         )
+      }
+
+      const optimizationToast = buildProfileImageOptimizationToastPayload(
+        imageUploadResponses.map((upload) => upload.response)
+      )
+      if (optimizationToast) {
+        toast(optimizationToast)
       }
 
       try {

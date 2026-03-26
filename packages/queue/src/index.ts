@@ -2,6 +2,7 @@ import { Queue } from "bullmq"
 import type {
   ChapterPublishJobPayload,
   NotificationDispatchJobPayload,
+  ProfileImageOptimizeJobPayload,
   ProfileSyncJobPayload,
 } from "@mist/shared"
 
@@ -9,6 +10,7 @@ export const queueNames = {
   chapterPublish: "chapter-publish",
   notificationDispatch: "notification-dispatch",
   profileSync: "profile-sync",
+  profileImageOptimize: "profile-image-optimize",
 } as const
 
 export function createChapterPublishQueue(connection: unknown) {
@@ -39,6 +41,16 @@ export function createProfileSyncQueue(connection: unknown) {
   )
 }
 
+export function createProfileImageOptimizeQueue(connection: unknown) {
+  return new Queue<
+    ProfileImageOptimizeJobPayload,
+    unknown,
+    typeof queueNames.profileImageOptimize
+  >(queueNames.profileImageOptimize, {
+    connection: connection as never,
+  })
+}
+
 export async function enqueueChapterPublish(
   connection: unknown,
   payload: ChapterPublishJobPayload
@@ -61,4 +73,18 @@ export async function enqueueProfileSync(
 ) {
   const queue = createProfileSyncQueue(connection)
   return queue.add(queueNames.profileSync, payload)
+}
+
+export async function enqueueProfileImageOptimize(
+  connection: unknown,
+  payload: ProfileImageOptimizeJobPayload
+) {
+  const queue = createProfileImageOptimizeQueue(connection)
+  return queue.add(queueNames.profileImageOptimize, payload, {
+    attempts: 3,
+    backoff: {
+      type: "exponential",
+      delay: 10_000,
+    },
+  })
 }
