@@ -10,6 +10,7 @@ import {
 } from "react"
 import type { NostrUser } from "@/lib/nostr-types"
 import {
+  getPublicKeyFromNsec,
   isNostrExtensionAvailable,
   getPublicKey,
   isValidNsec,
@@ -122,12 +123,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setIsLoading(true)
     try {
-      const signedEvent = await signAuthChallengeWithNsec(nsec, "")
-      if (!signedEvent?.pubkey) {
-        return { success: false, error: "Failed to sign challenge with nsec" }
+      const pubkey = getPublicKeyFromNsec(nsec)
+      if (!pubkey) {
+        return { success: false, error: "Failed to derive pubkey from nsec" }
       }
 
-      const { challenge } = await requestAuthChallenge(signedEvent.pubkey)
+      const { challenge } = await requestAuthChallenge(pubkey)
       const signedChallengeEvent = await signAuthChallengeWithNsec(nsec, challenge)
       if (!signedChallengeEvent) {
         return { success: false, error: "Failed to sign challenge with nsec" }

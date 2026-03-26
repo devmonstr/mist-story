@@ -174,7 +174,15 @@ export default function StudioPage() {
                   <div className="flex-1">
                     <div className="flex items-start gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-muted">
-                        <BookOpen className="h-5 w-5 text-muted-foreground" />
+                        {novel.coverUrl ? (
+                          <img
+                            src={novel.coverUrl}
+                            alt={`${novel.title} cover`}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <BookOpen className="h-5 w-5 text-muted-foreground" />
+                        )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">

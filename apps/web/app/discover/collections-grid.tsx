@@ -1,81 +1,84 @@
 "use client"
 
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ChevronRight } from "lucide-react"
+import { BookOpen, ChevronRight } from "lucide-react"
+import { resolveNovelCoverSrc } from "@/lib/novel-cover"
 
-interface Collection {
-  id: string
-  title: string
-  description: string
-  storyCount: number
-  curator: string
+import type { DiscoverCollection } from "./discover-data"
+
+interface CollectionsGridProps {
+  collections: DiscoverCollection[]
 }
 
-const collections: Collection[] = [
-  {
-    id: "trending",
-    title: "Trending This Week",
-    description: "The most-read stories gaining popularity right now.",
-    storyCount: 45,
-    curator: "Mist Story Editors",
-  },
-  {
-    id: "hidden-gems",
-    title: "Hidden Gems",
-    description: "Underrated stories that deserve more attention.",
-    storyCount: 32,
-    curator: "Community",
-  },
-  {
-    id: "editors-picks",
-    title: "Editor's Picks",
-    description: "Our favorite stories showcasing exceptional writing.",
-    storyCount: 28,
-    curator: "Mist Story Team",
-  },
-  {
-    id: "new-voices",
-    title: "New Voices",
-    description: "First stories from fresh and exciting writers.",
-    storyCount: 56,
-    curator: "Community",
-  },
-]
-
-export function CollectionsGrid() {
+export function CollectionsGrid({ collections }: CollectionsGridProps) {
   return (
-    <section className="px-4 py-16 sm:px-6 lg:px-8">
+    <section className="px-4 py-10 sm:px-6 sm:py-16 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-12">
-          <h2 className="font-serif text-2xl font-light tracking-tight text-foreground">
+        <div className="mb-8 sm:mb-12">
+          <h2 className="font-serif text-xl font-light tracking-tight text-foreground sm:text-2xl">
             Curated Collections
           </h2>
-          <p className="mt-2 text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground sm:text-base">
             Handpicked and community-curated selections of exceptional stories.
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 md:gap-6">
           {collections.map((collection) => (
             <article
               key={collection.id}
-              className="flex flex-col justify-between border border-border/40 bg-card p-8 transition-all hover:border-border/80 hover:shadow-sm"
+              className="flex flex-col justify-between border border-border/40 bg-card p-5 transition-all hover:border-border/80 hover:shadow-sm sm:p-8"
             >
               <div>
-                <h3 className="font-serif text-xl font-medium text-foreground">
+                <h3 className="font-serif text-lg font-medium text-foreground sm:text-xl">
                   {collection.title}
                 </h3>
-                <p className="mt-2 text-sm text-muted-foreground">
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                   {collection.description}
                 </p>
               </div>
-              <div className="mt-6 flex items-center justify-between border-t border-border/40 pt-4">
+              {collection.previewNovels.length > 0 ? (
+                <div className="mt-5 grid grid-cols-3 gap-2 sm:mt-6">
+                  {collection.previewNovels.map((novel) => {
+                    const coverSrc = resolveNovelCoverSrc({
+                      novelId: novel.id,
+                      coverUrl: novel.coverUrl,
+                      coverStorageKey: novel.coverStorageKey,
+                    })
+
+                    return (
+                      <Link
+                        key={novel.id}
+                        href={`/novel/${novel.slug}`}
+                        className="group overflow-hidden border border-border/40 bg-muted/20"
+                        title={`${novel.title} by ${novel.authorName}`}
+                      >
+                        {coverSrc ? (
+                          <img
+                            src={coverSrc}
+                            alt={`${novel.title} cover`}
+                            className="aspect-[3/4] w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="flex aspect-[3/4] w-full items-center justify-center text-muted-foreground">
+                            <BookOpen className="h-5 w-5" />
+                          </div>
+                        )}
+                      </Link>
+                    )
+                  })}
+                </div>
+              ) : null}
+              <div className="mt-5 flex flex-col gap-3 border-t border-border/40 pt-4 sm:mt-6 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-xs text-muted-foreground">
                   <p className="font-medium">{collection.curator}</p>
                   <p>{collection.storyCount} stories</p>
                 </div>
-                <Button variant="ghost" size="sm">
-                  Explore <ChevronRight className="ml-1 h-4 w-4" />
+                <Button variant="ghost" size="sm" asChild className="w-full sm:w-auto">
+                  <Link href={collection.href}>
+                    Explore <ChevronRight className="ml-1 h-4 w-4" />
+                  </Link>
                 </Button>
               </div>
             </article>

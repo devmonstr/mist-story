@@ -7,8 +7,12 @@ import { requestLogger } from "./middleware/request-logger"
 import { sessionMiddleware } from "./middleware/session"
 import { authRouter } from "./routes/auth"
 import { chaptersRouter } from "./routes/chapters"
+import { discoverRouter } from "./routes/discover"
+import { libraryRouter } from "./routes/library"
 import { meRouter } from "./routes/me"
 import { novelsRouter } from "./routes/novels"
+import { profilesRouter } from "./routes/profiles"
+import { settingsRouter } from "./routes/settings"
 
 export function createApp() {
   const app = express()
@@ -19,7 +23,7 @@ export function createApp() {
       credentials: true,
     })
   )
-  app.use(express.json({ limit: "1mb" }))
+  app.use(express.json({ limit: "8mb" }))
   app.use(cookieParser())
   app.use(requestLogger)
   app.use(sessionMiddleware)
@@ -29,8 +33,12 @@ export function createApp() {
   })
 
   app.use("/api/v1/auth", authRouter)
+  app.use("/api/v1/discover", discoverRouter)
+  app.use("/api/v1/library", libraryRouter)
   app.use("/api/v1/me", meRouter)
+  app.use("/api/v1/me/settings", settingsRouter)
   app.use("/api/v1/novels", novelsRouter)
+  app.use("/api/v1/profiles", profilesRouter)
   app.use("/api/v1", chaptersRouter)
 
   app.use(errorHandler)

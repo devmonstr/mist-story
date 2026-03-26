@@ -5,6 +5,7 @@ export async function createNotification(input: {
   actorUserId?: string
   type:
     | "CHAPTER_PUBLISHED"
+    | "USER_FOLLOWED"
     | "NOVEL_BOOKMARKED"
     | "MENTION"
     | "COMMENT_REPLY"

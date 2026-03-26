@@ -1,71 +1,441 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { useTheme } from 'next-themes'
 import { useRequireAuth } from '@/hooks/use-require-auth'
-import { LogOut, User, Bell, Lock, Palette, Code, Loader2 } from 'lucide-react'
+import {
+  createApiKey,
+  createRelay,
+  deleteRelay,
+  fetchAppearanceSettings,
+  fetchIntegrationsSettings,
+  fetchMyProfile,
+  fetchNotificationSettings,
+  fetchSecuritySettings,
+  refreshMyProfile as refreshMyProfileFromApi,
+  revokeApiKey,
+  updateAppearanceSettings,
+  updateNotificationSettings,
+  type AppearanceSettingsDto,
+  type IntegrationsSettingsDto,
+  type NotificationSettingsDto,
+  type SecuritySettingsDto,
+} from '@/lib/api'
+import {
+  Bell,
+  Check,
+  Code,
+  Copy,
+  KeyRound,
+  Loader2,
+  Lock,
+  LogOut,
+  Palette,
+  Shield,
+  User,
+} from 'lucide-react'
+
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return 'Never'
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value))
+}
+
+function compactValue(value: string, head = 14, tail = 10) {
+  if (value.length <= head + tail + 3) {
+    return value
+  }
+
+  return `${value.slice(0, head)}...${value.slice(-tail)}`
+}
 
 export default function SettingsPage() {
-  const { user, signOut, isLoading, isAuthenticated } = useRequireAuth()
-  const { theme, setTheme } = useTheme()
+  const { user, signOut, isLoading, isAuthenticated, refreshProfile } = useRequireAuth()
+  const { setTheme } = useTheme()
   const [activeTab, setActiveTab] = useState('profile')
-  const [formData, setFormData] = useState({
-    name: 'Sarah Mitchell',
-    email: 'sarah@example.com',
-    bio: 'Storyteller exploring themes of identity, love, and transformation.',
-    location: 'Portland, Oregon',
-    website: 'https://sarahstories.com',
-  })
-  const [preferences, setPreferences] = useState({
-    emailNotifications: true,
-    newChapterNotifications: true,
-    commentNotifications: true,
-    followNotifications: true,
-    fontSize: 'medium',
-  })
-  type Preferences = typeof preferences
-  type PreferenceKey = keyof Preferences
+  const [profileData, setProfileData] = useState<Awaited<ReturnType<typeof fetchMyProfile>> | null>(null)
+  const [profileError, setProfileError] = useState<string | null>(null)
+  const [isProfileLoading, setIsProfileLoading] = useState(true)
+  const [isRefreshingProfile, setIsRefreshingProfile] = useState(false)
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettingsDto | null>(null)
+  const [notificationLoading, setNotificationLoading] = useState(false)
+  const [notificationSaving, setNotificationSaving] = useState(false)
+  const [notificationError, setNotificationError] = useState<string | null>(null)
+  const [notificationLoaded, setNotificationLoaded] = useState(false)
 
-  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+  const [appearanceSettings, setAppearanceSettings] = useState<AppearanceSettingsDto | null>(null)
+  const [appearanceLoading, setAppearanceLoading] = useState(false)
+  const [appearanceSaving, setAppearanceSaving] = useState(false)
+  const [appearanceError, setAppearanceError] = useState<string | null>(null)
+  const [appearanceLoaded, setAppearanceLoaded] = useState(false)
+
+  const [securitySettings, setSecuritySettings] = useState<SecuritySettingsDto | null>(null)
+  const [securityLoading, setSecurityLoading] = useState(false)
+  const [securityError, setSecurityError] = useState<string | null>(null)
+  const [securityLoaded, setSecurityLoaded] = useState(false)
+
+  const [integrationsSettings, setIntegrationsSettings] = useState<IntegrationsSettingsDto | null>(null)
+  const [integrationsLoading, setIntegrationsLoading] = useState(false)
+  const [integrationsError, setIntegrationsError] = useState<string | null>(null)
+  const [integrationsLoaded, setIntegrationsLoaded] = useState(false)
+  const [apiKeyName, setApiKeyName] = useState('')
+  const [relayUrl, setRelayUrl] = useState('')
+  const [relayRead, setRelayRead] = useState(true)
+  const [relayWrite, setRelayWrite] = useState(false)
+  const [isCreatingApiKey, setIsCreatingApiKey] = useState(false)
+  const [isCreatingRelay, setIsCreatingRelay] = useState(false)
+  const [creatingApiKeyResult, setCreatingApiKeyResult] = useState<{ name: string; token: string } | null>(null)
+  const [copiedValue, setCopiedValue] = useState<string | null>(null)
+
+  const copyTimerRef = useRef<number | null>(null)
+
+  const handleCopy = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopiedValue(value)
+
+      if (copyTimerRef.current) {
+        window.clearTimeout(copyTimerRef.current)
+      }
+
+      copyTimerRef.current = window.setTimeout(() => {
+        setCopiedValue(null)
+      }, 1800)
+    } catch (error) {
+      console.error('Failed to copy value:', error)
+    }
   }
 
-  const handlePreferenceChange = <K extends PreferenceKey>(key: K, value: Preferences[K]) => {
-    setPreferences((prev) => ({ ...prev, [key]: value }))
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return
+    }
+
+    const loadProfile = async () => {
+      setIsProfileLoading(true)
+      setProfileError(null)
+
+      try {
+        const payload = await fetchMyProfile()
+        setProfileData(payload)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to load profile'
+        setProfileError(message)
+      } finally {
+        setIsProfileLoading(false)
+      }
+    }
+
+    void loadProfile()
+  }, [isAuthenticated])
+
+  useEffect(() => {
+    if (!isAuthenticated || activeTab !== 'notifications' || notificationLoaded || notificationLoading) {
+      return
+    }
+
+    const loadNotifications = async () => {
+      setNotificationLoading(true)
+      setNotificationError(null)
+
+      try {
+        const payload = await fetchNotificationSettings()
+        setNotificationSettings(payload)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to load notifications'
+        setNotificationError(message)
+      } finally {
+        setNotificationLoading(false)
+        setNotificationLoaded(true)
+      }
+    }
+
+    void loadNotifications()
+  }, [activeTab, isAuthenticated, notificationLoaded, notificationLoading])
+
+  useEffect(() => {
+    if (!isAuthenticated || activeTab !== 'appearance' || appearanceLoaded || appearanceLoading) {
+      return
+    }
+
+    const loadAppearance = async () => {
+      setAppearanceLoading(true)
+      setAppearanceError(null)
+
+      try {
+        const payload = await fetchAppearanceSettings()
+        setAppearanceSettings(payload)
+        setTheme(payload.theme)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to load appearance'
+        setAppearanceError(message)
+      } finally {
+        setAppearanceLoading(false)
+        setAppearanceLoaded(true)
+      }
+    }
+
+    void loadAppearance()
+  }, [activeTab, appearanceLoaded, appearanceLoading, isAuthenticated, setTheme])
+
+  useEffect(() => {
+    if (!isAuthenticated || activeTab !== 'security' || securityLoaded || securityLoading) {
+      return
+    }
+
+    const loadSecurity = async () => {
+      setSecurityLoading(true)
+      setSecurityError(null)
+
+      try {
+        const payload = await fetchSecuritySettings()
+        setSecuritySettings(payload)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to load security settings'
+        setSecurityError(message)
+      } finally {
+        setSecurityLoading(false)
+        setSecurityLoaded(true)
+      }
+    }
+
+    void loadSecurity()
+  }, [activeTab, isAuthenticated, securityLoaded, securityLoading])
+
+  useEffect(() => {
+    if (!isAuthenticated || activeTab !== 'api' || integrationsLoaded || integrationsLoading) {
+      return
+    }
+
+    const loadIntegrations = async () => {
+      setIntegrationsLoading(true)
+      setIntegrationsError(null)
+
+      try {
+        const payload = await fetchIntegrationsSettings()
+        setIntegrationsSettings(payload)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to load integrations'
+        setIntegrationsError(message)
+      } finally {
+        setIntegrationsLoading(false)
+        setIntegrationsLoaded(true)
+      }
+    }
+
+    void loadIntegrations()
+  }, [activeTab, integrationsLoaded, integrationsLoading, isAuthenticated])
+
+  const handleRefreshProfile = async () => {
+    setIsRefreshingProfile(true)
+    setProfileError(null)
+
+    try {
+      const payload = await refreshMyProfileFromApi()
+      setProfileData(payload)
+      await refreshProfile()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to refresh profile'
+      setProfileError(message)
+    } finally {
+      setIsRefreshingProfile(false)
+    }
   }
 
-  const notificationSettings: Array<{
-    key: Exclude<PreferenceKey, 'fontSize'>
-    label: string
-    description: string
-  }> = [
-    {
-      key: 'emailNotifications',
-      label: 'Email Notifications',
-      description: 'Receive updates and news via email',
-    },
-    {
-      key: 'newChapterNotifications',
-      label: 'New Chapter Alerts',
-      description: 'Get notified when authors you follow publish new chapters',
-    },
-    {
-      key: 'commentNotifications',
-      label: 'Comment Notifications',
-      description: 'Be notified when readers comment on your work',
-    },
-    {
-      key: 'followNotifications',
-      label: 'New Follower Alerts',
-      description: 'Get notified when someone follows you',
-    },
-  ]
+  const handleToggleNotification = async (key: keyof NotificationSettingsDto) => {
+    if (!notificationSettings) {
+      return
+    }
+
+    const nextSettings = {
+      ...notificationSettings,
+      [key]: !notificationSettings[key],
+    }
+
+    setNotificationSettings(nextSettings)
+    setNotificationSaving(true)
+    setNotificationError(null)
+
+    try {
+      const saved = await updateNotificationSettings(nextSettings)
+      setNotificationSettings(saved)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save notification settings'
+      setNotificationError(message)
+      setNotificationSettings(notificationSettings)
+    } finally {
+      setNotificationSaving(false)
+    }
+  }
+
+  const saveAppearanceSettings = async (
+    nextSettings: AppearanceSettingsDto,
+    previousTheme = appearanceSettings?.theme
+  ) => {
+    const previous = appearanceSettings
+    setAppearanceSettings(nextSettings)
+    setAppearanceSaving(true)
+    setAppearanceError(null)
+
+    try {
+      const saved = await updateAppearanceSettings(nextSettings)
+      setAppearanceSettings(saved)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save appearance settings'
+      setAppearanceError(message)
+      setAppearanceSettings(previous ?? nextSettings)
+      if (previousTheme) {
+        setTheme(previousTheme)
+      }
+    } finally {
+      setAppearanceSaving(false)
+    }
+  }
+
+  const handleAppearanceThemeChange = async (nextTheme: AppearanceSettingsDto['theme']) => {
+    if (!appearanceSettings) {
+      return
+    }
+
+    const previousTheme = appearanceSettings.theme
+    setTheme(nextTheme)
+    await saveAppearanceSettings({
+      ...appearanceSettings,
+      theme: nextTheme,
+    }, previousTheme)
+  }
+
+  const handleAppearanceFontSizeChange = async (nextFontSize: AppearanceSettingsDto['fontSize']) => {
+    if (!appearanceSettings) {
+      return
+    }
+
+    await saveAppearanceSettings({
+      ...appearanceSettings,
+      fontSize: nextFontSize,
+    })
+  }
+
+  const handleCreateApiKey = async () => {
+    const name = apiKeyName.trim()
+    if (!name) {
+      setIntegrationsError('API key name is required')
+      return
+    }
+
+    setIsCreatingApiKey(true)
+    setIntegrationsError(null)
+
+    try {
+      const payload = await createApiKey({ name })
+      setCreatingApiKeyResult({ name: payload.apiKey.name, token: payload.token })
+      setApiKeyName('')
+      setIntegrationsSettings((current) =>
+        current
+          ? {
+              ...current,
+              apiKeys: [payload.apiKey, ...current.apiKeys],
+            }
+          : {
+              apiKeys: [payload.apiKey],
+              relays: [],
+            }
+      )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create API key'
+      setIntegrationsError(message)
+    } finally {
+      setIsCreatingApiKey(false)
+    }
+  }
+
+  const handleRevokeApiKey = async (apiKeyId: string) => {
+    setIntegrationsError(null)
+
+    try {
+      await revokeApiKey(apiKeyId)
+      setIntegrationsSettings((current) =>
+        current
+          ? {
+              ...current,
+              apiKeys: current.apiKeys.filter((apiKey) => apiKey.id !== apiKeyId),
+            }
+          : current
+      )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to revoke API key'
+      setIntegrationsError(message)
+    }
+  }
+
+  const handleCreateRelay = async () => {
+    const url = relayUrl.trim()
+    if (!url) {
+      setIntegrationsError('Relay URL is required')
+      return
+    }
+
+    setIsCreatingRelay(true)
+    setIntegrationsError(null)
+
+    try {
+      const payload = await createRelay({
+        url,
+        read: relayRead,
+        write: relayWrite,
+      })
+      setRelayUrl('')
+      setRelayRead(true)
+      setRelayWrite(false)
+      setIntegrationsSettings((current) =>
+        current
+          ? {
+              ...current,
+              relays: [payload, ...current.relays],
+            }
+          : {
+              apiKeys: [],
+              relays: [payload],
+            }
+      )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save relay'
+      setIntegrationsError(message)
+    } finally {
+      setIsCreatingRelay(false)
+    }
+  }
+
+  const handleDeleteRelay = async (relayId: string) => {
+    setIntegrationsError(null)
+
+    try {
+      await deleteRelay(relayId)
+      setIntegrationsSettings((current) =>
+        current
+          ? {
+              ...current,
+              relays: current.relays.filter((relay) => relay.id !== relayId),
+            }
+          : current
+      )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to remove relay'
+      setIntegrationsError(message)
+    }
+  }
 
   const settingsSections = [
     { id: 'profile', label: 'Profile', icon: User },
@@ -137,74 +507,188 @@ export default function SettingsPage() {
               <div className="space-y-6">
                 <div>
                   <h2 className="font-serif text-2xl font-bold text-foreground mb-6">Profile Settings</h2>
-                  <form className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">Display Name</label>
-                      <input
-                        type="text"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleProfileChange}
-                        className="w-full px-4 py-2 border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">Email</label>
-                      <input
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleProfileChange}
-                        className="w-full px-4 py-2 border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                      <p className="mt-1 text-xs text-muted-foreground">Used for notifications and account recovery</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">Bio</label>
-                      <textarea
-                        name="bio"
-                        value={formData.bio}
-                        onChange={handleProfileChange}
-                        rows={4}
-                        className="w-full px-4 py-2 border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                      <p className="mt-1 text-xs text-muted-foreground">Max 200 characters</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">Location</label>
-                      <input
-                        type="text"
-                        name="location"
-                        value={formData.location}
-                        onChange={handleProfileChange}
-                        className="w-full px-4 py-2 border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">Website</label>
-                      <input
-                        type="url"
-                        name="website"
-                        value={formData.website}
-                        onChange={handleProfileChange}
-                        className="w-full px-4 py-2 border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                    <Button>Save Changes</Button>
-                  </form>
+                  <div className="rounded border border-border/40 bg-card p-6">
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      Mist Story syncs your public identity from your Nostr kind `0` metadata and
+                      keeps a cached copy in our database. We use the cached version for profile
+                      pages, then refresh it in the background when it gets stale so we do not hit
+                      relays too often.
+                    </p>
+                  </div>
                 </div>
 
-                <Separator />
+                {isProfileLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : profileError ? (
+                  <div className="rounded border border-destructive/30 bg-card p-6 text-destructive">
+                    {profileError}
+                  </div>
+                ) : profileData ? (
+                  <>
+                    <div className="overflow-hidden rounded border border-border/40 bg-card">
+                      {profileData.profile.bannerUrl && (
+                        <div className="h-32 w-full bg-muted">
+                          <img
+                            src={profileData.profile.bannerUrl}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      )}
+                      <div className="space-y-6 p-6">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="flex items-center gap-4">
+                            {profileData.profile.avatarUrl ? (
+                              <img
+                                src={profileData.profile.avatarUrl}
+                                alt={profileData.profile.displayName ?? 'Profile avatar'}
+                                className="h-16 w-16 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                                <User className="h-6 w-6" />
+                              </div>
+                            )}
+                            <div>
+                              <h3 className="font-serif text-xl font-semibold text-foreground">
+                                {profileData.profile.displayName ?? profileData.profile.handle ?? 'Unnamed profile'}
+                              </h3>
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <code
+                                  className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded bg-muted px-2 py-1 text-xs text-muted-foreground"
+                                  title={profileData.profile.npub}
+                                >
+                                  {compactValue(profileData.profile.npub)}
+                                </code>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-2"
+                                  onClick={() => void handleCopy(profileData.profile.npub)}
+                                >
+                                  {copiedValue === profileData.profile.npub ? (
+                                    <>
+                                      <Check className="h-3.5 w-3.5" />
+                                      Copied
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="h-3.5 w-3.5" />
+                                      Copy npub
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                              {profileData.profile.nip05 && (
+                                <p className="text-sm text-muted-foreground">@{profileData.profile.nip05}</p>
+                              )}
+                            </div>
+                          </div>
+                        <div className="flex flex-wrap gap-3 lg:max-w-xs lg:justify-end">
+                            <Button
+                              variant="outline"
+                              onClick={() => void handleRefreshProfile()}
+                              disabled={isRefreshingProfile}
+                            >
+                              {isRefreshingProfile ? 'Refreshing...' : 'Refresh from Nostr'}
+                            </Button>
+                            <Button asChild>
+                              <Link href={`/profile/${user?.npub}`}>View Profile</Link>
+                            </Button>
+                          </div>
+                        </div>
 
-                <div>
-                  <h3 className="font-serif text-lg font-semibold text-foreground mb-4">Public Profile</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Your public profile URL: <code className="bg-muted px-2 py-1 rounded text-xs">Mist Story.app/profile/{user?.npub?.slice(0, 16)}...</code>
-                  </p>
-                  <Button variant="outline" asChild>
-                    <Link href={`/profile/${user?.npub}`}>View Profile</Link>
-                  </Button>
-                </div>
+                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                          <div className="rounded border border-border/40 bg-background p-4">
+                            <div className="text-2xl font-semibold text-foreground">
+                              {profileData.stats.novels.toLocaleString()}
+                            </div>
+                            <div className="text-sm text-muted-foreground">Novels</div>
+                          </div>
+                          <div className="rounded border border-border/40 bg-background p-4">
+                            <div className="text-2xl font-semibold text-foreground">
+                              {profileData.stats.followers.toLocaleString()}
+                            </div>
+                            <div className="text-sm text-muted-foreground">Followers</div>
+                          </div>
+                          <div className="rounded border border-border/40 bg-background p-4">
+                            <div className="text-2xl font-semibold text-foreground">
+                              {profileData.stats.following.toLocaleString()}
+                            </div>
+                            <div className="text-sm text-muted-foreground">Following</div>
+                          </div>
+                          <div className="rounded border border-border/40 bg-background p-4">
+                            <div className="text-2xl font-semibold text-foreground">
+                              {profileData.stats.totalReads.toLocaleString()}
+                            </div>
+                            <div className="text-sm text-muted-foreground">Total Reads</div>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="rounded border border-border/40 bg-background p-4">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              Handle
+                            </p>
+                            <p className="mt-2 text-sm text-foreground">
+                              {profileData.profile.handle ?? 'Not set'}
+                            </p>
+                          </div>
+                          <div className="rounded border border-border/40 bg-background p-4">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              Website
+                            </p>
+                            <p className="mt-2 text-sm text-foreground break-all">
+                              {profileData.profile.website ?? 'Not set'}
+                            </p>
+                          </div>
+                          <div className="rounded border border-border/40 bg-background p-4">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              Lightning
+                            </p>
+                            <p className="mt-2 text-sm text-foreground">
+                              {profileData.profile.lud16 ?? 'Not set'}
+                            </p>
+                          </div>
+                        <div className="rounded border border-border/40 bg-background p-4">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            Last synced
+                          </p>
+                            <p className="mt-2 text-sm text-foreground">
+                              {formatDateTime(profileData.sync.lastSyncedAt)}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {profileData.sync.isStale
+                                ? 'Profile is stale and due for refresh.'
+                                : 'Cached profile is fresh.'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="rounded border border-border/40 bg-background p-4">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            Bio
+                          </p>
+                          <p className="mt-2 text-sm leading-relaxed text-foreground">
+                            {profileData.profile.about ?? 'No bio set on Nostr yet.'}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            Your public profile URL:{' '}
+                            <code className="rounded bg-muted px-2 py-1 text-xs">
+                              Mist Story.app/profile/{user?.npub?.slice(0, 16)}...
+                            </code>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : null}
               </div>
             )}
 
@@ -212,31 +696,64 @@ export default function SettingsPage() {
             {activeTab === 'notifications' && (
               <div>
                 <h2 className="font-serif text-2xl font-bold text-foreground mb-6">Notification Settings</h2>
-                <div className="space-y-4">
-                  {notificationSettings.map((setting) => (
-                    <div
-                      key={setting.key}
-                      className="flex items-center justify-between border border-border/40 rounded bg-card p-4"
-                    >
-                      <div>
-                        <p className="font-medium text-foreground">{setting.label}</p>
-                        <p className="text-sm text-muted-foreground">{setting.description}</p>
-                      </div>
-                      <button
-                        onClick={() => handlePreferenceChange(setting.key, !preferences[setting.key])}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          preferences[setting.key] ? 'bg-primary' : 'bg-muted'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            preferences[setting.key] ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                {notificationLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : notificationError ? (
+                  <div className="rounded border border-destructive/30 bg-card p-6 text-destructive">
+                    {notificationError}
+                  </div>
+                ) : notificationSettings ? (
+                  <div className="space-y-4">
+                    {[
+                      {
+                        key: 'emailNotifications',
+                        label: 'Email Notifications',
+                        description: 'Receive updates and news via email',
+                      },
+                      {
+                        key: 'newChapterNotifications',
+                        label: 'New Chapter Alerts',
+                        description: 'Get notified when authors you follow publish new chapters',
+                      },
+                      {
+                        key: 'commentNotifications',
+                        label: 'Comment Notifications',
+                        description: 'Be notified when readers comment on your work',
+                      },
+                      {
+                        key: 'followNotifications',
+                        label: 'New Follower Alerts',
+                        description: 'Get notified when someone follows you',
+                      },
+                    ].map((setting) => {
+                      const checked = notificationSettings[setting.key as keyof NotificationSettingsDto]
+
+                      return (
+                        <div
+                          key={setting.key}
+                          className="flex items-center justify-between gap-4 border border-border/40 rounded bg-card p-4"
+                        >
+                          <div>
+                            <p className="font-medium text-foreground">{setting.label}</p>
+                            <p className="text-sm text-muted-foreground">{setting.description}</p>
+                          </div>
+                          <Switch
+                            checked={checked}
+                            onCheckedChange={() =>
+                              void handleToggleNotification(setting.key as keyof NotificationSettingsDto)
+                            }
+                            disabled={notificationSaving}
+                          />
+                        </div>
+                      )
+                    })}
+                    <p className="text-sm text-muted-foreground">
+                      {notificationSaving ? 'Saving notification preferences...' : 'Preferences save automatically.'}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             )}
 
@@ -244,47 +761,67 @@ export default function SettingsPage() {
             {activeTab === 'appearance' && (
               <div>
                 <h2 className="font-serif text-2xl font-bold text-foreground mb-6">Appearance</h2>
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-3">Theme</label>
-                    <div className="space-y-2">
-                      {['light', 'dark', 'system'].map((themeOption) => (
-                        <label key={themeOption} className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="theme"
-                            value={themeOption}
-                            checked={theme === themeOption}
-                            onChange={() => setTheme(themeOption)}
-                            className="h-4 w-4"
-                          />
-                          <span className="text-foreground capitalize">{themeOption === 'system' ? 'Auto (system)' : themeOption}</span>
-                        </label>
-                      ))}
-                    </div>
+                {appearanceLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
+                ) : appearanceError ? (
+                  <div className="rounded border border-destructive/30 bg-card p-6 text-destructive">
+                    {appearanceError}
+                  </div>
+                ) : appearanceSettings ? (
+                  <div className="space-y-6">
+                    <div className="rounded border border-border/40 bg-card p-6">
+                      <label className="block text-sm font-medium text-foreground mb-3">Theme</label>
+                      <div className="space-y-3">
+                        {(['light', 'dark', 'system'] as const).map((themeOption) => (
+                          <label key={themeOption} className="flex items-center gap-3 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="theme"
+                              value={themeOption}
+                              checked={appearanceSettings.theme === themeOption}
+                              onChange={() => void handleAppearanceThemeChange(themeOption)}
+                              className="h-4 w-4"
+                            />
+                            <span className="text-foreground capitalize">
+                              {themeOption === 'system' ? 'Auto (system)' : themeOption}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-3">Reader Font Size</label>
-                    <div className="space-y-2">
-                      {['small', 'medium', 'large'].map((size) => (
-                        <label key={size} className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="fontSize"
-                            value={size}
-                            checked={preferences.fontSize === size}
-                            onChange={() => handlePreferenceChange('fontSize', size)}
-                            className="h-4 w-4"
-                          />
-                          <span className={`text-foreground capitalize ${size === 'small' ? 'text-sm' : size === 'large' ? 'text-lg' : 'text-base'}`}>
-                            {size}
-                          </span>
-                        </label>
-                      ))}
+                    <div className="rounded border border-border/40 bg-card p-6">
+                      <label className="block text-sm font-medium text-foreground mb-3">Reader Font Size</label>
+                      <div className="space-y-3">
+                        {(['small', 'medium', 'large'] as const).map((size) => (
+                          <label key={size} className="flex items-center gap-3 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="fontSize"
+                              value={size}
+                              checked={appearanceSettings.fontSize === size}
+                              onChange={() => void handleAppearanceFontSizeChange(size)}
+                              className="h-4 w-4"
+                            />
+                            <span
+                              className={`text-foreground capitalize ${
+                                size === 'small' ? 'text-sm' : size === 'large' ? 'text-lg' : 'text-base'
+                              }`}
+                            >
+                              {size}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
+
+                    <p className="text-sm text-muted-foreground">
+                      {appearanceSaving ? 'Saving appearance preferences...' : 'Theme and font size sync to your account.'}
+                    </p>
                   </div>
-                </div>
+                ) : null}
               </div>
             )}
 
@@ -292,24 +829,117 @@ export default function SettingsPage() {
             {activeTab === 'security' && (
               <div>
                 <h2 className="font-serif text-2xl font-bold text-foreground mb-6">Security</h2>
-                <div className="space-y-4">
-                  <div className="border border-border/40 rounded bg-card p-6">
-                    <h3 className="font-medium text-foreground mb-2">Nostr NIP-07 Extension</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Your account is secured through your Nostr NIP-07 compatible wallet extension
-                    </p>
-                    <p className="text-xs font-mono text-muted-foreground break-all bg-muted p-2 rounded mb-4">
-                      npub: {user?.npub}
-                    </p>
-                    <Button variant="outline">Manage Connected Apps</Button>
+                {securityLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
+                ) : securityError ? (
+                  <div className="rounded border border-destructive/30 bg-card p-6 text-destructive">
+                    {securityError}
+                  </div>
+                ) : securitySettings ? (
+                  <div className="space-y-6">
+                    <div className="rounded border border-border/40 bg-card p-6">
+                      <div className="flex items-start gap-3">
+                        <Shield className="mt-1 h-5 w-5 text-foreground" />
+                        <div className="flex-1">
+                          <h3 className="font-medium text-foreground mb-2">Nostr Account</h3>
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Your account is secured through your Nostr identity and the session managed by Mist Story.
+                          </p>
 
-                  <div className="border border-border/40 rounded bg-card p-6">
-                    <h3 className="font-medium text-foreground mb-2">Two-Factor Authentication</h3>
-                    <p className="text-sm text-muted-foreground mb-4">Add an extra layer of security to your account</p>
-                    <Button variant="outline">Enable 2FA</Button>
+                          <div className="space-y-3">
+                            <div className="rounded border border-border/40 bg-background p-4">
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">npub</p>
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <code className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
+                                  {compactValue(securitySettings.npub)}
+                                </code>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-2"
+                                  onClick={() => void handleCopy(securitySettings.npub)}
+                                >
+                                  {copiedValue === securitySettings.npub ? (
+                                    <>
+                                      <Check className="h-3.5 w-3.5" />
+                                      Copied
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="h-3.5 w-3.5" />
+                                      Copy
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+
+                            <div className="rounded border border-border/40 bg-background p-4">
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">pubkey</p>
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <code className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground break-all">
+                                  {compactValue(securitySettings.pubkey, 18, 12)}
+                                </code>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-2"
+                                  onClick={() => void handleCopy(securitySettings.pubkey)}
+                                >
+                                  {copiedValue === securitySettings.pubkey ? (
+                                    <>
+                                      <Check className="h-3.5 w-3.5" />
+                                      Copied
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="h-3.5 w-3.5" />
+                                      Copy
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded border border-border/40 bg-card p-6">
+                      <h3 className="flex items-center gap-2 font-medium text-foreground mb-4">
+                        <KeyRound className="h-4 w-4" />
+                        Recent Auth Activity
+                      </h3>
+                      {securitySettings.recentAuthActivity.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No recent authentication activity.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {securitySettings.recentAuthActivity.map((activity) => (
+                            <div
+                              key={activity.id}
+                              className="rounded border border-border/40 bg-background p-4"
+                            >
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                  <p className="font-medium text-foreground">{activity.action}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {activity.resultCode}
+                                    {activity.detail ? ` · ${activity.detail}` : ''}
+                                  </p>
+                                </div>
+                                <p className="text-xs text-muted-foreground">{formatDateTime(activity.createdAt)}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                ) : null}
               </div>
             )}
 
@@ -317,21 +947,177 @@ export default function SettingsPage() {
             {activeTab === 'api' && (
               <div>
                 <h2 className="font-serif text-2xl font-bold text-foreground mb-6">API & Integration</h2>
-                <div className="space-y-4">
-                  <div className="border border-border/40 rounded bg-card p-6">
-                    <h3 className="font-medium text-foreground mb-2">API Keys</h3>
-                    <p className="text-sm text-muted-foreground mb-4">Generate API keys for external integrations</p>
-                    <Button variant="outline">Generate New Key</Button>
+                {integrationsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
+                ) : integrationsError ? (
+                  <div className="rounded border border-destructive/30 bg-card p-6 text-destructive">
+                    {integrationsError}
+                  </div>
+                ) : integrationsSettings ? (
+                  <div className="space-y-6">
+                    {creatingApiKeyResult && (
+                      <div className="rounded border border-primary/30 bg-primary/5 p-6">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <h3 className="font-medium text-foreground">API key created</h3>
+                            <p className="text-sm text-muted-foreground">
+                              This token is shown once. Copy it now and store it securely.
+                            </p>
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={() => setCreatingApiKeyResult(null)}>
+                            Dismiss
+                          </Button>
+                        </div>
+                        <div className="mt-4 space-y-3">
+                          <div className="rounded border border-border/40 bg-background p-4">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              {creatingApiKeyResult.name}
+                            </p>
+                            <code className="mt-2 block break-all rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
+                              {creatingApiKeyResult.token}
+                            </code>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void handleCopy(creatingApiKeyResult.token)}
+                          >
+                            {copiedValue === creatingApiKeyResult.token ? 'Copied' : 'Copy token'}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
 
-                  <div className="border border-border/40 rounded bg-card p-6">
-                    <h3 className="font-medium text-foreground mb-2">Relay Configuration</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Manage Nostr relays for syncing your content
-                    </p>
-                    <Button variant="outline">Configure Relays</Button>
+                    <div className="grid gap-6 xl:grid-cols-2">
+                      <div className="rounded border border-border/40 bg-card p-6">
+                        <h3 className="font-medium text-foreground mb-2">API Keys</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Generate and revoke tokens for external integrations.
+                        </p>
+
+                        <div className="flex flex-col gap-3 sm:flex-row">
+                          <Input
+                            value={apiKeyName}
+                            onChange={(event) => setApiKeyName(event.target.value)}
+                            placeholder="New API key name"
+                          />
+                          <Button
+                            onClick={() => void handleCreateApiKey()}
+                            disabled={isCreatingApiKey || !apiKeyName.trim()}
+                          >
+                            {isCreatingApiKey ? 'Creating...' : 'Create Key'}
+                          </Button>
+                        </div>
+
+                        <div className="mt-5 space-y-3">
+                          {integrationsSettings.apiKeys.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No API keys yet.</p>
+                          ) : (
+                            integrationsSettings.apiKeys.map((apiKey) => (
+                              <div key={apiKey.id} className="rounded border border-border/40 bg-background p-4">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                  <div className="space-y-1">
+                                    <p className="font-medium text-foreground">{apiKey.name}</p>
+                                    <p className="text-xs text-muted-foreground">{apiKey.keyPreview}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Created {formatDateTime(apiKey.createdAt)}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Last used {formatDateTime(apiKey.lastUsedAt)}
+                                    </p>
+                                    {apiKey.revokedAt && (
+                                      <p className="text-xs text-destructive">
+                                        Revoked {formatDateTime(apiKey.revokedAt)}
+                                      </p>
+                                    )}
+                                  </div>
+                                  {!apiKey.revokedAt ? (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => void handleRevokeApiKey(apiKey.id)}
+                                    >
+                                      Revoke
+                                    </Button>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">Revoked</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="rounded border border-border/40 bg-card p-6">
+                        <h3 className="font-medium text-foreground mb-2">Relay Configuration</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Manage the relays used for content syncing.
+                        </p>
+
+                        <div className="space-y-4">
+                          <Input
+                            value={relayUrl}
+                            onChange={(event) => setRelayUrl(event.target.value)}
+                            placeholder="wss://relay.example.com"
+                          />
+                          <div className="flex flex-wrap gap-4">
+                            <label className="flex items-center gap-2 text-sm text-foreground">
+                              <Switch checked={relayRead} onCheckedChange={(checked) => setRelayRead(Boolean(checked))} />
+                              Read
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-foreground">
+                              <Switch checked={relayWrite} onCheckedChange={(checked) => setRelayWrite(Boolean(checked))} />
+                              Write
+                            </label>
+                          </div>
+                          <Button onClick={() => void handleCreateRelay()} disabled={isCreatingRelay || !relayUrl.trim()}>
+                            {isCreatingRelay ? 'Saving...' : 'Add Relay'}
+                          </Button>
+                        </div>
+
+                        <div className="mt-5 space-y-3">
+                          {integrationsSettings.relays.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No relays configured yet.</p>
+                          ) : (
+                            integrationsSettings.relays.map((relay) => (
+                              <div key={relay.id} className="rounded border border-border/40 bg-background p-4">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                  <div className="space-y-2">
+                                    <p className="font-medium text-foreground break-all">{relay.url}</p>
+                                    <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                      <span className="rounded bg-muted px-2 py-1">
+                                        {relay.read ? 'Read enabled' : 'Read disabled'}
+                                      </span>
+                                      <span className="rounded bg-muted px-2 py-1">
+                                        {relay.write ? 'Write enabled' : 'Write disabled'}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                      Added {formatDateTime(relay.createdAt)}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Updated {formatDateTime(relay.updatedAt)}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => void handleDeleteRelay(relay.id)}
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : null}
               </div>
             )}
           </div>

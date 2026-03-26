@@ -18,8 +18,27 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "../services/notification-service"
+import { getMyProfile, refreshMyProfile } from "../services/profile-service"
 
 export const meRouter = Router()
+
+meRouter.get("/profile", requireAuth, async (_request, response, next) => {
+  try {
+    const payload = await getMyProfile(response.locals.user.id as string)
+    return response.json(payload)
+  } catch (error) {
+    return next(error)
+  }
+})
+
+meRouter.post("/profile/refresh", requireAuth, async (_request, response, next) => {
+  try {
+    const payload = await refreshMyProfile(response.locals.user.id as string)
+    return response.json(payload)
+  } catch (error) {
+    return next(error)
+  }
+})
 
 meRouter.get("/library", requireAuth, async (_request, response, next) => {
   try {

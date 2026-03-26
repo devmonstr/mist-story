@@ -10,10 +10,11 @@ datasource db {
 model User {
   id                          String                        @id @default(cuid())
   pubkey                      String                        @unique
-  handle                      String?                       @unique
+  handle                      String?
   displayName                 String?
   about                       String?
   avatarUrl                   String?
+  bannerUrl                   String?
   nip05                       String?
   nip05VerifiedAt             DateTime?
   lud16                       String?
@@ -38,9 +39,14 @@ model User {
   notificationPreferences     NotificationPreference[]
   notificationPreset          NotificationPreferencePreset?
   notificationPresetUpdatedAt DateTime?
+  settings                    UserSetting?
+  apiKeys                     UserApiKey[]
+  relays                      UserRelay[]
   reports                     Report[]                      @relation("UserReports")
   moderatedReports            Report[]                      @relation("UserModeratedReports")
   moderationAuditLogs         ModerationAuditLog[]          @relation("UserModerationActions")
+  followers                   UserFollow[]                  @relation("UserFollowers")
+  following                   UserFollow[]                  @relation("UserFollowing")
   novelBookmarks              NovelBookmark[]
   novelRatings                NovelRating[]
   readingProgress             ReadingProgress[]
@@ -49,6 +55,9 @@ model User {
   isAdmin                     Boolean                       @default(false)
   createdAt                   DateTime                      @default(now())
   updatedAt                   DateTime                      @updatedAt
+
+  @@index([displayName])
+  @@index([handle])
 }
 
 enum AuthAuditAction {
@@ -88,6 +97,11 @@ enum NovelStatus {
 enum NovelVisibility {
   PUBLISHED
   HIDDEN
+}
+
+enum NovelWorkType {
+  ORIGINAL
+  TRANSLATION
 }
 
 enum ChapterStatus {
@@ -176,6 +190,7 @@ enum ReportReason {
 
 enum NotificationType {
   CHAPTER_PUBLISHED
+  USER_FOLLOWED
   NOVEL_BOOKMARKED
   MENTION
   COMMENT_REPLY
@@ -198,6 +213,18 @@ enum NotificationPreferencePreset {
   CREATOR
   ADMIN_ON_CALL
   CUSTOM
+}
+
+enum AppTheme {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+enum ReaderFontSize {
+  SMALL
+  MEDIUM
+  LARGE
 }
 
 enum CommentNostrPublishState {
@@ -226,6 +253,7 @@ model Novel {
   title             String
   summary           String            @default("")
   genre             String
+  workType          NovelWorkType     @default(ORIGINAL)
   subgenres         String[]          @default([])
   tags              String[]          @default([])
   searchDocument    Unsupported("tsvector")?
@@ -233,10 +261,15 @@ model Novel {
   translatorName    String            @default("")
   status            NovelStatus       @default(Ongoing)
   visibility        NovelVisibility   @default(HIDDEN)
+  contentWarning    String            @default("")
   rating            Decimal           @default(0) @db.Decimal(3, 1)
   ratingsCount      Int               @default(0)
   updateNote        String            @default("")
   coverUrl          String            @default("")
+  coverStorageKey   String?
+  coverMimeType     String?
+  coverOriginalName String?
+  coverFileSizeBytes Int?
   chaptersCount     Int               @default(0)
   authorId          String
   publishedAt       DateTime?
@@ -252,6 +285,12 @@ model Novel {
 
   @@index([authorId])
   @@index([visibility, status])
+  @@index([visibility, genre])
+  @@index([visibility, workType])
+  @@index([visibility, publishedAt])
+  @@index([visibility, updatedAt])
+  @@index([visibility, ratingsCount])
+  @@index([visibility, authorDisplayName])
 }
 
 model Chapter {
@@ -300,6 +339,60 @@ model NovelBookmark {
   @@unique([userId, novelId])
   @@index([userId, createdAt])
   @@index([novelId, createdAt])
+}
+
+model UserFollow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    User     @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId, createdAt])
+  @@index([followingId, createdAt])
+}
+
+model UserSetting {
+  id              String         @id @default(cuid())
+  userId          String         @unique
+  emailNotifications Boolean     @default(true)
+  appearanceTheme AppTheme       @default(SYSTEM)
+  readerFontSize  ReaderFontSize @default(MEDIUM)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserApiKey {
+  id         String   @id @default(cuid())
+  userId     String
+  name       String
+  keyPreview String
+  keyHash    String   @unique
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, revokedAt, createdAt])
+}
+
+model UserRelay {
+  id        String   @id @default(cuid())
+  userId    String
+  url       String
+  read      Boolean  @default(true)
+  write     Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, url])
+  @@index([userId, createdAt])
 }
 
 model NovelRating {

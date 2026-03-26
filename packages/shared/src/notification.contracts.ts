@@ -2,6 +2,7 @@ import { z } from "zod"
 
 export const notificationTypeSchema = z.enum([
   "CHAPTER_PUBLISHED",
+  "USER_FOLLOWED",
   "NOVEL_BOOKMARKED",
   "MENTION",
   "COMMENT_REPLY",

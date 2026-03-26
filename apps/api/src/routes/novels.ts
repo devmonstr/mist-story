@@ -9,6 +9,7 @@ import {
   createNovel,
   getNovel,
   listNovels,
+  streamNovelCover,
   updateNovel,
 } from "../services/novel-service"
 
@@ -25,8 +26,23 @@ novelsRouter.get("/", async (_request, response, next) => {
 
 novelsRouter.get("/:novelId", async (request, response, next) => {
   try {
-    const payload = await getNovel(String(request.params.novelId))
+    const payload = await getNovel(
+      String(request.params.novelId),
+      response.locals.user?.id as string | undefined
+    )
     return response.json(payload)
+  } catch (error) {
+    return next(error)
+  }
+})
+
+novelsRouter.get("/:novelId/cover", async (request, response, next) => {
+  try {
+    await streamNovelCover(
+      String(request.params.novelId),
+      response.locals.user?.id as string | undefined,
+      response
+    )
   } catch (error) {
     return next(error)
   }

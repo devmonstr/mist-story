@@ -1,10 +1,12 @@
 import type { ChapterDto, CreateNovelInput, NovelDto } from "@mist/shared"
+import { resolveNovelCoverSrc } from "./novel-cover"
 
 export interface StudioNovelCard {
   id: string
   title: string
   description: string
   status: "published" | "draft"
+  coverUrl: string | null
   chapters: number
   totalWords: number
   lastEdited: string
@@ -15,9 +17,13 @@ export interface StudioNovelFormData {
   title: string
   description: string
   genre: string
-  status: string
+  status: "draft" | "publishing"
+  workType: "ORIGINAL" | "TRANSLATION"
   tags: string[]
   coverImage: string | null
+  coverImageName: string | null
+  coverImageMimeType: string | null
+  coverImageSizeBytes: number | null
   isComplete: boolean
   contentWarning: string
 }
@@ -28,6 +34,19 @@ export interface EditorChapter {
   content: string
   wordCount: number
   lastEdited: string
+  status: ChapterDto["status"]
+  publishedAt: string | null
+}
+
+export interface EditorNovel {
+  id: string
+  title: string
+  description: string
+  coverImage: string | null
+  visibility: NovelDto["visibility"]
+  workType: NovelDto["workType"]
+  status: NovelDto["status"]
+  chapters: EditorChapter[]
 }
 
 export function mapNovelToCard(novel: NovelDto): StudioNovelCard {
@@ -36,6 +55,11 @@ export function mapNovelToCard(novel: NovelDto): StudioNovelCard {
     title: novel.title,
     description: novel.summary,
     status: novel.visibility === "PUBLISHED" ? "published" : "draft",
+    coverUrl: resolveNovelCoverSrc({
+      novelId: novel.id,
+      coverUrl: novel.coverUrl,
+      coverStorageKey: novel.coverStorageKey,
+    }),
     chapters: novel.chaptersCount,
     totalWords: 0,
     lastEdited: novel.updatedAt,
@@ -47,17 +71,20 @@ export function mapNovelToFormData(novel: NovelDto): StudioNovelFormData {
   return {
     title: novel.title,
     description: novel.summary,
-    genre: novel.genre,
-    status:
-      novel.visibility === "HIDDEN"
-        ? "draft"
-        : novel.status === "Completed"
-          ? "published"
-          : "publishing",
+    genre: novel.genre.toLowerCase(),
+    status: novel.visibility === "HIDDEN" ? "draft" : "publishing",
+    workType: novel.workType,
     tags: novel.tags,
-    coverImage: novel.coverUrl || null,
-    isComplete: novel.status === "Completed",
-    contentWarning: "",
+    coverImage: resolveNovelCoverSrc({
+      novelId: novel.id,
+      coverUrl: novel.coverUrl,
+      coverStorageKey: novel.coverStorageKey,
+    }),
+    coverImageName: novel.coverOriginalName,
+    coverImageMimeType: novel.coverMimeType,
+    coverImageSizeBytes: novel.coverFileSizeBytes,
+    isComplete: novel.isComplete,
+    contentWarning: novel.contentWarning,
   }
 }
 
@@ -66,20 +93,40 @@ export function buildNovelInputFromForm(
   authorDisplayName = ""
 ): CreateNovelInput {
   const visibility = formData.status === "draft" ? "HIDDEN" : "PUBLISHED"
-  const status = formData.status === "published" ? "Completed" : "Ongoing"
+  const status = formData.isComplete ? "Completed" : "Ongoing"
 
   return {
     title: formData.title,
     summary: formData.description,
     genre: formData.genre,
+    workType: formData.workType,
     subgenres: [],
     tags: formData.tags,
     authorDisplayName,
     translatorName: "",
+    isComplete: formData.isComplete,
     status,
     visibility,
+    contentWarning: formData.contentWarning,
     updateNote: "",
-    coverUrl: formData.coverImage || "",
+    coverUrl:
+      formData.coverImage && !formData.coverImage.startsWith("data:")
+        ? formData.coverImage
+        : "",
+    clearCover: formData.coverImage === null,
+    coverUpload:
+      formData.coverImage &&
+      formData.coverImage.startsWith("data:") &&
+      formData.coverImageName &&
+      formData.coverImageMimeType &&
+      formData.coverImageSizeBytes
+        ? {
+            dataUrl: formData.coverImage,
+            fileName: formData.coverImageName,
+            mimeType: formData.coverImageMimeType,
+            fileSizeBytes: formData.coverImageSizeBytes,
+          }
+        : undefined,
   }
 }
 
@@ -94,5 +141,7 @@ export function mapChapterToEditorChapter(chapter: ChapterDto): EditorChapter {
       .split(/\s+/)
       .filter(Boolean).length,
     lastEdited: chapter.updatedAt,
+    status: chapter.status,
+    publishedAt: chapter.publishedAt,
   }
 }

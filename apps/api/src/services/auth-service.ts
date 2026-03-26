@@ -10,6 +10,7 @@ import type { AuthUserDto, SignedNostrEvent } from "@mist/shared"
 import { verifyEvent } from "nostr-tools"
 import { env } from "../config/env"
 import { HttpError } from "../utils/http-error"
+import { ensureUserProfileHydrated } from "./profile-sync-service"
 
 const redis = createRedisClient(env.REDIS_URL)
 
@@ -112,7 +113,7 @@ export async function verifyChallenge(input: {
     throw new HttpError(401, "Invalid signed event")
   }
 
-  const user = await upsertUserByPubkey(input.pubkey)
+  const user = await ensureUserProfileHydrated(await upsertUserByPubkey(input.pubkey))
   const sessionId = randomUUID()
 
   await redis.set(

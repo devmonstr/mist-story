@@ -1,128 +1,479 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { StoryCardSkeleton } from "@/components/skeletons/story-card-skeleton"
+import { AlertCircle, BookOpen, RefreshCcw } from "lucide-react"
+import { resolveNovelCoverSrc } from "@/lib/novel-cover"
+import { useLibraryCatalogContext } from "./library-catalog-context"
+import {
+  loadLibraryCatalog,
+  type LibraryCatalogNovel,
+  type LibraryCatalogResponse,
+} from "./library-catalog"
+import { StoriesGridSkeleton } from "./stories-grid-skeleton"
 
-interface Story {
-  id: string
-  title: string
-  author: string
-  genre: string
-  chapters: number
-  description: string
-  reads: number
+function formatWorkType(value: LibraryCatalogNovel["workType"]) {
+  return value === "TRANSLATION" ? "Translation" : "Original"
 }
 
-const stories: Story[] = [
-  {
-    id: "1",
-    title: "The Forgotten Kingdom",
-    author: "Emma Stone",
-    genre: "Fantasy",
-    chapters: 24,
-    description: "An epic tale of magic, adventure, and redemption across forgotten realms.",
-    reads: 12500,
-  },
-  {
-    id: "2",
-    title: "Midnight in the City",
-    author: "James River",
-    genre: "Mystery",
-    chapters: 18,
-    description: "A gripping detective story that unravels secrets in a sprawling metropolis.",
-    reads: 8900,
-  },
-  {
-    id: "3",
-    title: "Hearts in Transit",
-    author: "Sarah Mitchell",
-    genre: "Romance",
-    chapters: 32,
-    description: "Two strangers meet on a train and discover love in unexpected places.",
-    reads: 15600,
-  },
-  {
-    id: "4",
-    title: "The Last Signal",
-    author: "David Chen",
-    genre: "Science Fiction",
-    chapters: 28,
-    description: "Humanity's final message to the stars before the silence.",
-    reads: 11200,
-  },
-  {
-    id: "5",
-    title: "Echoes of the Past",
-    author: "Laura Rossi",
-    genre: "Historical",
-    chapters: 26,
-    description: "A journey through time that reveals hidden truths about a forgotten era.",
-    reads: 9800,
-  },
-  {
-    id: "6",
-    title: "The Phantom Door",
-    author: "Michael Brooks",
-    genre: "Thriller",
-    chapters: 22,
-    description: "A door appears in your apartment. It shouldn't exist. Now your life changes forever.",
-    reads: 13400,
-  },
-]
+function formatStoryDate(value: string | null | undefined) {
+  if (!value) {
+    return null
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value))
+}
 
 export function StoriesGrid() {
-  // Simulate loading state for demonstration
-  // Remove this in production when using real data fetching
-  const isLoading = false
+  const {
+    query,
+    deferredQuery,
+    sortBy,
+    cursor,
+    direction,
+    genre,
+    workType,
+    status,
+    collection,
+    setCursorState,
+    setGenre,
+    setWorkType,
+    setStatus,
+    setCollection,
+    clearQuery,
+    clearFilters,
+  } = useLibraryCatalogContext()
+  const [stories, setStories] = useState<LibraryCatalogNovel[]>([])
+  const [catalog, setCatalog] = useState<LibraryCatalogResponse | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [refreshToken, setRefreshToken] = useState(0)
+
+  useEffect(() => {
+    let isActive = true
+
+    const timer = window.setTimeout(() => {
+      setIsLoading(true)
+      setError(null)
+
+      void loadLibraryCatalog({
+        query: deferredQuery,
+        sortBy,
+        cursor,
+        direction,
+        pageSize: 18,
+        genre,
+        workType,
+        status,
+        collection,
+      })
+        .then((payload) => {
+          if (!isActive) {
+            return
+          }
+
+          setCatalog(payload)
+          setStories(payload.novels)
+        })
+        .catch((loadError) => {
+          if (!isActive) {
+            return
+          }
+
+          setCatalog(null)
+          setStories([])
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Failed to load the library catalog."
+          )
+        })
+        .finally(() => {
+          if (isActive) {
+            setIsLoading(false)
+          }
+        })
+    }, 220)
+
+    return () => {
+      isActive = false
+      window.clearTimeout(timer)
+    }
+  }, [collection, cursor, deferredQuery, direction, genre, refreshToken, sortBy, status, workType])
 
   if (isLoading) {
+    return <StoriesGridSkeleton />
+  }
+
+  if (error) {
     return (
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {[...Array(6)].map((_, i) => (
-          <StoryCardSkeleton key={i} />
-        ))}
+      <div className="border border-border/40 bg-card p-8 text-center">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+          <AlertCircle className="h-5 w-5" />
+        </div>
+        <h2 className="mt-4 font-serif text-2xl text-foreground">
+          We could not load the library
+        </h2>
+        <p className="mt-3 text-sm text-muted-foreground">{error}</p>
+        <div className="mt-6 flex items-center justify-center gap-3">
+          <Button onClick={() => setRefreshToken((value) => value + 1)}>
+            <RefreshCcw className="mr-2 h-4 w-4" />
+            Try again
+          </Button>
+          {query ? (
+            <Button variant="outline" onClick={clearQuery}>
+              Clear search
+            </Button>
+          ) : null}
+          {genre || workType || status || collection ? (
+            <Button variant="outline" onClick={clearFilters}>
+              Reset filters
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
+  if (stories.length === 0) {
+    return (
+      <div className="border border-border/40 bg-card p-8 text-center">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          <BookOpen className="h-5 w-5" />
+        </div>
+        <h2 className="mt-4 font-serif text-2xl text-foreground">
+          {query || genre || workType || status || collection
+            ? "No stories matched your filters"
+            : "No published stories yet"}
+        </h2>
+        <p className="mt-3 text-sm text-muted-foreground">
+          {query || genre || workType || status || collection
+            ? "Try adjusting your search or filters and browse the full library again."
+            : "Once authors publish novels, they will appear here automatically."}
+        </p>
+        {query || genre || workType || status || collection ? (
+          <div className="mt-6 flex items-center justify-center gap-3">
+            {query ? (
+              <Button variant="outline" onClick={clearQuery}>
+                Clear search
+              </Button>
+            ) : null}
+            <Button variant="outline" onClick={clearFilters}>
+              Reset filters
+            </Button>
+          </div>
+        ) : null}
       </div>
     )
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-      {stories.map((story) => (
-        <article
-          key={story.id}
-          className="flex flex-col border border-border/40 bg-card p-6 transition-all hover:border-border/80 hover:shadow-sm"
-        >
-          <div className="flex-1">
-            <div className="mb-3 flex items-start justify-between gap-2">
-              <h3 className="font-serif text-lg font-medium text-foreground line-clamp-2">
-                <Link href={`/novel/${story.id}`} className="hover:underline">
-                  {story.title}
-                </Link>
-              </h3>
-              <span className="flex-shrink-0 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-                {story.genre}
-              </span>
-            </div>
-            <p className="mb-4 text-sm text-muted-foreground">
-              by <span className="font-medium">{story.author}</span>
-            </p>
-            <p className="mb-4 text-sm text-foreground/80 line-clamp-3">
-              {story.description}
-            </p>
-          </div>
+    <>
+      <div className="mb-8 flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {(catalog?.pagination.totalItems ?? catalog?.total ?? stories.length).toLocaleString()}{" "}
+          {catalog?.pagination.totalItems === 1 || catalog?.total === 1 ? "Story" : "Stories"}
+        </p>
+        {catalog?.filters.genre ? (
+          <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+            {catalog.filters.genre}
+          </span>
+        ) : catalog?.filters.collection ? (
+          <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+            {catalog.filters.collection.replace(/-/g, " ")}
+          </span>
+        ) : null}
+      </div>
 
-          <div className="flex items-center justify-between border-t border-border/40 pt-4">
-            <div className="flex gap-4 text-xs text-muted-foreground">
-              <span>{story.chapters} chapters</span>
-              <span>{story.reads.toLocaleString()} reads</span>
-            </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href={`/novel/${story.id}`}>Read</Link>
+      <div className="mb-8 space-y-4">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setGenre(null)}
+            className={
+              !genre
+                ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+                : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            }
+          >
+            All Genres
+          </Button>
+          {(catalog?.facets.genres ?? []).slice(0, 6).map((facet) => (
+            <Button
+              key={facet.value}
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setGenre(facet.value)}
+              className={
+                genre === facet.value
+                  ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+                  : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+              }
+            >
+              {facet.label}
+            </Button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+          <span className="mr-1 self-center font-medium">Format</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setWorkType(null)}
+            className={
+              !workType
+                ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+                : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            }
+          >
+            All
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setWorkType("ORIGINAL")}
+            className={
+              workType === "ORIGINAL"
+                ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+                : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            }
+          >
+            Original
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setWorkType("TRANSLATION")}
+            className={
+              workType === "TRANSLATION"
+                ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+                : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            }
+          >
+            Translation
+          </Button>
+        </div>
+
+        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+          <span className="mr-1 self-center font-medium">Status</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setStatus(null)}
+            className={
+              !status
+                ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+                : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            }
+          >
+            All
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setStatus("Ongoing")}
+            className={
+              status === "Ongoing"
+                ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+                : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            }
+          >
+            Ongoing
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setStatus("Completed")}
+            className={
+              status === "Completed"
+                ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+                : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            }
+          >
+            Completed
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setStatus("Hiatus")}
+            className={
+              status === "Hiatus"
+                ? "rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+                : "rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            }
+          >
+            Hiatus
+          </Button>
+          {genre || workType || status || collection ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            >
+              Clear filters
+            </Button>
+          ) : null}
+        </div>
+
+        {collection ? (
+          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+            <span className="mr-1 self-center font-medium">Collection</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="rounded-none border border-black bg-black text-white shadow-none transition-none hover:bg-black hover:text-white dark:border-white dark:bg-white dark:text-black dark:hover:bg-white dark:hover:text-black"
+            >
+              {collection.replace(/-/g, " ")}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setCollection(null)}
+              className="rounded-none border border-transparent bg-transparent text-muted-foreground shadow-none transition-none hover:bg-transparent hover:text-foreground"
+            >
+              Clear collection
             </Button>
           </div>
-        </article>
-      ))}
-    </div>
+        ) : null}
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {stories.map((story) => {
+          const coverSrc = resolveNovelCoverSrc({
+            novelId: story.id,
+            coverUrl: story.coverUrl,
+            coverStorageKey: story.coverStorageKey,
+          })
+
+          return (
+            <article
+              key={story.id}
+              className="flex flex-col overflow-hidden border border-border/40 bg-card transition-all hover:border-border/80 hover:shadow-sm"
+            >
+              <Link
+                href={`/novel/${story.slug}`}
+                className="block border-b border-border/40 bg-muted/20"
+              >
+                {coverSrc ? (
+                  <img
+                    src={coverSrc}
+                    alt={`${story.title} cover`}
+                    className="aspect-[16/9] w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex aspect-[16/9] w-full items-center justify-center bg-muted/40 text-muted-foreground">
+                    <BookOpen className="h-8 w-8" />
+                  </div>
+                )}
+              </Link>
+
+              <div className="flex flex-1 flex-col p-6">
+                <div className="flex-1">
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <h3 className="line-clamp-2 font-serif text-lg font-medium text-foreground">
+                      <Link href={`/novel/${story.slug}`} className="hover:underline">
+                        {story.title}
+                      </Link>
+                    </h3>
+                    <div className="flex flex-shrink-0 flex-col items-end gap-2">
+                      <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+                        {story.genre}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {formatWorkType(story.workType)}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="mb-4 text-sm text-muted-foreground">
+                    by{" "}
+                    <span className="font-medium">
+                      {story.author.displayName ?? "Anonymous"}
+                    </span>
+                  </p>
+                  <p className="mb-4 text-xs text-muted-foreground">
+                    {story.status}
+                    {formatStoryDate(story.publishedAt) ? (
+                      <> · {formatStoryDate(story.publishedAt)}</>
+                    ) : null}
+                  </p>
+                  <p className="mb-4 line-clamp-3 text-sm text-foreground/80">
+                    {story.summary || "A new story is waiting to be explored."}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-border/40 pt-4">
+                  <div className="flex gap-4 text-xs text-muted-foreground">
+                    <span>{story.chaptersCount} chapters</span>
+                    <span>{story.readsCount.toLocaleString()} reads</span>
+                    <span>{story.bookmarksCount.toLocaleString()} saves</span>
+                  </div>
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href={`/novel/${story.slug}`}>Read</Link>
+                  </Button>
+                </div>
+              </div>
+            </article>
+          )
+        })}
+      </div>
+
+      {catalog?.pagination.hasPreviousPage || catalog?.pagination.hasNextPage ? (
+        <div className="mt-10 flex flex-col gap-3 border-t border-border/40 pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            {catalog.pagination.totalItems.toLocaleString()} Stories
+          </p>
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!catalog.pagination.hasPreviousPage}
+              onClick={() =>
+                setCursorState({
+                  cursor: catalog.pagination.previousCursor,
+                  direction: "prev",
+                })
+              }
+            >
+              Previous
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!catalog.pagination.hasNextPage}
+              onClick={() =>
+                setCursorState({
+                  cursor: catalog.pagination.nextCursor,
+                  direction: "next",
+                })
+              }
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </>
   )
 }

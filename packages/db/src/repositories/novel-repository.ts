@@ -42,14 +42,21 @@ export async function createNovelForAuthor(
     title: string
     summary: string
     genre: string
+    workType: "ORIGINAL" | "TRANSLATION"
     subgenres: string[]
     tags: string[]
     authorDisplayName: string
     translatorName: string
     status: "Ongoing" | "Completed" | "Hiatus"
     visibility: "PUBLISHED" | "HIDDEN"
+    contentWarning: string
     updateNote: string
     coverUrl: string
+    coverStorageKey?: string | null
+    coverMimeType?: string | null
+    coverOriginalName?: string | null
+    coverFileSizeBytes?: number | null
+    publishedAt?: Date | null
   }
 ) {
   const slug = await createUniqueNovelSlug(input.title)
@@ -70,14 +77,21 @@ export async function updateNovelForAuthor(
     title: string
     summary: string
     genre: string
+    workType: "ORIGINAL" | "TRANSLATION"
     subgenres: string[]
     tags: string[]
     authorDisplayName: string
     translatorName: string
     status: "Ongoing" | "Completed" | "Hiatus"
     visibility: "PUBLISHED" | "HIDDEN"
+    contentWarning: string
     updateNote: string
     coverUrl: string
+    coverStorageKey: string | null
+    coverMimeType: string | null
+    coverOriginalName: string | null
+    coverFileSizeBytes: number | null
+    publishedAt: Date | null
   }>
 ) {
   const existing = await prisma.novel.findUnique({
@@ -92,14 +106,21 @@ export async function updateNovelForAuthor(
     title: string
     summary: string
     genre: string
+    workType: "ORIGINAL" | "TRANSLATION"
     subgenres: string[]
     tags: string[]
     authorDisplayName: string
     translatorName: string
     status: "Ongoing" | "Completed" | "Hiatus"
     visibility: "PUBLISHED" | "HIDDEN"
+    contentWarning: string
     updateNote: string
     coverUrl: string
+    coverStorageKey: string | null
+    coverMimeType: string | null
+    coverOriginalName: string | null
+    coverFileSizeBytes: number | null
+    publishedAt: Date | null
     slug: string
   }> = { ...input }
 

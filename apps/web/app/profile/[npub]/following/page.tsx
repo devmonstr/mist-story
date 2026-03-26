@@ -1,109 +1,136 @@
 'use client'
 
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Users } from 'lucide-react'
-import { useState } from 'react'
-import { use } from 'react'
+import { use, useEffect, useState } from 'react'
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
-
-interface Following {
-  npub: string
-  name: string
-  bio: string
-  followers: number
-  novels: number
-}
+import { Button } from '@/components/ui/button'
+import { fetchProfileFollowing, unfollowProfile } from '@/lib/api'
+import { truncateNpub } from '@/lib/nostr-utils'
+import { useAuth } from '@/context/auth-context'
+import type { ProfileConnectionsResponse } from '@mist/shared'
+import { Loader2, Users } from 'lucide-react'
 
 export default function FollowingPage({ params }: { params: Promise<{ npub: string }> }) {
   const { npub } = use(params)
-  
-  const [following] = useState<Following[]>([
-    {
-      npub: 'nprofile1qqsrxje...',
-      name: 'Eleanor Chen',
-      bio: 'Science fiction author exploring futures where technology meets humanity.',
-      followers: 2103,
-      novels: 5,
-    },
-    {
-      npub: 'nprofile2qqstyx...',
-      name: 'Marcus Williams',
-      bio: 'Contemporary fiction and personal essays about identity and belonging.',
-      followers: 1540,
-      novels: 3,
-    },
-    {
-      npub: 'nprofile3qqsabc...',
-      name: 'Priya Patel',
-      bio: 'Fantasy worldbuilder and creative writing mentor.',
-      followers: 892,
-      novels: 4,
-    },
-    {
-      npub: 'nprofile4qqsdef...',
-      name: 'James Turner',
-      bio: 'Mystery and thriller author. New chapter every Thursday.',
-      followers: 1203,
-      novels: 6,
-    },
-    {
-      npub: 'nprofile5qqsghi...',
-      name: 'Sofia Russo',
-      bio: 'Historical fiction enthusiast and romance writer.',
-      followers: 651,
-      novels: 2,
-    },
-  ])
+  const { user } = useAuth()
+  const [data, setData] = useState<ProfileConnectionsResponse | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [pendingNpub, setPendingNpub] = useState<string | null>(null)
+
+  useEffect(() => {
+    const loadFollowing = async () => {
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        const payload = await fetchProfileFollowing(npub)
+        setData(payload)
+      } catch (loadError) {
+        const message =
+          loadError instanceof Error ? loadError.message : 'Failed to load following'
+        setError(message)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    void loadFollowing()
+  }, [npub])
+
+  const canManageFollowing = user?.npub === npub
+
+  const handleUnfollow = async (targetNpub: string) => {
+    setPendingNpub(targetNpub)
+
+    try {
+      await unfollowProfile(targetNpub)
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              users: current.users.filter((entry) => entry.npub !== targetNpub),
+            }
+          : current
+      )
+    } catch (unfollowError) {
+      console.error('Failed to unfollow profile:', unfollowError)
+    } finally {
+      setPendingNpub(null)
+    }
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
       <main className="flex-1 bg-background">
-      {/* Header */}
       <div className="border-b border-border">
         <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <Users className="h-8 w-8 text-foreground" />
             <h1 className="font-serif text-3xl font-bold text-foreground">Following</h1>
           </div>
-          <p className="mt-2 text-muted-foreground">{following.length} authors</p>
+          <p className="mt-2 text-muted-foreground">
+            {data?.users.length ?? 0} authors
+          </p>
         </div>
       </div>
 
-      {/* Following List */}
       <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="space-y-4">
-          {following.map((author) => (
-            <article
-              key={author.npub}
-              className="flex flex-col gap-4 border border-border/40 bg-card p-6 transition-all hover:border-border/80 hover:shadow-sm sm:flex-row sm:items-start sm:justify-between"
-            >
-              <div className="flex-1">
-                <h3 className="font-serif text-lg font-semibold text-foreground">
-                  <Link href={`/profile/${author.npub}`} className="hover:underline">
-                    {author.name}
-                  </Link>
-                </h3>
-                <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{author.bio}</p>
-                <div className="mt-3 flex gap-6 text-sm text-muted-foreground">
-                  <span>{author.novels} novels</span>
-                  <span>{author.followers.toLocaleString()} followers</span>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : error ? (
+          <div className="border border-destructive/30 bg-card p-6 text-destructive">
+            {error}
+          </div>
+        ) : !data || data.users.length === 0 ? (
+          <div className="border border-border/40 bg-card p-8 text-center text-muted-foreground">
+            This profile is not following anyone yet.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {data.users.map((author) => (
+              <article
+                key={author.id}
+                className="flex flex-col gap-4 border border-border/40 bg-card p-6 transition-all hover:border-border/80 hover:shadow-sm sm:flex-row sm:items-start sm:justify-between"
+              >
+                <div className="flex-1">
+                  <h3 className="font-serif text-lg font-semibold text-foreground">
+                    <Link href={`/profile/${author.npub}`} className="hover:underline">
+                      {author.displayName ?? truncateNpub(author.npub, 10)}
+                    </Link>
+                  </h3>
+                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                    {author.about ?? 'No bio yet.'}
+                  </p>
+                  <div className="mt-3 flex gap-6 text-sm text-muted-foreground">
+                    <span>{author.novels.toLocaleString()} novels</span>
+                    <span>{author.followers.toLocaleString()} followers</span>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex gap-2 sm:flex-col">
-                <Button variant="outline" className="flex-1" asChild>
-                  <Link href={`/profile/${author.npub}`}>View Profile</Link>
-                </Button>
-                <Button variant="outline" size="sm">
-                  Unfollow
-                </Button>
-              </div>
-            </article>
-          ))}
-        </div>
+                <div className="flex gap-2 sm:flex-col">
+                  <Button variant="outline" className="flex-1" asChild>
+                    <Link href={`/profile/${author.npub}`}>View Profile</Link>
+                  </Button>
+                  {canManageFollowing && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={pendingNpub === author.npub}
+                      onClick={() => void handleUnfollow(author.npub)}
+                    >
+                      {pendingNpub === author.npub ? 'Unfollowing...' : 'Unfollow'}
+                    </Button>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </div>
       </main>
       <Footer />
