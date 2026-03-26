@@ -1,4 +1,6 @@
 import { z } from "zod"
+import { nostrProfileSchema, signedNostrEventSchema } from "./auth.contracts"
+import { novelCoverUploadSchema } from "./novel.contracts"
 
 export const profileSummarySchema = z.object({
   id: z.string(),
@@ -81,6 +83,24 @@ export const myProfileResponseSchema = z.object({
   }),
 })
 
+export const updateMyProfileInputSchema = z.object({
+  profile: nostrProfileSchema,
+  signedEvent: signedNostrEventSchema.extend({
+    id: z.string(),
+    sig: z.string(),
+  }),
+})
+
+export const profileImageAssetTypeSchema = z.enum(["avatar", "banner"])
+
+export const uploadProfileImageInputSchema = z.object({
+  image: novelCoverUploadSchema,
+})
+
+export const uploadProfileImageResponseSchema = z.object({
+  url: z.string().url(),
+})
+
 export type ProfileSummaryDto = z.infer<typeof profileSummarySchema>
 export type ProfileStatsDto = z.infer<typeof profileStatsSchema>
 export type ProfileNovelDto = z.infer<typeof profileNovelSchema>
@@ -89,3 +109,7 @@ export type ProfileFollowState = z.infer<typeof profileFollowStateSchema>
 export type ProfileConnectionDto = z.infer<typeof profileConnectionSchema>
 export type ProfileConnectionsResponse = z.infer<typeof profileConnectionsResponseSchema>
 export type MyProfileResponse = z.infer<typeof myProfileResponseSchema>
+export type UpdateMyProfileInput = z.infer<typeof updateMyProfileInputSchema>
+export type ProfileImageAssetType = z.infer<typeof profileImageAssetTypeSchema>
+export type UploadProfileImageInput = z.infer<typeof uploadProfileImageInputSchema>
+export type UploadProfileImageResponse = z.infer<typeof uploadProfileImageResponseSchema>

@@ -9,6 +9,24 @@ type SignedAuthEvent = NostrEvent & {
   sig: string
 }
 
+export type PublishedNostrEvent = NostrEvent & {
+  pubkey: string
+  id: string
+  sig: string
+}
+
+export type RelayPublishResult = {
+  relayUrl: string
+  success: boolean
+  message: string | null
+}
+
+export const DEFAULT_NOSTR_PROFILE_RELAYS = [
+  "wss://relay.damus.io",
+  "wss://nos.lol",
+  "wss://relay.nostr.band",
+]
+
 hashes.hmacSha256 = (key, message) => hmac(sha256, key, message)
 hashes.sha256 = sha256
 hashes.hmacSha256Async = async (key, message) => hmac(sha256, key, message)
@@ -262,13 +280,92 @@ export async function signAuthChallengeWithNsec(
   return buildSignedEvent(createAuthEvent(pubkey, challenge), privateKeyHex)
 }
 
+function normalizeOptionalString(value: unknown) {
+  if (typeof value !== "string") {
+    return null
+  }
+
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function normalizeOptionalUrl(value: unknown) {
+  const normalized = normalizeOptionalString(value)
+  if (!normalized) {
+    return null
+  }
+
+  try {
+    return new URL(normalized).toString()
+  } catch {
+    throw new Error(`Invalid URL: ${normalized}`)
+  }
+}
+
+export function buildProfileMetadataContent(
+  profile: Partial<NostrProfile>,
+  extraMetadata: Record<string, unknown> = {}
+) {
+  const metadata: Record<string, unknown> = { ...extraMetadata }
+
+  for (const key of [
+    "name",
+    "display_name",
+    "about",
+    "picture",
+    "banner",
+    "website",
+    "nip05",
+    "lud16",
+  ]) {
+    delete metadata[key]
+  }
+
+  const name = normalizeOptionalString(profile.name)
+  const displayName = normalizeOptionalString(profile.display_name)
+  if (displayName && !name) {
+    throw new Error("`name` is required when `display_name` is set")
+  }
+
+  const about = normalizeOptionalString(profile.about)
+  const picture = normalizeOptionalUrl(profile.picture)
+  const banner = normalizeOptionalUrl(profile.banner)
+  const website = normalizeOptionalUrl(profile.website)
+  const nip05 = normalizeOptionalString(profile.nip05)
+  const lud16 = normalizeOptionalString(profile.lud16)
+
+  if (name) metadata.name = name
+  if (displayName) metadata.display_name = displayName
+  if (about) metadata.about = about
+  if (picture) metadata.picture = picture
+  if (banner) metadata.banner = banner
+  if (website) metadata.website = website
+  if (nip05) metadata.nip05 = nip05
+  if (lud16) metadata.lud16 = lud16
+
+  return metadata
+}
+
+export async function signKind0MetadataEvent(
+  metadata: Record<string, unknown>
+): Promise<PublishedNostrEvent | null> {
+  const signed = await signEvent({
+    created_at: Math.floor(Date.now() / 1000),
+    kind: 0,
+    tags: [],
+    content: JSON.stringify(metadata),
+  })
+
+  if (!signed?.id || !signed.pubkey || !signed.sig) {
+    return null
+  }
+
+  return signed as PublishedNostrEvent
+}
+
 // Fetch profile from relay (uses multiple relays for reliability)
 export async function fetchProfile(pubkey: string): Promise<NostrProfile | null> {
-  const relays = [
-    "wss://relay.damus.io",
-    "wss://nos.lol",
-    "wss://relay.nostr.band",
-  ]
+  const relays = DEFAULT_NOSTR_PROFILE_RELAYS
 
   // Try each relay
   for (const relayUrl of relays) {
@@ -284,6 +381,24 @@ export async function fetchProfile(pubkey: string): Promise<NostrProfile | null>
   }
 
   console.log("[Nostr] Profile not found on any relay")
+  return null
+}
+
+export async function fetchLatestProfileMetadata(
+  pubkey: string,
+  relays = DEFAULT_NOSTR_PROFILE_RELAYS
+): Promise<Record<string, unknown> | null> {
+  for (const relayUrl of dedupeRelayUrls(relays)) {
+    try {
+      const metadata = await fetchProfileMetadataFromRelay(relayUrl, pubkey)
+      if (metadata) {
+        return metadata
+      }
+    } catch (error) {
+      console.warn(`[Nostr] Failed to fetch raw metadata from ${relayUrl}:`, error)
+    }
+  }
+
   return null
 }
 
@@ -329,6 +444,154 @@ function fetchProfileFromRelay(relayUrl: string, pubkey: string): Promise<NostrP
       resolve(null)
     }
   })
+}
+
+function fetchProfileMetadataFromRelay(
+  relayUrl: string,
+  pubkey: string
+): Promise<Record<string, unknown> | null> {
+  return new Promise((resolve) => {
+    const ws = new WebSocket(relayUrl)
+    let settled = false
+    const finish = (value: Record<string, unknown> | null) => {
+      if (settled) {
+        return
+      }
+
+      settled = true
+      clearTimeout(timeout)
+      try {
+        ws.close()
+      } catch {
+        // ignore close failures
+      }
+      resolve(value)
+    }
+
+    const timeout = setTimeout(() => {
+      finish(null)
+    }, 8000)
+
+    ws.onopen = () => {
+      const subscriptionId = Math.random().toString(36).slice(2)
+      ws.send(
+        JSON.stringify([
+          "REQ",
+          subscriptionId,
+          {
+            kinds: [0],
+            authors: [pubkey],
+            limit: 1,
+          },
+        ])
+      )
+    }
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        if (data[0] === "EVENT") {
+          const parsed = JSON.parse(data[2].content) as unknown
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            finish(parsed as Record<string, unknown>)
+          }
+        } else if (data[0] === "EOSE") {
+          finish(null)
+        }
+      } catch {
+        // Continue waiting
+      }
+    }
+
+    ws.onerror = () => {
+      finish(null)
+    }
+  })
+}
+
+function dedupeRelayUrls(relays: string[]) {
+  const seen = new Set<string>()
+  return relays
+    .map((relayUrl) => relayUrl.trim())
+    .filter((relayUrl) => relayUrl.length > 0)
+    .filter((relayUrl) => {
+      if (seen.has(relayUrl)) {
+        return false
+      }
+
+      seen.add(relayUrl)
+      return true
+    })
+}
+
+function publishEventToRelay(
+  relayUrl: string,
+  event: PublishedNostrEvent
+): Promise<RelayPublishResult> {
+  return new Promise((resolve) => {
+    const ws = new WebSocket(relayUrl)
+    let settled = false
+
+    const finish = (success: boolean, message: string | null) => {
+      if (settled) {
+        return
+      }
+
+      settled = true
+      clearTimeout(timeout)
+      try {
+        ws.close()
+      } catch {
+        // ignore close failures
+      }
+      resolve({
+        relayUrl,
+        success,
+        message,
+      })
+    }
+
+    const timeout = setTimeout(() => {
+      finish(false, "Relay timed out before acknowledging the event")
+    }, 10000)
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify(["EVENT", event]))
+    }
+
+    ws.onmessage = (messageEvent) => {
+      try {
+        const data = JSON.parse(messageEvent.data)
+        if (Array.isArray(data) && data[0] === "OK" && data[1] === event.id) {
+          finish(Boolean(data[2]), typeof data[3] === "string" ? data[3] : null)
+        }
+      } catch {
+        // Ignore malformed relay messages while waiting for OK
+      }
+    }
+
+    ws.onerror = () => {
+      finish(false, "Failed to connect to relay")
+    }
+
+    ws.onclose = () => {
+      if (!settled) {
+        finish(false, "Relay closed before acknowledging the event")
+      }
+    }
+  })
+}
+
+export async function publishEventToRelays(
+  event: PublishedNostrEvent,
+  relayUrls: string[]
+) {
+  const relays = dedupeRelayUrls(relayUrls)
+  if (relays.length === 0) {
+    return [] as RelayPublishResult[]
+  }
+
+  return Promise.all(relays.map((relayUrl) => publishEventToRelay(relayUrl, event)))
 }
 
 // Create a NostrUser object

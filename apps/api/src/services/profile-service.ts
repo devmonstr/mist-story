@@ -15,6 +15,7 @@ import {
   listFollowingUsers,
   listPublishedProfileNovels,
   npubToHex,
+  saveUserNostrProfileSnapshot,
   toIsoString,
   unfollowUser,
   upsertUserByPubkey,
@@ -23,13 +24,21 @@ import { enqueueNotificationDispatch } from "@mist/queue"
 import { createRedisClient } from "@mist/redis"
 import type {
   MyProfileResponse,
+  ProfileImageAssetType,
   ProfileConnectionsResponse,
   ProfileFollowState,
   ProfilePageResponse,
   ProfileSummaryDto,
+  UpdateMyProfileInput,
+  UploadProfileImageInput,
 } from "@mist/shared"
+import { verifyEvent } from "nostr-tools"
 import { env } from "../config/env"
 import { HttpError } from "../utils/http-error"
+import {
+  deleteManagedProfileImageAsset,
+  uploadProfileImageAsset,
+} from "./profile-image-storage"
 import {
   ensureUserProfileHydrated,
   isUserProfileStale,
@@ -67,6 +76,70 @@ function serializeProfileSummary(user: {
     profileFetchedAt: toIsoString(user.profileFetchedAt),
     profileEventCreatedAt: toIsoString(user.profileEventCreatedAt),
   }
+}
+
+type NormalizedNostrProfileContent = {
+  name: string | null
+  display_name: string | null
+  about: string | null
+  picture: string | null
+  banner: string | null
+  website: string | null
+  nip05: string | null
+  lud16: string | null
+}
+
+function toNullableString(value: unknown) {
+  if (typeof value !== "string") {
+    return null
+  }
+
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function toNullableUrl(value: unknown) {
+  const normalized = toNullableString(value)
+  if (!normalized) {
+    return null
+  }
+
+  try {
+    return new URL(normalized).toString()
+  } catch {
+    return null
+  }
+}
+
+function normalizeNostrProfileContent(
+  input: Partial<Record<string, unknown>>
+): NormalizedNostrProfileContent {
+  return {
+    name: toNullableString(input.name),
+    display_name: toNullableString(input.display_name),
+    about: toNullableString(input.about),
+    picture: toNullableUrl(input.picture),
+    banner: toNullableUrl(input.banner),
+    website: toNullableUrl(input.website),
+    nip05: toNullableString(input.nip05),
+    lud16: toNullableString(input.lud16),
+  }
+}
+
+function sameNormalizedProfile(
+  left: NormalizedNostrProfileContent,
+  right: NormalizedNostrProfileContent
+) {
+  return (
+    left.name === right.name &&
+    left.display_name === right.display_name &&
+    left.about === right.about &&
+    left.picture === right.picture &&
+    left.banner === right.banner &&
+    left.website === right.website &&
+    left.nip05 === right.nip05 &&
+    left.lud16 === right.lud16
+  )
 }
 
 async function resolveProfileUserByNpub(npub: string) {
@@ -269,4 +342,90 @@ export async function refreshMyProfile(userId: string) {
 
   await syncUserProfileNow(user.pubkey)
   return buildMyProfileResponse(userId)
+}
+
+export async function updateMyProfile(
+  userId: string,
+  input: UpdateMyProfileInput
+) {
+  const user = await findUserById(userId)
+  if (!user) {
+    throw new HttpError(404, "User not found")
+  }
+
+  if (input.signedEvent.kind !== 0) {
+    throw new HttpError(400, "Profile updates must use Nostr kind 0 metadata events")
+  }
+
+  if (
+    input.signedEvent.pubkey !== user.pubkey ||
+    !verifyEvent(input.signedEvent as Parameters<typeof verifyEvent>[0])
+  ) {
+    throw new HttpError(401, "Invalid signed profile metadata event")
+  }
+
+  let parsedContent: Record<string, unknown>
+  try {
+    const parsed = JSON.parse(input.signedEvent.content) as unknown
+    if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+      throw new Error("Profile metadata must be an object")
+    }
+
+    parsedContent = parsed as Record<string, unknown>
+  } catch {
+    throw new HttpError(400, "Signed event content must be valid metadata JSON")
+  }
+
+  const normalizedSubmitted = normalizeNostrProfileContent(input.profile)
+  const normalizedEvent = normalizeNostrProfileContent(parsedContent)
+
+  if (normalizedSubmitted.display_name && !normalizedSubmitted.name) {
+    throw new HttpError(400, "`name` is required when `display_name` is set")
+  }
+
+  if (!sameNormalizedProfile(normalizedSubmitted, normalizedEvent)) {
+    throw new HttpError(400, "Signed event content does not match submitted profile metadata")
+  }
+
+  await saveUserNostrProfileSnapshot({
+    pubkey: user.pubkey,
+    handle: normalizedEvent.name,
+    displayName: normalizedEvent.display_name ?? normalizedEvent.name,
+    about: normalizedEvent.about,
+    avatarUrl: normalizedEvent.picture,
+    bannerUrl: normalizedEvent.banner,
+    nip05: normalizedEvent.nip05,
+    lud16: normalizedEvent.lud16,
+    website: normalizedEvent.website,
+    profileEventId: input.signedEvent.id,
+    profileEventCreatedAt: new Date(input.signedEvent.created_at * 1000),
+    profileFetchedAt: new Date(),
+  })
+
+  if (user.avatarUrl !== normalizedEvent.picture) {
+    await deleteManagedProfileImageAsset(user.avatarUrl)
+  }
+
+  if (user.bannerUrl !== normalizedEvent.banner) {
+    await deleteManagedProfileImageAsset(user.bannerUrl)
+  }
+
+  return buildMyProfileResponse(userId)
+}
+
+export async function uploadMyProfileImage(
+  userId: string,
+  assetType: ProfileImageAssetType,
+  input: UploadProfileImageInput
+) {
+  const user = await findUserById(userId)
+  if (!user) {
+    throw new HttpError(404, "User not found")
+  }
+
+  return uploadProfileImageAsset({
+    userId,
+    assetType,
+    payload: input.image,
+  })
 }
