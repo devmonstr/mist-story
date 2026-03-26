@@ -1,4 +1,5 @@
 import {
+  countChaptersForNovel,
   createChapterForNovel,
   createChapterVersionFromDraft,
   deleteChapterById,
@@ -6,7 +7,8 @@ import {
   findChapterWithNovelById,
   findNovelByIdOrSlug,
   listChaptersForNovel,
-  reorderChaptersForNovel,
+  listChaptersForNovelPage,
+  reorderChapterPageForNovel,
   serializeChapter,
   serializeChapterVersion,
   updateChapterById,
@@ -17,14 +19,62 @@ import type {
   CreateChapterInput,
   PublishChapterInput,
   ReorderChaptersInput,
+  StudioChapterListResponse,
   UpdateChapterInput,
 } from "@mist/shared"
 import { env } from "../config/env"
 import { HttpError } from "../utils/http-error"
 
 const redis = createRedisClient(env.REDIS_URL)
+const STUDIO_CHAPTER_LIST_PAGE_SIZE = 100
 
-export async function listChapters(novelId: string, currentUserId?: string) {
+function normalizeChapterPage(page: number | undefined, totalPages: number) {
+  const fallback = totalPages > 0 ? 1 : 1
+  if (!Number.isFinite(page) || !page || page < 1) {
+    return fallback
+  }
+
+  return Math.min(Math.floor(page), Math.max(totalPages, 1))
+}
+
+function buildStudioChapterList(input: {
+  totalChapters: number
+  currentPage: number
+  pageSize: number
+}): StudioChapterListResponse["chapterList"] {
+  const totalPages =
+    input.totalChapters === 0
+      ? 1
+      : Math.max(1, Math.ceil(input.totalChapters / input.pageSize))
+  const safeCurrentPage = normalizeChapterPage(input.currentPage, totalPages)
+  const visibleFrom =
+    input.totalChapters === 0 ? 0 : (safeCurrentPage - 1) * input.pageSize + 1
+  const visibleTo =
+    input.totalChapters === 0
+      ? 0
+      : Math.min(input.totalChapters, safeCurrentPage * input.pageSize)
+
+  return {
+    totalChapters: input.totalChapters,
+    maxChapterNumber: input.totalChapters,
+    currentPage: safeCurrentPage,
+    pageSize: input.pageSize,
+    totalPages,
+    visibleFrom,
+    visibleTo,
+    hasPreviousPage: safeCurrentPage > 1,
+    hasNextPage: safeCurrentPage < totalPages,
+  }
+}
+
+export async function listChapters(
+  novelId: string,
+  currentUserId?: string,
+  options?: {
+    chapterPage?: number
+    all?: boolean
+  }
+): Promise<StudioChapterListResponse> {
   const novel = await findNovelByIdOrSlug(novelId)
   if (!novel) {
     throw new HttpError(404, "Novel not found")
@@ -35,10 +85,46 @@ export async function listChapters(novelId: string, currentUserId?: string) {
     throw new HttpError(404, "Novel not found")
   }
 
-  const chapters = await listChaptersForNovel(novel.id)
-  return chapters
-    .filter((chapter) => isOwner || chapter.status === "PUBLISHED")
-    .map(serializeChapter)
+  const totalChapters = isOwner
+    ? novel.chaptersCount
+    : await countChaptersForNovel({
+        novelId: novel.id,
+        status: "PUBLISHED",
+      })
+
+  if (options?.all) {
+    const chapters = await listChaptersForNovel(novel.id)
+    const visibleChapters = chapters.filter(
+      (chapter) => isOwner || chapter.status === "PUBLISHED"
+    )
+
+    return {
+      chapters: visibleChapters.map(serializeChapter),
+      chapterList: buildStudioChapterList({
+        totalChapters: visibleChapters.length,
+        currentPage: 1,
+        pageSize: Math.max(visibleChapters.length, 1),
+      }),
+    }
+  }
+
+  const chapterList = buildStudioChapterList({
+    totalChapters,
+    currentPage: options?.chapterPage ?? 1,
+    pageSize: STUDIO_CHAPTER_LIST_PAGE_SIZE,
+  })
+
+  const chapters = await listChaptersForNovelPage({
+    novelId: novel.id,
+    page: chapterList.currentPage,
+    pageSize: chapterList.pageSize,
+    status: isOwner ? undefined : "PUBLISHED",
+  })
+
+  return {
+    chapters: chapters.map(serializeChapter),
+    chapterList,
+  }
 }
 
 export async function createChapter(novelId: string, input: CreateChapterInput) {
@@ -155,7 +241,7 @@ export async function reorderChaptersForAuthor(
   novelId: string,
   actorUserId: string,
   input: ReorderChaptersInput
-) {
+): Promise<StudioChapterListResponse> {
   const novel = await findNovelByIdOrSlug(novelId)
   if (!novel) {
     throw new HttpError(404, "Novel not found")
@@ -166,9 +252,38 @@ export async function reorderChaptersForAuthor(
   }
 
   try {
-    const chapters = await reorderChaptersForNovel(novel.id, input.orderedChapterIds)
-    return chapters.map(serializeChapter)
+    const totalPages = Math.max(
+      1,
+      Math.ceil(Math.max(novel.chaptersCount, 1) / STUDIO_CHAPTER_LIST_PAGE_SIZE)
+    )
+
+    if (input.chapterPage > totalPages) {
+      throw new HttpError(400, "Invalid chapter ordering payload")
+    }
+
+    const chapterList = buildStudioChapterList({
+      totalChapters: novel.chaptersCount,
+      currentPage: input.chapterPage,
+      pageSize: STUDIO_CHAPTER_LIST_PAGE_SIZE,
+    })
+
+    const chapters = await reorderChapterPageForNovel({
+      novelId: novel.id,
+      page: chapterList.currentPage,
+      pageSize: chapterList.pageSize,
+      totalChapters: novel.chaptersCount,
+      orderedChapterIds: input.orderedChapterIds,
+    })
+
+    return {
+      chapters: chapters.map(serializeChapter),
+      chapterList,
+    }
   } catch (error) {
+    if (error instanceof HttpError) {
+      throw error
+    }
+
     if (error instanceof Error && error.message === "Invalid chapter ordering payload") {
       throw new HttpError(400, error.message)
     }

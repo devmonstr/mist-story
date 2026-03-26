@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   closestCenter,
   DndContext,
@@ -19,7 +19,16 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { Check, GripVertical, Loader2, MoreVertical, Plus, Trash2 } from "lucide-react"
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  GripVertical,
+  Loader2,
+  MoreVertical,
+  Plus,
+  Trash2,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -30,25 +39,28 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import type { EditorChapter } from "@/lib/studio"
+import type { EditorChapter, EditorChapterList } from "@/lib/studio"
 
 type ChapterPanelMode = "browse" | "reorder"
 
 interface ChapterPanelProps {
   chapters: EditorChapter[]
+  chapterList: EditorChapterList | null
   activeChapterId: string
   deletingChapterId: string | null
+  isLoadingPage: boolean
   isPersistingOrder: boolean
   onAddChapter: () => void
   onDeleteChapter: (chapterId: string) => void
   onSelectChapter: (chapterId: string) => void
+  onOpenChapterPage: (page: number) => void
   onReorderChapters: (orderedChapterIds: string[]) => void
   onSelectionComplete?: () => void
 }
 
 interface BrowseChapterRowProps {
   chapter: EditorChapter
-  index: number
+  displayNumber: number
   isActive: boolean
   isDeleting: boolean
   onDelete: () => void
@@ -62,6 +74,12 @@ interface ReorderChapterRowProps {
   isPersistingOrder: boolean
 }
 
+function getGroupRange(page: number, pageSize: number, totalChapters: number) {
+  const start = (page - 1) * pageSize + 1
+  const end = Math.min(page * pageSize, totalChapters)
+  return { start, end }
+}
+
 function ChapterStatusBadge({ status }: { status: EditorChapter["status"] }) {
   return (
     <Badge variant={status === "PUBLISHED" ? "outline" : "secondary"} className="text-[10px]">
@@ -72,7 +90,7 @@ function ChapterStatusBadge({ status }: { status: EditorChapter["status"] }) {
 
 function BrowseChapterRow({
   chapter,
-  index,
+  displayNumber,
   isActive,
   isDeleting,
   onDelete,
@@ -102,7 +120,7 @@ function BrowseChapterRow({
             : "border-border/70 bg-background text-muted-foreground"
         }`}
       >
-        {index + 1}
+        {displayNumber.toLocaleString()}
       </div>
 
       <div className="min-w-0 flex-1">
@@ -185,7 +203,7 @@ function ReorderChapterRow({
     >
       <div className="flex items-center gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-background text-xs font-medium text-muted-foreground">
-          {index + 1}
+          {(index + 1).toLocaleString()}
         </div>
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-border/80 bg-background text-muted-foreground">
           <GripVertical className="h-4 w-4" />
@@ -211,16 +229,22 @@ function ReorderChapterRow({
 
 export function ChapterPanel({
   chapters,
+  chapterList,
   activeChapterId,
   deletingChapterId,
+  isLoadingPage,
   isPersistingOrder,
   onAddChapter,
   onDeleteChapter,
   onSelectChapter,
+  onOpenChapterPage,
   onReorderChapters,
   onSelectionComplete,
 }: ChapterPanelProps) {
   const [mode, setMode] = useState<ChapterPanelMode>("browse")
+  const [openGroup, setOpenGroup] = useState(
+    chapterList ? `group-${chapterList.currentPage}` : ""
+  )
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -233,7 +257,31 @@ export function ChapterPanel({
     })
   )
 
-  const chapterIds = useMemo(() => chapters.map((chapter) => chapter.id), [chapters])
+  useEffect(() => {
+    if (!chapterList) return
+    setOpenGroup(`group-${chapterList.currentPage}`)
+  }, [chapterList])
+
+  const totalChapters = chapterList?.totalChapters ?? chapters.length
+  const reorderChapters = useMemo(() => chapters, [chapters])
+  const chapterIds = useMemo(
+    () => reorderChapters.map((chapter) => chapter.id),
+    [reorderChapters]
+  )
+  const groups = useMemo(() => {
+    if (!chapterList) {
+      return []
+    }
+
+    return Array.from({ length: chapterList.totalPages }, (_, index) => {
+      const page = index + 1
+      return {
+        page,
+        key: `group-${page}`,
+        ...getGroupRange(page, chapterList.pageSize, chapterList.totalChapters),
+      }
+    })
+  }, [chapterList])
 
   const handleDragEnd = (event: DragEndEvent) => {
     const activeId = String(event.active.id)
@@ -243,8 +291,8 @@ export function ChapterPanel({
       return
     }
 
-    const fromIndex = chapters.findIndex((chapter) => chapter.id === activeId)
-    const toIndex = chapters.findIndex((chapter) => chapter.id === overId)
+    const fromIndex = reorderChapters.findIndex((chapter) => chapter.id === activeId)
+    const toIndex = reorderChapters.findIndex((chapter) => chapter.id === overId)
     if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) {
       return
     }
@@ -253,6 +301,14 @@ export function ChapterPanel({
     onReorderChapters(orderedChapterIds)
   }
 
+  const handleEnterReorderMode = () => {
+    setMode("reorder")
+  }
+
+  const rangeLabel = chapterList
+    ? `${chapterList.visibleFrom.toLocaleString()}-${chapterList.visibleTo.toLocaleString()}`
+    : "this group"
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-start justify-between gap-3 p-4">
@@ -260,10 +316,10 @@ export function ChapterPanel({
           <h2 className="text-sm font-medium text-foreground">Chapters</h2>
           <p className="text-xs text-muted-foreground">
             {mode === "browse"
-              ? "Open a chapter to edit it, or switch to reorder mode."
+              ? "Browse by groups so big drafts stay fast. Open a group to load its chapters."
               : isPersistingOrder
                 ? "Saving chapter order..."
-                : "Drag rows to reorder. Changes save when you drop."}
+                : `Reordering chapters ${rangeLabel}. Only this loaded group is draggable.`}
           </p>
         </div>
 
@@ -273,10 +329,11 @@ export function ChapterPanel({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setMode("reorder")}
+                onClick={handleEnterReorderMode}
                 className="h-8"
+                disabled={isLoadingPage || chapters.length <= 1}
               >
-                Reorder
+                Reorder Group
               </Button>
               <Button variant="ghost" size="icon" onClick={onAddChapter} className="h-8 w-8">
                 <Plus className="h-4 w-4" />
@@ -289,6 +346,7 @@ export function ChapterPanel({
               size="sm"
               className="h-8"
               onClick={() => setMode("browse")}
+              disabled={isPersistingOrder}
             >
               <Check className="mr-2 h-4 w-4" />
               Done
@@ -301,22 +359,102 @@ export function ChapterPanel({
 
       <div className="flex-1 overflow-y-auto p-2">
         {mode === "browse" ? (
-          <div className="space-y-2">
-            {chapters.map((chapter, index) => (
-              <BrowseChapterRow
-                key={chapter.id}
-                chapter={chapter}
-                index={index}
-                isActive={chapter.id === activeChapterId}
-                isDeleting={chapters.length <= 1 || deletingChapterId === chapter.id}
-                onSelect={() => {
-                  onSelectChapter(chapter.id)
-                  onSelectionComplete?.()
-                }}
-                onDelete={() => onDeleteChapter(chapter.id)}
-              />
-            ))}
-          </div>
+          chapterList && totalChapters > 0 ? (
+            <div className="space-y-3">
+              <p className="px-2 text-[11px] text-muted-foreground">
+                {totalChapters.toLocaleString()} chapters total. Only the open group is loaded.
+              </p>
+              {groups.map((group) => {
+                const isCurrentGroup = group.page === chapterList.currentPage
+                const isOpen = openGroup === group.key
+
+                return (
+                  <div
+                    key={group.key}
+                    className="overflow-hidden rounded-2xl border border-border/50 bg-background"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isCurrentGroup) {
+                          setOpenGroup((previous) =>
+                            previous === group.key ? "" : group.key
+                          )
+                          return
+                        }
+
+                        setOpenGroup(group.key)
+                        onOpenChapterPage(group.page)
+                      }}
+                      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Chapters {group.start.toLocaleString()}-{group.end.toLocaleString()}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Group {group.page} of {chapterList.totalPages}
+                          {isCurrentGroup ? " . current" : ""}
+                        </p>
+                      </div>
+                      {isCurrentGroup && isOpen ? (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </button>
+
+                    {isOpen ? (
+                      <div className="border-t border-border/40">
+                        {isCurrentGroup && !isLoadingPage ? (
+                          <>
+                            <div className="px-4 py-3 text-xs text-muted-foreground">
+                              Showing loaded chapters{" "}
+                              {chapterList.visibleFrom.toLocaleString()}-
+                              {chapterList.visibleTo.toLocaleString()} of{" "}
+                              {chapterList.totalChapters.toLocaleString()}
+                            </div>
+                            <div className="space-y-2 px-2 pb-2">
+                              {chapters.map((chapter, index) => (
+                                <BrowseChapterRow
+                                  key={chapter.id}
+                                  chapter={chapter}
+                                  displayNumber={chapterList.visibleFrom + index}
+                                  isActive={chapter.id === activeChapterId}
+                                  isDeleting={
+                                    totalChapters <= 1 || deletingChapterId === chapter.id
+                                  }
+                                  onSelect={() => {
+                                    onSelectChapter(chapter.id)
+                                    onSelectionComplete?.()
+                                  }}
+                                  onDelete={() => onDeleteChapter(chapter.id)}
+                                />
+                              ))}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Loading this chapter group...
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          ) : isLoadingPage ? (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Loading chapters...
+            </div>
+          ) : (
+            <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
+              No chapters yet. Create the first chapter to start writing.
+            </div>
+          )
         ) : (
           <DndContext
             sensors={sensors}
@@ -326,11 +464,17 @@ export function ChapterPanel({
           >
             <SortableContext items={chapterIds} strategy={verticalListSortingStrategy}>
               <div className="space-y-2">
-                {chapters.map((chapter, index) => (
+                {chapterList ? (
+                  <div className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+                    Reordering loaded group {rangeLabel}. Open another group to reorder that
+                    range.
+                  </div>
+                ) : null}
+                {reorderChapters.map((chapter, index) => (
                   <ReorderChapterRow
                     key={chapter.id}
                     chapter={chapter}
-                    index={index}
+                    index={(chapterList?.visibleFrom ?? 1) + index - 1}
                     isActive={chapter.id === activeChapterId}
                     isPersistingOrder={isPersistingOrder}
                   />

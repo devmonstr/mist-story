@@ -18,11 +18,20 @@ import {
 
 export const chaptersRouter = Router()
 
+function parsePositiveInt(value: unknown, fallback: number) {
+  const parsed = Number.parseInt(String(value ?? ""), 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
 chaptersRouter.get("/novels/:novelId/chapters", async (request, response, next) => {
   try {
     const payload = await listChapters(
       String(request.params.novelId),
-      response.locals.user?.id as string | undefined
+      response.locals.user?.id as string | undefined,
+      {
+        chapterPage: parsePositiveInt(request.query.chapterPage, 1),
+        all: String(request.query.all ?? "").toLowerCase() === "true",
+      }
     )
     return response.json(payload)
   } catch (error) {

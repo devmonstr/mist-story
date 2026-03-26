@@ -22,12 +22,12 @@ import type {
   PublicNovelDetailResponse,
   PublicNovelReaderResponse,
   PublishChapterInput,
-  ReorderChaptersInput,
   ReadingProgressState,
   SearchFilterType,
   SearchResponse,
   SearchSortBy,
   SignedNostrEvent,
+  StudioChapterListResponse,
   UpsertReadingProgressInput,
   UpdateChapterInput,
   UpdateNovelInput,
@@ -563,8 +563,27 @@ export function updateNovel(novelId: string, input: UpdateNovelInput) {
   })
 }
 
-export function fetchNovelChapters(novelId: string) {
-  return apiFetch<ChapterDto[]>(`/api/v1/novels/${novelId}/chapters`)
+export function fetchNovelChapters(
+  novelId: string,
+  input?: {
+    chapterPage?: number
+    all?: boolean
+  }
+) {
+  const searchParams = new URLSearchParams()
+
+  if (input?.chapterPage && input.chapterPage > 1) {
+    searchParams.set("chapterPage", String(input.chapterPage))
+  }
+  if (input?.all) {
+    searchParams.set("all", "true")
+  }
+
+  const path = searchParams.size
+    ? `/api/v1/novels/${novelId}/chapters?${searchParams.toString()}`
+    : `/api/v1/novels/${novelId}/chapters`
+
+  return apiFetch<StudioChapterListResponse>(path)
 }
 
 export function createChapter(novelId: string, input: CreateChapterInput) {
@@ -574,8 +593,14 @@ export function createChapter(novelId: string, input: CreateChapterInput) {
   })
 }
 
-export function reorderChapters(novelId: string, input: ReorderChaptersInput) {
-  return apiFetch<ChapterDto[]>(`/api/v1/novels/${novelId}/chapters/reorder`, {
+export function reorderChapters(
+  novelId: string,
+  input: {
+    chapterPage: number
+    orderedChapterIds: string[]
+  }
+) {
+  return apiFetch<StudioChapterListResponse>(`/api/v1/novels/${novelId}/chapters/reorder`, {
     method: "PUT",
     body: JSON.stringify(input),
   })
