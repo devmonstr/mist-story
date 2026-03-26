@@ -1,5 +1,10 @@
 import { Router } from "express"
-import { upsertReadingProgressInputSchema } from "@mist/shared"
+import {
+  profileImageAssetTypeSchema,
+  updateMyProfileInputSchema,
+  uploadProfileImageInputSchema,
+  upsertReadingProgressInputSchema,
+} from "@mist/shared"
 import { requireAuth } from "../middleware/require-auth"
 import { validateBody } from "../middleware/validate"
 import {
@@ -18,7 +23,12 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "../services/notification-service"
-import { getMyProfile, refreshMyProfile } from "../services/profile-service"
+import {
+  getMyProfile,
+  refreshMyProfile,
+  updateMyProfile,
+  uploadMyProfileImage,
+} from "../services/profile-service"
 
 export const meRouter = Router()
 
@@ -39,6 +49,51 @@ meRouter.post("/profile/refresh", requireAuth, async (_request, response, next) 
     return next(error)
   }
 })
+
+meRouter.put(
+  "/profile",
+  requireAuth,
+  validateBody(updateMyProfileInputSchema),
+  async (request, response, next) => {
+    try {
+      const payload = await updateMyProfile(
+        response.locals.user.id as string,
+        request.body
+      )
+      return response.json(payload)
+    } catch (error) {
+      return next(error)
+    }
+  }
+)
+
+meRouter.post(
+  "/profile/assets/:assetType",
+  requireAuth,
+  validateBody(uploadProfileImageInputSchema),
+  async (request, response, next) => {
+    try {
+      const parsedAssetType = profileImageAssetTypeSchema.safeParse(
+        String(request.params.assetType)
+      )
+
+      if (!parsedAssetType.success) {
+        return response.status(400).json({
+          error: "Invalid profile asset type",
+        })
+      }
+
+      const payload = await uploadMyProfileImage(
+        response.locals.user.id as string,
+        parsedAssetType.data,
+        request.body
+      )
+      return response.status(201).json(payload)
+    } catch (error) {
+      return next(error)
+    }
+  }
+)
 
 meRouter.get("/library", requireAuth, async (_request, response, next) => {
   try {

@@ -83,6 +83,10 @@ export type IntegrationsSettingsDto = {
   relays: RelayDto[]
 }
 
+export type UploadProfileImageResponse = {
+  url: string
+}
+
 export type CreateApiKeyResponse = {
   apiKey: ApiKeyDto
   token: string
@@ -194,6 +198,33 @@ export function fetchMyProfile() {
 export function refreshMyProfile() {
   return apiFetch<MyProfileResponse>("/api/v1/me/profile/refresh", {
     method: "POST",
+  })
+}
+
+export function publishMyProfile(input: {
+  profile: NostrUser["profile"]
+  signedEvent: SignedNostrEvent & { id: string; sig: string }
+}) {
+  return apiFetch<MyProfileResponse>("/api/v1/me/profile", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  })
+}
+
+export function uploadMyProfileImage(
+  assetType: "avatar" | "banner",
+  input: {
+    image: {
+      dataUrl: string
+      fileName: string
+      mimeType: string
+      fileSizeBytes: number
+    }
+  }
+) {
+  return apiFetch<UploadProfileImageResponse>(`/api/v1/me/profile/assets/${assetType}`, {
+    method: "POST",
+    body: JSON.stringify(input),
   })
 }
 
