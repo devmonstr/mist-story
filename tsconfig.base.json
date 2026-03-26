@@ -19,7 +19,9 @@
       "@mist/redis": ["packages/redis/src/index.ts"],
       "@mist/redis/*": ["packages/redis/src/*"],
       "@mist/queue": ["packages/queue/src/index.ts"],
-      "@mist/queue/*": ["packages/queue/src/*"]
+      "@mist/queue/*": ["packages/queue/src/*"],
+      "@mist/media": ["packages/media/src/index.ts"],
+      "@mist/media/*": ["packages/media/src/*"]
     }
   }
 }

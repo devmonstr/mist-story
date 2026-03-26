@@ -20,7 +20,10 @@ import {
   unfollowUser,
   upsertUserByPubkey,
 } from "@mist/db"
-import { enqueueNotificationDispatch } from "@mist/queue"
+import {
+  enqueueNotificationDispatch,
+  enqueueProfileImageOptimize,
+} from "@mist/queue"
 import { createRedisClient } from "@mist/redis"
 import type {
   MyProfileResponse,
@@ -31,6 +34,7 @@ import type {
   ProfileSummaryDto,
   UpdateMyProfileInput,
   UploadProfileImageInput,
+  UploadProfileImageResponse,
 } from "@mist/shared"
 import { verifyEvent } from "nostr-tools"
 import { env } from "../config/env"
@@ -417,15 +421,42 @@ export async function uploadMyProfileImage(
   userId: string,
   assetType: ProfileImageAssetType,
   input: UploadProfileImageInput
-) {
+): Promise<UploadProfileImageResponse> {
   const user = await findUserById(userId)
   if (!user) {
     throw new HttpError(404, "User not found")
   }
 
-  return uploadProfileImageAsset({
+  const uploadedAsset = await uploadProfileImageAsset({
     userId,
     assetType,
     payload: input.image,
   })
+
+  try {
+    await enqueueProfileImageOptimize(redis, {
+      userId,
+      assetType,
+      assetId: uploadedAsset.assetId,
+      sourceKey: uploadedAsset.sourceKey,
+      publicKey: uploadedAsset.publicKey,
+      sourceMimeType: input.image.mimeType,
+    })
+
+    return {
+      url: uploadedAsset.url,
+      optimization: {
+        state: "queued",
+      },
+    }
+  } catch (error) {
+    console.error("[profile-image] failed to enqueue optimization job", error)
+
+    return {
+      url: uploadedAsset.url,
+      optimization: {
+        state: "skipped",
+      },
+    }
+  }
 }

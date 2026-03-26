@@ -85,6 +85,9 @@ export type IntegrationsSettingsDto = {
 
 export type UploadProfileImageResponse = {
   url: string
+  optimization: {
+    state: "queued" | "skipped"
+  }
 }
 
 export type CreateApiKeyResponse = {

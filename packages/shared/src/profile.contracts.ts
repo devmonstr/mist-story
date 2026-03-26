@@ -99,6 +99,9 @@ export const uploadProfileImageInputSchema = z.object({
 
 export const uploadProfileImageResponseSchema = z.object({
   url: z.string().url(),
+  optimization: z.object({
+    state: z.enum(["queued", "skipped"]),
+  }),
 })
 
 export type ProfileSummaryDto = z.infer<typeof profileSummarySchema>

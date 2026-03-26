@@ -1,11 +1,10 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
-  Image as ImageIcon,
   Loader2,
   Plus,
   Sparkles,
@@ -32,6 +31,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  NovelCoverImageField,
+  type NovelCoverImageSelection,
+} from "@/components/novel/novel-cover-image-field"
 import { useRequireAuth } from "@/hooks/use-require-auth"
 import { createNovel } from "@/lib/api"
 import {
@@ -64,13 +67,9 @@ const WORK_TYPE_OPTIONS = [
   { value: "TRANSLATION", label: "Translation" },
 ] as const
 
-const MAX_COVER_FILE_SIZE_BYTES = 5 * 1024 * 1024
-const ALLOWED_COVER_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
-
 export default function NewNovelPage() {
   const { user, isLoading, isAuthenticated } = useRequireAuth()
   const router = useRouter()
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState<StudioNovelFormData>({
     title: "",
     description: "",
@@ -88,6 +87,7 @@ export default function NewNovelPage() {
   const [tagInput, setTagInput] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [coverError, setCoverError] = useState<string | null>(null)
   const [errors, setErrors] = useState<Partial<Record<keyof StudioNovelFormData, string>>>({})
 
   const updateField = <K extends keyof StudioNovelFormData>(
@@ -106,6 +106,13 @@ export default function NewNovelPage() {
       updateField("tags", [...formData.tags, trimmedTag])
       setTagInput("")
     }
+  }
+
+  const handleCoverImageChange = (coverImage: NovelCoverImageSelection | null) => {
+    updateField("coverImage", coverImage?.dataUrl ?? null)
+    updateField("coverImageName", coverImage?.fileName ?? null)
+    updateField("coverImageMimeType", coverImage?.mimeType ?? null)
+    updateField("coverImageSizeBytes", coverImage?.fileSizeBytes ?? null)
   }
 
   const validateForm = () => {
@@ -146,47 +153,6 @@ export default function NewNovelPage() {
       )
     } finally {
       setIsSubmitting(false)
-    }
-  }
-
-  const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    if (!ALLOWED_COVER_MIME_TYPES.has(file.type)) {
-      setErrors((prev) => ({
-        ...prev,
-        coverImage: "Please choose a JPG, PNG, or WEBP image",
-      }))
-      return
-    }
-
-    if (file.size > MAX_COVER_FILE_SIZE_BYTES) {
-      setErrors((prev) => ({
-        ...prev,
-        coverImage: "Cover image must be 5MB or smaller",
-      }))
-      return
-    }
-
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      updateField("coverImage", event.target?.result as string)
-      updateField("coverImageName", file.name)
-      updateField("coverImageMimeType", file.type)
-      updateField("coverImageSizeBytes", file.size)
-    }
-    reader.readAsDataURL(file)
-  }
-
-  const handleRemoveCoverImage = () => {
-    updateField("coverImage", null)
-    updateField("coverImageName", null)
-    updateField("coverImageMimeType", null)
-    updateField("coverImageSizeBytes", null)
-    setErrors((prev) => ({ ...prev, coverImage: undefined }))
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
     }
   }
 
@@ -391,77 +357,13 @@ export default function NewNovelPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Cover Image</CardTitle>
-                <CardDescription>Upload a cover for your novel.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                  {formData.coverImage ? (
-                    <div className="relative">
-                      <img
-                        src={formData.coverImage}
-                        alt="Cover preview"
-                        className="h-52 w-36 rounded-xl border border-border/50 object-cover shadow-sm"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleRemoveCoverImage}
-                        className="absolute -right-2 -top-2 rounded-full bg-destructive p-1 text-destructive-foreground transition-colors hover:bg-destructive/90"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex h-52 w-36 shrink-0 flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/60 px-4 text-center transition-colors hover:border-foreground/40 hover:bg-muted"
-                    >
-                      <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                      <span className="mt-3 text-sm font-medium text-foreground">
-                        Click to upload
-                      </span>
-                      <span className="mt-1 text-xs text-muted-foreground">
-                        600x900px recommended
-                      </span>
-                    </button>
-                  )}
-
-                  <div className="flex-1 space-y-3">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleCoverImageChange}
-                      className="hidden"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      {formData.coverImage ? "Replace image" : "Upload cover"}
-                    </Button>
-                    {errors.coverImage && (
-                      <p className="text-xs text-destructive">{errors.coverImage}</p>
-                    )}
-                    <div className="space-y-1 text-xs text-muted-foreground">
-                      <p>Recommended ratio: 2:3 portrait</p>
-                      <p>Supported formats: JPG, PNG, WEBP</p>
-                      <p>Maximum file size: 5MB</p>
-                      <p>Uploads go to Cloudflare R2 and the asset metadata is saved with the novel.</p>
-                      {formData.coverImageName ? (
-                        <p className="text-foreground/80">
-                          Selected: {formData.coverImageName}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <NovelCoverImageField
+              coverImage={formData.coverImage}
+              coverImageName={formData.coverImageName}
+              error={coverError}
+              onErrorChange={setCoverError}
+              onChange={handleCoverImageChange}
+            />
 
             <Card>
               <CardHeader>
