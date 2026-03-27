@@ -29,7 +29,6 @@ import { useTheme } from 'next-themes'
 import { useToast } from '@/hooks/use-toast'
 import { useRequireAuth } from '@/hooks/use-require-auth'
 import {
-  createApiKey,
   createRelay,
   deleteRelay,
   fetchAppearanceSettings,
@@ -39,13 +38,14 @@ import {
   fetchSecuritySettings,
   publishMyProfile,
   refreshMyProfile as refreshMyProfileFromApi,
-  revokeApiKey,
   uploadMyProfileImage,
+  updateRelay,
   updateAppearanceSettings,
   updateNotificationSettings,
   type AppearanceSettingsDto,
   type IntegrationsSettingsDto,
   type NotificationSettingsDto,
+  type RelayDto,
   type SecuritySettingsDto,
   type UploadProfileImageResponse,
 } from '@/lib/api'
@@ -63,7 +63,6 @@ import {
   Bell,
   Camera,
   Check,
-  Code,
   Copy,
   ImagePlus,
   KeyRound,
@@ -71,7 +70,11 @@ import {
   Lock,
   LogOut,
   Palette,
+  Pencil,
+  Plus,
+  RadioTower,
   Shield,
+  Trash2,
   User,
   X,
   ZoomIn,
@@ -151,6 +154,12 @@ type ProfileImageEditorDragState = {
   startOffset: ProfileImageEditorOffset
 }
 
+type RelayFormState = {
+  url: string
+  read: boolean
+  write: boolean
+}
+
 const EMPTY_PROFILE_FORM: ProfileFormState = {
   name: '',
   displayName: '',
@@ -160,6 +169,12 @@ const EMPTY_PROFILE_FORM: ProfileFormState = {
   website: '',
   nip05: '',
   lud16: '',
+}
+
+const EMPTY_RELAY_FORM: RelayFormState = {
+  url: '',
+  read: true,
+  write: true,
 }
 
 const MAX_PROFILE_IMAGE_FILE_SIZE_BYTES = 5 * 1024 * 1024
@@ -290,6 +305,53 @@ function buildProfileImageOptimizationToastPayload(
   return {
     title: 'Images uploaded',
     description: `Background optimization queued for ${queuedCount} image${queuedCount === 1 ? '' : 's'} and skipped for ${skippedCount}.`,
+  }
+}
+
+function createRelayFormState(relay?: RelayDto): RelayFormState {
+  return {
+    url: relay?.url ?? EMPTY_RELAY_FORM.url,
+    read: relay?.read ?? EMPTY_RELAY_FORM.read,
+    write: relay?.write ?? EMPTY_RELAY_FORM.write,
+  }
+}
+
+function isRelayFormValid(form: RelayFormState) {
+  return form.url.trim().length > 0 && (form.read || form.write)
+}
+
+function hasRelayFormChanges(relay: RelayDto, form: RelayFormState) {
+  return (
+    relay.url !== form.url.trim() ||
+    relay.read !== form.read ||
+    relay.write !== form.write
+  )
+}
+
+function getConfiguredRelayUrls(relays: RelayDto[], mode: 'read' | 'write') {
+  return Array.from(
+    new Set(
+      relays
+        .filter((relay) => (mode === 'read' ? relay.read : relay.write))
+        .map((relay) => relay.url.trim())
+        .filter((relayUrl) => relayUrl.length > 0)
+    )
+  )
+}
+
+function getEffectiveRelayDetails(relays: RelayDto[], mode: 'read' | 'write') {
+  const configured = getConfiguredRelayUrls(relays, mode)
+
+  if (configured.length > 0) {
+    return {
+      source: 'custom' as const,
+      urls: configured,
+    }
+  }
+
+  return {
+    source: 'fallback' as const,
+    urls: DEFAULT_NOSTR_PROFILE_RELAYS,
   }
 }
 
@@ -475,13 +537,10 @@ export default function SettingsPage() {
   const [integrationsLoading, setIntegrationsLoading] = useState(false)
   const [integrationsError, setIntegrationsError] = useState<string | null>(null)
   const [integrationsLoaded, setIntegrationsLoaded] = useState(false)
-  const [apiKeyName, setApiKeyName] = useState('')
-  const [relayUrl, setRelayUrl] = useState('')
-  const [relayRead, setRelayRead] = useState(true)
-  const [relayWrite, setRelayWrite] = useState(false)
-  const [isCreatingApiKey, setIsCreatingApiKey] = useState(false)
-  const [isCreatingRelay, setIsCreatingRelay] = useState(false)
-  const [creatingApiKeyResult, setCreatingApiKeyResult] = useState<{ name: string; token: string } | null>(null)
+  const [relayForm, setRelayForm] = useState<RelayFormState>(EMPTY_RELAY_FORM)
+  const [editingRelayId, setEditingRelayId] = useState<string | null>(null)
+  const [isSavingRelayForm, setIsSavingRelayForm] = useState(false)
+  const [relayActionId, setRelayActionId] = useState<string | null>(null)
   const [copiedValue, setCopiedValue] = useState<string | null>(null)
 
   const copyTimerRef = useRef<number | null>(null)
@@ -523,13 +582,11 @@ export default function SettingsPage() {
 
   const resolveProfileRelayUrls = useCallback(async (mode: 'read' | 'write') => {
     const settings = await ensureIntegrationsSettings()
-    const configured = settings?.relays
-      .filter((relay) => (mode === 'read' ? relay.read : relay.write))
-      .map((relay) => relay.url.trim())
-      .filter((relayUrl) => relayUrl.length > 0)
+    const relays = settings?.relays ?? []
+    const effective = getEffectiveRelayDetails(relays, mode)
 
-    if (configured && configured.length > 0) {
-      return Array.from(new Set(configured))
+    if (effective.urls.length > 0) {
+      return effective.urls
     }
 
     return DEFAULT_NOSTR_PROFILE_RELAYS
@@ -1120,77 +1177,130 @@ export default function SettingsPage() {
     })
   }
 
-  const handleCreateApiKey = async () => {
-    const name = apiKeyName.trim()
-    if (!name) {
-      setIntegrationsError('API key name is required')
-      return
-    }
-
-    setIsCreatingApiKey(true)
+  const resetRelayForm = () => {
+    setRelayForm(EMPTY_RELAY_FORM)
+    setEditingRelayId(null)
     setIntegrationsError(null)
-
-    try {
-      const payload = await createApiKey({ name })
-      setCreatingApiKeyResult({ name: payload.apiKey.name, token: payload.token })
-      setApiKeyName('')
-      setIntegrationsSettings((current) =>
-        current
-          ? {
-              ...current,
-              apiKeys: [payload.apiKey, ...current.apiKeys],
-            }
-          : {
-              apiKeys: [payload.apiKey],
-              relays: [],
-            }
-      )
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create API key'
-      setIntegrationsError(message)
-    } finally {
-      setIsCreatingApiKey(false)
-    }
   }
 
-  const handleRevokeApiKey = async (apiKeyId: string) => {
-    setIntegrationsError(null)
-
-    try {
-      await revokeApiKey(apiKeyId)
-      setIntegrationsSettings((current) =>
-        current
-          ? {
-              ...current,
-              apiKeys: current.apiKeys.filter((apiKey) => apiKey.id !== apiKeyId),
-            }
-          : current
-      )
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to revoke API key'
-      setIntegrationsError(message)
-    }
-  }
-
-  const handleCreateRelay = async () => {
-    const url = relayUrl.trim()
+  const handleSaveRelay = async () => {
+    const url = relayForm.url.trim()
     if (!url) {
       setIntegrationsError('Relay URL is required')
       return
     }
 
-    setIsCreatingRelay(true)
+    if (!relayForm.read && !relayForm.write) {
+      setIntegrationsError('Enable read or write for this relay')
+      return
+    }
+
+    setIsSavingRelayForm(true)
+    setIntegrationsError(null)
+
+    try {
+      const payload = editingRelayId
+        ? await updateRelay(editingRelayId, {
+            url,
+            read: relayForm.read,
+            write: relayForm.write,
+          })
+        : await createRelay({
+            url,
+            read: relayForm.read,
+            write: relayForm.write,
+          })
+
+      resetRelayForm()
+      setIntegrationsSettings((current) => {
+        if (!current) {
+          return {
+            apiKeys: [],
+            relays: [payload],
+          }
+        }
+
+        if (editingRelayId) {
+          return {
+            ...current,
+            relays: current.relays.map((relay) => (relay.id === editingRelayId ? payload : relay)),
+          }
+        }
+
+        return {
+          ...current,
+          relays: [payload, ...current.relays],
+        }
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save relay'
+      setIntegrationsError(message)
+    } finally {
+      setIsSavingRelayForm(false)
+    }
+  }
+
+  const handleEditRelay = (relay: RelayDto) => {
+    setIntegrationsError(null)
+    setEditingRelayId(relay.id)
+    setRelayForm(createRelayFormState(relay))
+  }
+
+  const handleToggleRelayRole = async (
+    relay: RelayDto,
+    mode: 'read' | 'write',
+    checked: boolean
+  ) => {
+    const nextRelay = {
+      ...relay,
+      read: mode === 'read' ? checked : relay.read,
+      write: mode === 'write' ? checked : relay.write,
+    }
+
+    if (!nextRelay.read && !nextRelay.write) {
+      setIntegrationsError('Enable read or write for this relay')
+      return
+    }
+
+    setRelayActionId(relay.id)
+    setIntegrationsError(null)
+
+    try {
+      const payload = await updateRelay(relay.id, {
+        url: relay.url,
+        read: nextRelay.read,
+        write: nextRelay.write,
+      })
+      setIntegrationsSettings((current) =>
+        current
+          ? {
+              ...current,
+              relays: current.relays.map((item) => (item.id === relay.id ? payload : item)),
+            }
+          : current
+      )
+
+      if (editingRelayId === relay.id) {
+        setRelayForm(createRelayFormState(payload))
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update relay'
+      setIntegrationsError(message)
+    } finally {
+      setRelayActionId(null)
+    }
+  }
+
+  const handleAddRecommendedRelay = async (url: string) => {
+    setRelayActionId(url)
     setIntegrationsError(null)
 
     try {
       const payload = await createRelay({
         url,
-        read: relayRead,
-        write: relayWrite,
+        read: true,
+        write: true,
       })
-      setRelayUrl('')
-      setRelayRead(true)
-      setRelayWrite(false)
       setIntegrationsSettings((current) =>
         current
           ? {
@@ -1203,14 +1313,15 @@ export default function SettingsPage() {
             }
       )
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to save relay'
+      const message = error instanceof Error ? error.message : 'Failed to add relay'
       setIntegrationsError(message)
     } finally {
-      setIsCreatingRelay(false)
+      setRelayActionId(null)
     }
   }
 
   const handleDeleteRelay = async (relayId: string) => {
+    setRelayActionId(relayId)
     setIntegrationsError(null)
 
     try {
@@ -1223,9 +1334,15 @@ export default function SettingsPage() {
             }
           : current
       )
+
+      if (editingRelayId === relayId) {
+        resetRelayForm()
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to remove relay'
       setIntegrationsError(message)
+    } finally {
+      setRelayActionId(null)
     }
   }
 
@@ -1234,7 +1351,7 @@ export default function SettingsPage() {
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'security', label: 'Security', icon: Lock },
-    { id: 'api', label: 'API & Integration', icon: Code },
+    { id: 'api', label: 'Nostr Relays', icon: RadioTower },
   ]
 
   if (isLoading) {
@@ -1252,6 +1369,28 @@ export default function SettingsPage() {
   if (!isAuthenticated) {
     return null
   }
+
+  const configuredRelays = integrationsSettings?.relays ?? []
+  const sortedConfiguredRelays = [...configuredRelays].sort((left, right) =>
+    right.updatedAt.localeCompare(left.updatedAt)
+  )
+  const editingRelay = editingRelayId
+    ? configuredRelays.find((relay) => relay.id === editingRelayId) ?? null
+    : null
+  const configuredReadRelays = getConfiguredRelayUrls(configuredRelays, 'read')
+  const configuredWriteRelays = getConfiguredRelayUrls(configuredRelays, 'write')
+  const effectiveReadRelays = getEffectiveRelayDetails(configuredRelays, 'read')
+  const effectiveWriteRelays = getEffectiveRelayDetails(configuredRelays, 'write')
+  const effectiveReadSource =
+    effectiveReadRelays.source === 'custom' ? 'Custom relays' : 'Built-in fallback'
+  const effectiveWriteSource =
+    effectiveWriteRelays.source === 'custom' ? 'Custom relays' : 'Built-in fallback'
+  const recommendedRelayUrls = DEFAULT_NOSTR_PROFILE_RELAYS.filter(
+    (relayUrl) => !configuredRelays.some((relay) => relay.url === relayUrl)
+  )
+  const relayFormHasChanges = editingRelay ? hasRelayFormChanges(editingRelay, relayForm) : true
+  const relayFormSubmitDisabled =
+    isSavingRelayForm || !isRelayFormValid(relayForm) || (editingRelay ? !relayFormHasChanges : false)
 
   const activeProfileImageEditorConfig = pendingProfileImageEdit
     ? PROFILE_IMAGE_EDITOR_CONFIG[pendingProfileImageEdit.assetType]
@@ -2080,176 +2219,348 @@ export default function SettingsPage() {
             {/* API Settings */}
             {activeTab === 'api' && (
               <div>
-                <h2 className="font-serif text-2xl font-bold text-foreground mb-6">API & Integration</h2>
+                <h2 className="font-serif text-2xl font-bold text-foreground mb-6">Nostr Relays</h2>
                 {integrationsLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
-                ) : integrationsError ? (
-                  <div className="rounded border border-destructive/30 bg-card p-6 text-destructive">
-                    {integrationsError}
-                  </div>
                 ) : integrationsSettings ? (
                   <div className="space-y-6">
-                    {creatingApiKeyResult && (
-                      <div className="rounded border border-primary/30 bg-primary/5 p-6">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                          <div>
-                            <h3 className="font-medium text-foreground">API key created</h3>
-                            <p className="text-sm text-muted-foreground">
-                              This token is shown once. Copy it now and store it securely.
-                            </p>
-                          </div>
-                          <Button variant="ghost" size="sm" onClick={() => setCreatingApiKeyResult(null)}>
-                            Dismiss
-                          </Button>
-                        </div>
-                        <div className="mt-4 space-y-3">
-                          <div className="rounded border border-border/40 bg-background p-4">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                              {creatingApiKeyResult.name}
-                            </p>
-                            <code className="mt-2 block break-all rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
-                              {creatingApiKeyResult.token}
-                            </code>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => void handleCopy(creatingApiKeyResult.token)}
-                          >
-                            {copiedValue === creatingApiKeyResult.token ? 'Copied' : 'Copy token'}
-                          </Button>
-                        </div>
+                    {integrationsError && (
+                      <div className="rounded border border-destructive/30 bg-card p-6 text-destructive">
+                        {integrationsError}
                       </div>
                     )}
 
-                    <div className="grid gap-6 xl:grid-cols-2">
-                      <div className="rounded border border-border/40 bg-card p-6">
-                        <h3 className="font-medium text-foreground mb-2">API Keys</h3>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Generate and revoke tokens for external integrations.
-                        </p>
+                    <div className="space-y-6">
+                        <div className="rounded border border-border/40 bg-card p-6">
+                          <div className="flex items-start gap-3">
+                            <RadioTower className="mt-0.5 h-5 w-5 text-foreground" />
+                            <div className="flex-1 space-y-4">
+                              <div>
+                                <h3 className="font-medium text-foreground">Relay Manager</h3>
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                  Control the Nostr relays Mist Story uses to refresh and broadcast your
+                                  profile metadata.
+                                </p>
+                              </div>
 
-                        <div className="flex flex-col gap-3 sm:flex-row">
-                          <Input
-                            value={apiKeyName}
-                            onChange={(event) => setApiKeyName(event.target.value)}
-                            placeholder="New API key name"
-                          />
-                          <Button
-                            onClick={() => void handleCreateApiKey()}
-                            disabled={isCreatingApiKey || !apiKeyName.trim()}
-                          >
-                            {isCreatingApiKey ? 'Creating...' : 'Create Key'}
-                          </Button>
-                        </div>
+                              <div className="grid gap-3 sm:grid-cols-3">
+                                <div className="rounded border border-border/40 bg-background p-3">
+                                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                                    Configured
+                                  </p>
+                                  <p className="mt-2 text-2xl font-semibold text-foreground">
+                                    {configuredRelays.length}
+                                  </p>
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    Saved relays in your account
+                                  </p>
+                                </div>
 
-                        <div className="mt-5 space-y-3">
-                          {integrationsSettings.apiKeys.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No API keys yet.</p>
-                          ) : (
-                            integrationsSettings.apiKeys.map((apiKey) => (
-                              <div key={apiKey.id} className="rounded border border-border/40 bg-background p-4">
-                                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                  <div className="space-y-1">
-                                    <p className="font-medium text-foreground">{apiKey.name}</p>
-                                    <p className="text-xs text-muted-foreground">{apiKey.keyPreview}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      Created {formatDateTime(apiKey.createdAt)}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      Last used {formatDateTime(apiKey.lastUsedAt)}
-                                    </p>
-                                    {apiKey.revokedAt && (
-                                      <p className="text-xs text-destructive">
-                                        Revoked {formatDateTime(apiKey.revokedAt)}
-                                      </p>
-                                    )}
-                                  </div>
-                                  {!apiKey.revokedAt ? (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => void handleRevokeApiKey(apiKey.id)}
-                                    >
-                                      Revoke
-                                    </Button>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">Revoked</span>
-                                  )}
+                                <div className="rounded border border-border/40 bg-background p-3">
+                                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                                    Read In Use
+                                  </p>
+                                  <p className="mt-2 text-2xl font-semibold text-foreground">
+                                    {effectiveReadRelays.urls.length}
+                                  </p>
+                                  <p className="mt-1 text-xs text-muted-foreground">{effectiveReadSource}</p>
+                                </div>
+
+                                <div className="rounded border border-border/40 bg-background p-3">
+                                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                                    Write In Use
+                                  </p>
+                                  <p className="mt-2 text-2xl font-semibold text-foreground">
+                                    {effectiveWriteRelays.urls.length}
+                                  </p>
+                                  <p className="mt-1 text-xs text-muted-foreground">{effectiveWriteSource}</p>
                                 </div>
                               </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
 
-                      <div className="rounded border border-border/40 bg-card p-6">
-                        <h3 className="font-medium text-foreground mb-2">Relay Configuration</h3>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Manage the relays used for content syncing.
-                        </p>
-
-                        <div className="space-y-4">
-                          <Input
-                            value={relayUrl}
-                            onChange={(event) => setRelayUrl(event.target.value)}
-                            placeholder="wss://relay.example.com"
-                          />
-                          <div className="flex flex-wrap gap-4">
-                            <label className="flex items-center gap-2 text-sm text-foreground">
-                              <Switch checked={relayRead} onCheckedChange={(checked) => setRelayRead(Boolean(checked))} />
-                              Read
-                            </label>
-                            <label className="flex items-center gap-2 text-sm text-foreground">
-                              <Switch checked={relayWrite} onCheckedChange={(checked) => setRelayWrite(Boolean(checked))} />
-                              Write
-                            </label>
-                          </div>
-                          <Button onClick={() => void handleCreateRelay()} disabled={isCreatingRelay || !relayUrl.trim()}>
-                            {isCreatingRelay ? 'Saving...' : 'Add Relay'}
-                          </Button>
-                        </div>
-
-                        <div className="mt-5 space-y-3">
-                          {integrationsSettings.relays.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No relays configured yet.</p>
-                          ) : (
-                            integrationsSettings.relays.map((relay) => (
-                              <div key={relay.id} className="rounded border border-border/40 bg-background p-4">
-                                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                  <div className="space-y-2">
-                                    <p className="font-medium text-foreground break-all">{relay.url}</p>
-                                    <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                      <span className="rounded bg-muted px-2 py-1">
-                                        {relay.read ? 'Read enabled' : 'Read disabled'}
-                                      </span>
-                                      <span className="rounded bg-muted px-2 py-1">
-                                        {relay.write ? 'Write enabled' : 'Write disabled'}
-                                      </span>
+                              <div className="grid gap-3 lg:grid-cols-2">
+                                <div className="rounded border border-border/40 bg-background p-4">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm font-medium text-foreground">Effective read relays</p>
+                                      <p className="mt-1 text-xs text-muted-foreground">{effectiveReadSource}</p>
                                     </div>
-                                    <p className="text-xs text-muted-foreground">
-                                      Added {formatDateTime(relay.createdAt)}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      Updated {formatDateTime(relay.updatedAt)}
+                                    <span className="rounded border border-border/50 px-2 py-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                                      Read
+                                    </span>
+                                  </div>
+                                  <div className="mt-3 space-y-2">
+                                    {effectiveReadRelays.urls.map((relayUrl) => (
+                                      <div
+                                        key={`effective-read-${relayUrl}`}
+                                        className="rounded border border-border/40 px-3 py-2 text-xs text-foreground break-all"
+                                      >
+                                        {relayUrl}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div className="rounded border border-border/40 bg-background p-4">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm font-medium text-foreground">Effective write relays</p>
+                                      <p className="mt-1 text-xs text-muted-foreground">{effectiveWriteSource}</p>
+                                    </div>
+                                    <span className="rounded border border-border/50 px-2 py-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                                      Write
+                                    </span>
+                                  </div>
+                                  <div className="mt-3 space-y-2">
+                                    {effectiveWriteRelays.urls.map((relayUrl) => (
+                                      <div
+                                        key={`effective-write-${relayUrl}`}
+                                        className="rounded border border-border/40 px-3 py-2 text-xs text-foreground break-all"
+                                      >
+                                        {relayUrl}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <p className="text-xs text-muted-foreground">
+                                If no custom read or write relays are enabled for a mode, Mist Story falls
+                                back to the built-in profile relays above.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded border border-border/40 bg-card p-6">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <h3 className="font-medium text-foreground">
+                                {editingRelay ? 'Edit relay' : 'Add relay'}
+                              </h3>
+                              <p className="mt-2 text-sm text-muted-foreground">
+                                Save a relay once, then fine-tune read and write roles any time.
+                              </p>
+                            </div>
+                            {editingRelay ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={resetRelayForm}
+                                disabled={isSavingRelayForm}
+                              >
+                                Cancel edit
+                              </Button>
+                            ) : null}
+                          </div>
+
+                          <div className="mt-5 space-y-4">
+                            <Input
+                              value={relayForm.url}
+                              onChange={(event) =>
+                                setRelayForm((current) => ({ ...current, url: event.target.value }))
+                              }
+                              placeholder="wss://relay.example.com"
+                            />
+                            <div className="flex flex-wrap gap-4">
+                              <label className="flex items-center gap-2 text-sm text-foreground">
+                                <Switch
+                                  checked={relayForm.read}
+                                  onCheckedChange={(checked) =>
+                                    setRelayForm((current) => ({ ...current, read: Boolean(checked) }))
+                                  }
+                                />
+                                Read
+                              </label>
+                              <label className="flex items-center gap-2 text-sm text-foreground">
+                                <Switch
+                                  checked={relayForm.write}
+                                  onCheckedChange={(checked) =>
+                                    setRelayForm((current) => ({ ...current, write: Boolean(checked) }))
+                                  }
+                                />
+                                Write
+                              </label>
+                            </div>
+                            <div className="flex flex-wrap gap-3">
+                              <Button
+                                onClick={() => void handleSaveRelay()}
+                                disabled={relayFormSubmitDisabled}
+                              >
+                                {isSavingRelayForm
+                                  ? 'Saving...'
+                                  : editingRelay
+                                    ? 'Save relay'
+                                    : 'Add relay'}
+                              </Button>
+                              <p className="self-center text-xs text-muted-foreground">
+                                Relay URLs must start with <code>ws://</code> or <code>wss://</code>.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded border border-border/40 bg-card p-6">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <h3 className="font-medium text-foreground">Configured relays</h3>
+                              <p className="mt-2 text-sm text-muted-foreground">
+                                Update roles inline, edit the URL, or remove relays you no longer use.
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Read enabled: {configuredReadRelays.length} · Write enabled: {configuredWriteRelays.length}
+                              </p>
+                            </div>
+                            <span className="rounded border border-border/50 px-2 py-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                              {configuredRelays.length} saved
+                            </span>
+                          </div>
+
+                          <div className="mt-5 space-y-3">
+                            {configuredRelays.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">
+                                No custom relays yet. Add one below or start from the recommended list.
+                              </p>
+                            ) : (
+                              sortedConfiguredRelays.map((relay) => {
+                                const isBusy = relayActionId === relay.id
+
+                                return (
+                                  <div
+                                    key={relay.id}
+                                    className="rounded border border-border/40 bg-background p-4"
+                                  >
+                                    <div className="flex flex-col gap-4">
+                                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                        <div className="space-y-2">
+                                          <p className="font-medium text-foreground break-all">{relay.url}</p>
+                                          <div className="flex flex-wrap gap-2 text-xs">
+                                            <span className="rounded border border-border/50 px-2 py-1 text-muted-foreground">
+                                              {relay.read ? 'Read enabled' : 'Read disabled'}
+                                            </span>
+                                            <span className="rounded border border-border/50 px-2 py-1 text-muted-foreground">
+                                              {relay.write ? 'Write enabled' : 'Write disabled'}
+                                            </span>
+                                          </div>
+                                          <p className="text-xs text-muted-foreground">
+                                            Updated {formatDateTime(relay.updatedAt)}
+                                          </p>
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-2">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="gap-2"
+                                            onClick={() => handleEditRelay(relay)}
+                                            disabled={isBusy || isSavingRelayForm}
+                                          >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                            Edit
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="gap-2"
+                                            onClick={() => void handleDeleteRelay(relay.id)}
+                                            disabled={isBusy || isSavingRelayForm}
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                            Remove
+                                          </Button>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex flex-col gap-3 border-t border-border/40 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                                        <div className="flex flex-wrap gap-4">
+                                          <label className="flex items-center gap-2 text-sm text-foreground">
+                                            <Switch
+                                              checked={relay.read}
+                                              disabled={isBusy || isSavingRelayForm}
+                                              onCheckedChange={(checked) =>
+                                                void handleToggleRelayRole(relay, 'read', Boolean(checked))
+                                              }
+                                            />
+                                            Read
+                                          </label>
+                                          <label className="flex items-center gap-2 text-sm text-foreground">
+                                            <Switch
+                                              checked={relay.write}
+                                              disabled={isBusy || isSavingRelayForm}
+                                              onCheckedChange={(checked) =>
+                                                void handleToggleRelayRole(relay, 'write', Boolean(checked))
+                                              }
+                                            />
+                                            Write
+                                          </label>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                          {editingRelayId === relay.id
+                                            ? 'Editing in the relay form above.'
+                                            : 'Toggle roles here for quick updates.'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              })
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="rounded border border-border/40 bg-card p-6">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <h3 className="font-medium text-foreground">Recommended profile relays</h3>
+                              <p className="mt-2 text-sm text-muted-foreground">
+                                Quick-add the default relays Mist Story falls back to for profile refresh and
+                                publish.
+                              </p>
+                            </div>
+                            <span className="rounded border border-border/50 px-2 py-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                              Defaults
+                            </span>
+                          </div>
+
+                          <div className="mt-5 space-y-3">
+                            {recommendedRelayUrls.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">
+                                All recommended relays are already configured.
+                              </p>
+                            ) : (
+                              recommendedRelayUrls.map((relayUrl) => (
+                                <div
+                                  key={relayUrl}
+                                  className="flex flex-col gap-3 rounded border border-border/40 bg-background p-4 sm:flex-row sm:items-center sm:justify-between"
+                                >
+                                  <div>
+                                    <p className="font-medium text-foreground break-all">{relayUrl}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                      Adds this relay with both read and write enabled.
                                     </p>
                                   </div>
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => void handleDeleteRelay(relay.id)}
+                                    className="gap-2"
+                                    onClick={() => void handleAddRecommendedRelay(relayUrl)}
+                                    disabled={relayActionId === relayUrl || isSavingRelayForm}
                                   >
-                                    Remove
+                                    <Plus className="h-3.5 w-3.5" />
+                                    {relayActionId === relayUrl ? 'Adding...' : 'Add relay'}
                                   </Button>
                                 </div>
-                              </div>
-                            ))
-                          )}
+                              ))
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
+                  </div>
+                ) : integrationsError ? (
+                  <div className="rounded border border-destructive/30 bg-card p-6 text-destructive">
+                    {integrationsError}
                   </div>
                 ) : null}
               </div>

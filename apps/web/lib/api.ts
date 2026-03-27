@@ -281,6 +281,16 @@ export function createRelay(input: { url: string; read: boolean; write: boolean 
   })
 }
 
+export function updateRelay(
+  relayId: string,
+  input: { url: string; read: boolean; write: boolean }
+) {
+  return apiFetch<RelayDto>(`/api/v1/me/settings/relays/${relayId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  })
+}
+
 export function deleteRelay(relayId: string) {
   return apiFetch<void>(`/api/v1/me/settings/relays/${relayId}`, {
     method: "DELETE",

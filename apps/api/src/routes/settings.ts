@@ -4,6 +4,7 @@ import {
   createApiKeyInputSchema,
   createRelayInputSchema,
   notificationSettingsSchema,
+  updateRelayInputSchema,
 } from "@mist/shared"
 import { requireAuth } from "../middleware/require-auth"
 import { validateBody } from "../middleware/validate"
@@ -16,6 +17,7 @@ import {
   getNotificationSettings,
   getSecuritySettings,
   revokeApiKey,
+  updateRelay,
   updateAppearanceSettings,
   updateNotificationSettings,
 } from "../services/settings-service"
@@ -130,6 +132,23 @@ settingsRouter.post(
         request.body
       )
       return response.status(201).json(payload)
+    } catch (error) {
+      return next(error)
+    }
+  }
+)
+
+settingsRouter.patch(
+  "/relays/:relayId",
+  validateBody(updateRelayInputSchema),
+  async (request, response, next) => {
+    try {
+      const payload = await updateRelay(
+        response.locals.user.id as string,
+        String(request.params.relayId),
+        request.body
+      )
+      return response.json(payload)
     } catch (error) {
       return next(error)
     }
