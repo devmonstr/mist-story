@@ -695,7 +695,7 @@ export default function NovelEditorPage() {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        <aside className="hidden w-64 shrink-0 border-r border-border/40 lg:block">
+        <aside className="hidden w-72 shrink-0 border-r border-border/40 lg:block">
           <ChapterPanel
             chapters={chapters}
             chapterList={chapterList}
