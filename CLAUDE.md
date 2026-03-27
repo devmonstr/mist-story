@@ -9,6 +9,7 @@ This file provides guidance to Claude Code and similar coding assistants when wo
 - `apps/api` - Express.js API
 - `apps/worker` - BullMQ worker
 - `packages/db` - Prisma/PostgreSQL access
+- `packages/media` - Cloudflare R2 media helpers and image processing
 - `packages/redis` - Redis helpers and key namespaces
 - `packages/queue` - BullMQ queue contracts and producers
 - `packages/shared` - shared Zod schemas, DTOs, and env parsing
@@ -36,6 +37,7 @@ apps/
 
 packages/
   db/
+  media/
   queue/
   redis/
   shared/
@@ -46,6 +48,7 @@ packages/
 - Frontend talks to the backend through REST endpoints under `/api/v1`
 - Auth uses Nostr challenge/verify and Redis-backed HTTP-only sessions
 - PostgreSQL is accessed through Prisma in `packages/db`
+- Cloudflare R2 media uploads and image processing helpers live in `packages/media`
 - Redis is used for session storage, cache keys, and BullMQ connections
 - Background jobs currently include chapter publishing and notification dispatch
 
@@ -61,6 +64,7 @@ packages/
 
 - Prefer `pnpm` over `npm`
 - Keep shared contracts in `packages/shared`
+- Keep reusable storage and image-processing logic in `packages/media`
 - Do not access Prisma directly from `apps/web`
 - Keep queue names and payloads in `packages/queue`
 - Preserve user changes already present in the worktree

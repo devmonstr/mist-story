@@ -43,6 +43,7 @@ Mist Story is a `pnpm` monorepo with these working areas:
 | `apps/api` | Express API under `/api/v1` | auth/session flow, REST behavior, uploads, orchestration |
 | `apps/worker` | BullMQ background jobs | publish jobs, notifications, profile sync |
 | `packages/db` | Prisma schema and repositories | schema, query behavior, search prep, persistence |
+| `packages/media` | Cloudflare R2 helpers and image processing | upload flows, object keys, cache headers, optimization |
 | `packages/queue` | queue contracts and producers | payload shapes and job producers |
 | `packages/redis` | Redis helpers and key namespaces | sessions, cache keys, queue connections |
 | `packages/shared` | shared contracts and env parsing | DTO drift, env expectations, cross-app compatibility |
@@ -65,6 +66,7 @@ Project-scoped Codex agents now live under `.codex/agents/`, with shared agent s
 | `mist_web_builder` | workspace-write | `gpt-5.4` medium | `apps/web/**` | UI work, client flows, studio UX, app-router behavior |
 | `mist_api_builder` | workspace-write | `gpt-5.4` medium | `apps/api/**` | routes, middleware, auth/session server logic, service behavior |
 | `mist_data_builder` | workspace-write | `gpt-5.4` high | `packages/db/**`, `packages/shared/**`, `schema.prisma` | schema work, repositories, shared contracts, env definitions |
+| `mist_media_builder` | workspace-write | `gpt-5.4` medium | `packages/media/**` | Cloudflare R2 helpers, image processing, media storage behavior |
 | `mist_jobs_builder` | workspace-write | `gpt-5.4` medium | `apps/worker/**`, `packages/queue/**`, `packages/redis/**` | BullMQ, queue payloads, Redis-backed async behavior |
 | `mist_reviewer` | read-only | `gpt-5.4` high | review only | correctness, regression, security, contract drift, missing tests |
 
@@ -106,7 +108,7 @@ Use for features that touch one UI surface plus one or two backend layers.
 Recommended agents:
 
 - `mist_architect`
-- one or more of `mist_web_builder`, `mist_api_builder`, `mist_data_builder`, `mist_jobs_builder`
+- one or more of `mist_web_builder`, `mist_api_builder`, `mist_data_builder`, `mist_media_builder`, `mist_jobs_builder`
 - `mist_reviewer`
 
 Codex prompt starter:
@@ -115,7 +117,8 @@ Codex prompt starter:
 Use subagents for this task. First spawn mist_architect to map impact, split the work,
 and assign file ownership. Then spawn mist_web_builder for apps/web changes and
 mist_api_builder for apps/api changes. Keep packages/shared and schema files under
-mist_data_builder if they need to change. Wait for the write agents, then run
+mist_data_builder if they need to change. Use mist_media_builder for packages/media
+or Cloudflare R2 image pipeline work. Wait for the write agents, then run
 mist_reviewer and summarize the outcome plus residual risk.
 ```
 
@@ -154,7 +157,26 @@ Ownership rule:
 - `mist_jobs_builder` owns `apps/worker/**`, `packages/queue/**`, and `packages/redis/**`
 - `mist_data_builder` owns queue payload contract changes only if they live in shared or DB-owned files
 
-### 4. PR review team
+### 4. Media and image pipeline team
+
+Use for profile images, cover uploads, R2 object lifecycle, or image optimization work.
+
+Recommended agents:
+
+- `mist_architect`
+- `mist_api_builder`
+- `mist_media_builder`
+- `mist_jobs_builder` if a worker touches optimization or async cleanup
+- `mist_data_builder` only if shared media contracts or env definitions change
+- `mist_reviewer`
+
+Ownership rule:
+
+- `mist_media_builder` owns `packages/media/**`
+- `mist_api_builder` owns upload endpoints and request validation in `apps/api/**`
+- `mist_jobs_builder` owns background image optimization or cleanup in `apps/worker/**`, `packages/queue/**`, and `packages/redis/**`
+
+### 5. PR review team
 
 Use when you want maximum signal with minimal edit risk.
 
@@ -172,7 +194,7 @@ spawn mist_reviewer to find correctness, auth/session, queue, and test risks, wa
 both, then summarize findings by severity with file references.
 ```
 
-### 5. Bug hunt with competing hypotheses
+### 6. Bug hunt with competing hypotheses
 
 This is the place where Claude teams can outperform Codex subagents because teammate-to-teammate debate matters.
 
@@ -199,6 +221,7 @@ Use this matrix before spawning writers:
 | `apps/api/**` | `mist_api_builder` |
 | `apps/worker/**` | `mist_jobs_builder` |
 | `packages/db/**` | `mist_data_builder` |
+| `packages/media/**` | `mist_media_builder` |
 | `packages/shared/**` | `mist_data_builder` |
 | `packages/queue/**` | `mist_jobs_builder` |
 | `packages/redis/**` | `mist_jobs_builder` |

@@ -6,6 +6,7 @@ This repository is a `pnpm` monorepo with:
 - `apps/api`: Express API
 - `apps/worker`: BullMQ workers
 - `packages/db`: Prisma + PostgreSQL access
+- `packages/media`: Cloudflare R2 media helpers and image processing
 - `packages/redis`: Redis helpers
 - `packages/queue`: BullMQ contracts and queue helpers
 - `packages/shared`: Shared Zod contracts and env parsing
