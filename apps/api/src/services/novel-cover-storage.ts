@@ -15,6 +15,32 @@ const ALLOWED_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp
 
 let r2Client: S3Client | null = null
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null
+}
+
+function isMissingR2ObjectError(error: unknown) {
+  const record = asRecord(error)
+  if (!record) {
+    return false
+  }
+
+  const code = record.Code
+  if (code === "NoSuchKey" || code === "NotFound") {
+    return true
+  }
+
+  const name = record.name
+  if (name === "NoSuchKey" || name === "NotFound") {
+    return true
+  }
+
+  const metadata = asRecord(record.$metadata)
+  return metadata?.httpStatusCode === 404
+}
+
 function getR2Client() {
   if (r2Client) {
     return r2Client
@@ -165,10 +191,18 @@ export async function getNovelCoverAsset(coverStorageKey: string) {
   const { bucketName } = getBucketName()
   const client = getR2Client()
 
-  return client.send(
-    new GetObjectCommand({
-      Bucket: bucketName,
-      Key: coverStorageKey,
-    })
-  )
+  try {
+    return await client.send(
+      new GetObjectCommand({
+        Bucket: bucketName,
+        Key: coverStorageKey,
+      })
+    )
+  } catch (error) {
+    if (isMissingR2ObjectError(error)) {
+      return null
+    }
+
+    throw error
+  }
 }
