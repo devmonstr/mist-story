@@ -2,6 +2,7 @@ import {
   createApiKeyForUser,
   createRelayForUser,
   deleteRelayForUser,
+  findRelayByIdForUser,
   findUserById,
   getNotificationPreferencesForUser,
   getOrCreateUserSetting,
@@ -11,6 +12,7 @@ import {
   listRelaysForUser,
   revokeApiKeyForUser,
   updateUserSetting,
+  updateRelayForUser,
   setNotificationPreferencesForUser,
 } from "@mist/db"
 import type {
@@ -21,6 +23,7 @@ import type {
   IntegrationSettings,
   NotificationSettings,
   SecuritySettings,
+  UpdateRelayInput,
 } from "@mist/shared"
 import { HttpError } from "../utils/http-error"
 
@@ -32,6 +35,16 @@ const SETTINGS_NOTIFICATION_TYPES = [
   ...COMMENT_TYPES,
   ...FOLLOW_TYPES,
 ] as const
+
+function isPrismaUniqueConstraintError(error: unknown): error is { code: string } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string" &&
+    error.code === "P2002"
+  )
+}
 
 function toTheme(theme: "LIGHT" | "DARK" | "SYSTEM"): AppearanceSettings["theme"] {
   return theme.toLowerCase() as AppearanceSettings["theme"]
@@ -201,12 +214,64 @@ export async function revokeApiKey(userId: string, apiKeyId: string) {
 }
 
 export async function createRelay(userId: string, input: CreateRelayInput) {
-  const relay = await createRelayForUser({
-    userId,
-    url: input.url,
-    read: input.read,
-    write: input.write,
-  })
+  let relay
+
+  try {
+    relay = await createRelayForUser({
+      userId,
+      url: input.url,
+      read: input.read,
+      write: input.write,
+    })
+  } catch (error) {
+    if (isPrismaUniqueConstraintError(error)) {
+      throw new HttpError(409, "You already have a relay with this URL")
+    }
+
+    throw error
+  }
+
+  return {
+    id: relay.id,
+    url: relay.url,
+    read: relay.read,
+    write: relay.write,
+    createdAt: relay.createdAt.toISOString(),
+    updatedAt: relay.updatedAt.toISOString(),
+  }
+}
+
+export async function updateRelay(
+  userId: string,
+  relayId: string,
+  input: UpdateRelayInput
+) {
+  const existing = await findRelayByIdForUser(userId, relayId)
+  if (!existing) {
+    throw new HttpError(404, "Relay not found")
+  }
+
+  let relay
+
+  try {
+    relay = await updateRelayForUser({
+      userId,
+      relayId,
+      url: input.url,
+      read: input.read,
+      write: input.write,
+    })
+  } catch (error) {
+    if (isPrismaUniqueConstraintError(error)) {
+      throw new HttpError(409, "You already have a relay with this URL")
+    }
+
+    throw error
+  }
+
+  if (!relay) {
+    throw new HttpError(404, "Relay not found")
+  }
 
   return {
     id: relay.id,

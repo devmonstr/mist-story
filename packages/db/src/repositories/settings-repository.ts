@@ -141,15 +141,38 @@ export async function createRelayForUser(input: {
   read: boolean
   write: boolean
 }) {
-  return prisma.userRelay.upsert({
+  return prisma.userRelay.create({
+    data: input,
+  })
+}
+
+export async function findRelayByIdForUser(userId: string, relayId: string) {
+  return prisma.userRelay.findFirst({
     where: {
-      userId_url: {
-        userId: input.userId,
-        url: input.url,
-      },
+      id: relayId,
+      userId,
     },
-    create: input,
-    update: {
+  })
+}
+
+export async function updateRelayForUser(input: {
+  userId: string
+  relayId: string
+  url: string
+  read: boolean
+  write: boolean
+}) {
+  const existing = await findRelayByIdForUser(input.userId, input.relayId)
+  if (!existing) {
+    return null
+  }
+
+  return prisma.userRelay.update({
+    where: {
+      id: input.relayId,
+    },
+    data: {
+      url: input.url,
       read: input.read,
       write: input.write,
     },
