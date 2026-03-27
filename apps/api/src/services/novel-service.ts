@@ -73,7 +73,7 @@ export async function streamNovelCover(
 
   if (novel.coverStorageKey) {
     const object = await getNovelCoverAsset(novel.coverStorageKey)
-    if (!object.Body) {
+    if (!object?.Body) {
       throw new HttpError(404, "Novel cover not found")
     }
 
