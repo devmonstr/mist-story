@@ -20,6 +20,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import {
+  ArrowUpDown,
   Check,
   ChevronDown,
   ChevronRight,
@@ -82,7 +83,10 @@ function getGroupRange(page: number, pageSize: number, totalChapters: number) {
 
 function ChapterStatusBadge({ status }: { status: EditorChapter["status"] }) {
   return (
-    <Badge variant={status === "PUBLISHED" ? "outline" : "secondary"} className="text-[10px]">
+    <Badge
+      variant={status === "PUBLISHED" ? "outline" : "secondary"}
+      className="h-5 rounded-none px-1.5 text-[10px] font-medium"
+    >
       {status === "PUBLISHED" ? "Published" : "Draft"}
     </Badge>
   )
@@ -107,17 +111,17 @@ function BrowseChapterRow({
           onSelect()
         }
       }}
-      className={`group flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+      className={`group flex items-center gap-3 border border-transparent px-3 py-2.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
         isActive
-          ? "border-foreground/15 bg-muted shadow-sm"
-          : "border-transparent hover:border-border/70 hover:bg-muted/50"
+          ? "border-primary/25 bg-accent/35"
+          : "hover:border-border/50"
       }`}
     >
       <div
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-xs font-medium ${
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-none border text-xs font-medium ${
           isActive
-            ? "border-foreground/15 bg-background text-foreground"
-            : "border-border/70 bg-background text-muted-foreground"
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-border/70 text-muted-foreground"
         }`}
       >
         {displayNumber.toLocaleString()}
@@ -125,9 +129,18 @@ function BrowseChapterRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <p className="truncate text-sm font-medium text-foreground">{chapter.title}</p>
+          <p
+            className={`truncate text-sm font-medium ${
+              isActive ? "text-primary" : "text-foreground"
+            }`}
+          >
+            {chapter.title}
+          </p>
           {isActive ? (
-            <Badge variant="outline" className="hidden text-[10px] sm:inline-flex">
+            <Badge
+              variant="default"
+              className="hidden h-5 rounded-none px-1.5 text-[10px] sm:inline-flex"
+            >
               Current
             </Badge>
           ) : null}
@@ -193,26 +206,41 @@ function ReorderChapterRow({
       }}
       {...attributes}
       {...listeners}
-      className={`touch-none rounded-xl border px-3 py-3 transition-shadow ${
+      className={`touch-none border border-transparent px-3 py-2.5 transition-colors ${
         isDragging
-          ? "z-10 border-foreground/15 bg-card shadow-xl ring-1 ring-border"
+          ? "z-10 border-border shadow-sm"
           : isActive
-            ? "border-foreground/15 bg-muted"
-            : "border-border/60 bg-background hover:border-border hover:bg-muted/35"
+            ? "border-primary/25 bg-accent/35"
+            : "hover:border-border/50"
       } ${isPersistingOrder ? "cursor-progress opacity-70" : "cursor-grab active:cursor-grabbing"}`}
     >
       <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-background text-xs font-medium text-muted-foreground">
+        <div
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-none border text-xs font-medium ${
+            isActive
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border/70 text-muted-foreground"
+          }`}
+        >
           {(index + 1).toLocaleString()}
         </div>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-border/80 bg-background text-muted-foreground">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-none border border-dashed border-border/80 text-muted-foreground">
           <GripVertical className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-medium text-foreground">{chapter.title}</p>
+            <p
+              className={`truncate text-sm font-medium ${
+                isActive ? "text-primary" : "text-foreground"
+              }`}
+            >
+              {chapter.title}
+            </p>
             {isActive ? (
-              <Badge variant="outline" className="hidden text-[10px] sm:inline-flex">
+              <Badge
+                variant="default"
+                className="hidden h-5 rounded-none px-1.5 text-[10px] sm:inline-flex"
+              >
                 Current
               </Badge>
             ) : null}
@@ -311,40 +339,58 @@ export function ChapterPanel({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-start justify-between gap-3 p-4">
-        <div className="space-y-1">
-          <h2 className="text-sm font-medium text-foreground">Chapters</h2>
-          <p className="text-xs text-muted-foreground">
+      <div className="border-b border-border/50 px-4 py-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold tracking-[0.01em] text-foreground">
+              Chapters
+            </h2>
+            <Badge variant="outline" className="rounded-none px-2 py-0 text-[10px]">
+              {totalChapters.toLocaleString()}
+            </Badge>
+          </div>
+          <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
             {mode === "browse"
-              ? "Browse by groups so big drafts stay fast. Open a group to load its chapters."
+              ? "Grouped browse keeps large drafts responsive. Open any range below to focus there."
               : isPersistingOrder
-                ? "Saving chapter order..."
+                ? "Saving this chapter group..."
                 : `Reordering chapters ${rangeLabel}. Only this loaded group is draggable.`}
           </p>
+          {chapterList ? (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Loaded {rangeLabel} of {totalChapters.toLocaleString()} chapters
+            </p>
+          ) : null}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="mt-4 flex items-center gap-2">
           {mode === "browse" ? (
             <>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={handleEnterReorderMode}
-                className="h-8"
+                className="h-9 flex-1 justify-center rounded-none"
                 disabled={isLoadingPage || chapters.length <= 1}
               >
+                <ArrowUpDown className="mr-2 h-4 w-4" />
                 Reorder Group
               </Button>
-              <Button variant="ghost" size="icon" onClick={onAddChapter} className="h-8 w-8">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={onAddChapter}
+                className="h-9 w-9 rounded-none"
+              >
                 <Plus className="h-4 w-4" />
                 <span className="sr-only">Add chapter</span>
               </Button>
             </>
           ) : (
             <Button
-              variant="default"
+              variant="outline"
               size="sm"
-              className="h-8"
+              className="h-9 flex-1 rounded-none"
               onClick={() => setMode("browse")}
               disabled={isPersistingOrder}
             >
@@ -357,11 +403,11 @@ export function ChapterPanel({
 
       <Separator />
 
-      <div className="flex-1 overflow-y-auto p-2">
+      <div className="flex-1 overflow-y-auto px-3 py-2">
         {mode === "browse" ? (
           chapterList && totalChapters > 0 ? (
-            <div className="space-y-3">
-              <p className="px-2 text-[11px] text-muted-foreground">
+            <div className="space-y-2.5">
+              <p className="px-1 text-[11px] text-muted-foreground">
                 {totalChapters.toLocaleString()} chapters total. Only the open group is loaded.
               </p>
               {groups.map((group) => {
@@ -371,7 +417,7 @@ export function ChapterPanel({
                 return (
                   <div
                     key={group.key}
-                    className="overflow-hidden rounded-2xl border border-border/50 bg-background"
+                    className="overflow-hidden border border-border/50"
                   >
                     <button
                       type="button"
@@ -386,15 +432,15 @@ export function ChapterPanel({
                         setOpenGroup(group.key)
                         onOpenChapterPage(group.page)
                       }}
-                      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors"
                     >
                       <div>
-                        <p className="text-sm font-medium text-foreground">
+                        <p className="text-sm font-semibold text-foreground">
                           Chapters {group.start.toLocaleString()}-{group.end.toLocaleString()}
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="mt-1 text-[11px] text-muted-foreground">
                           Group {group.page} of {chapterList.totalPages}
-                          {isCurrentGroup ? " . current" : ""}
+                          {isCurrentGroup ? " . Current" : ""}
                         </p>
                       </div>
                       {isCurrentGroup && isOpen ? (
@@ -408,13 +454,13 @@ export function ChapterPanel({
                       <div className="border-t border-border/40">
                         {isCurrentGroup && !isLoadingPage ? (
                           <>
-                            <div className="px-4 py-3 text-xs text-muted-foreground">
+                            <div className="px-4 py-2.5 text-[11px] text-muted-foreground">
                               Showing loaded chapters{" "}
                               {chapterList.visibleFrom.toLocaleString()}-
                               {chapterList.visibleTo.toLocaleString()} of{" "}
                               {chapterList.totalChapters.toLocaleString()}
                             </div>
-                            <div className="space-y-2 px-2 pb-2">
+                            <div className="space-y-1 px-2 pb-2">
                               {chapters.map((chapter, index) => (
                                 <BrowseChapterRow
                                   key={chapter.id}
@@ -463,9 +509,9 @@ export function ChapterPanel({
             onDragEnd={handleDragEnd}
           >
             <SortableContext items={chapterIds} strategy={verticalListSortingStrategy}>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {chapterList ? (
-                  <div className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+                  <div className="border border-border/50 px-3 py-2.5 text-[11px] leading-5 text-muted-foreground">
                     Reordering loaded group {rangeLabel}. Open another group to reorder that
                     range.
                   </div>
