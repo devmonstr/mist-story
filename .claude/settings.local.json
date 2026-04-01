@@ -2,13 +2,22 @@
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
-  "teammateMode": "in-process",
   "permissions": {
     "allow": [
       "Bash(git branch:*)",
       "Bash(git push:*)",
       "Bash(git checkout:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(dir:*)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "sequentialthinking",
+    "chrome-devtools",
+    "web-search-prime",
+    "zai-mcp-server",
+    "web-reader",
+    "context7"
+  ],
+  "teammateMode": "in-process"
 }
