@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { Navbar } from "@/components/navbar"
+import { NovelCard } from "@/components/novel/novel-card"
 import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
 import { BookOpen, Bookmark, Loader2, Trash2 } from 'lucide-react'
@@ -123,102 +124,84 @@ export default function BookmarksPage() {
                   coverUrl: novel.coverUrl,
                   coverStorageKey: novel.coverStorageKey,
                 })
+                const novelHref = `/novel/${novel.novelId}`
 
                 return (
-                  <article
+                  <NovelCard
                     key={novel.novelId}
-                    className="flex h-full flex-col border border-border bg-card transition-colors hover:border-foreground"
-                  >
-                    <div className="relative border-b border-border bg-muted">
-                      <Link href={`/novel/${novel.novelId}`} className="block">
-                        {coverSrc ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={coverSrc}
-                            alt={novel.title}
-                            className="aspect-[3/4] w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex aspect-[3/4] w-full items-center justify-center bg-muted">
-                            <BookOpen className="h-10 w-10 text-muted-foreground" />
-                          </div>
-                        )}
-                      </Link>
-                      <button
-                        type="button"
-                        className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center border border-border bg-background text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-                        disabled={isSubmitting}
-                        onClick={() => void handleRemove(novel.novelId)}
-                        title="Remove from bookmarks"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    <div className="flex flex-1 flex-col p-4">
-                      <div className="mb-3 flex items-start justify-between gap-3">
-                        <span className="border border-border px-2 py-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                    href={novelHref}
+                    title={novel.title}
+                    coverSrc={coverSrc}
+                    coverAlt={novel.title}
+                    authorName={novel.authorDisplayName || "Unknown author"}
+                    summary={novel.summary}
+                    titleAside={
+                      <>
+                        <span className="border border-border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground">
                           {novel.genre}
                         </span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-[11px] text-muted-foreground">
                           {novel.progressPercent > 0
                             ? `${novel.progressPercent}% read`
                             : "Not started"}
                         </span>
-                      </div>
-
-                      <h3 className="font-serif text-lg font-semibold text-foreground">
-                        <Link href={`/novel/${novel.novelId}`} className="hover:underline">
-                          {novel.title}
-                        </Link>
-                      </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        By {novel.authorDisplayName || "Unknown author"}
-                      </p>
-                      <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-foreground">
-                        {novel.summary}
-                      </p>
-
-                      <div className="mt-4 space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
-                        <p>{formatRelativeUpdate(novel.latestChapterUpdatedAt)}</p>
-                        <p>Saved {formatSavedDate(novel.savedAt)}</p>
-                      </div>
-
-                      {novel.progressPercent > 0 ? (
-                        <div className="mt-4">
-                          <div className="mb-1 flex items-center justify-between">
-                            <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                              Progress
-                            </span>
-                            <span className="text-xs font-medium text-foreground">
-                              {novel.progressPercent}%
-                            </span>
-                          </div>
-                          <div className="h-2 w-full overflow-hidden bg-muted">
-                            <div
-                              className="h-full bg-foreground transition-all"
-                              style={{ width: `${novel.progressPercent}%` }}
-                            />
-                          </div>
+                      </>
+                    }
+                    afterSummary={
+                      <>
+                        <div className="space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
+                          <p>{formatRelativeUpdate(novel.latestChapterUpdatedAt)}</p>
+                          <p>Saved {formatSavedDate(novel.savedAt)}</p>
                         </div>
-                      ) : null}
 
+                        {novel.progressPercent > 0 ? (
+                          <div className="mt-4">
+                            <div className="mb-1 flex items-center justify-between">
+                              <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                                Progress
+                              </span>
+                              <span className="text-xs font-medium text-foreground">
+                                {novel.progressPercent}%
+                              </span>
+                            </div>
+                            <div className="h-2 w-full overflow-hidden bg-muted">
+                              <div
+                                className="h-full bg-foreground transition-all"
+                                style={{ width: `${novel.progressPercent}%` }}
+                              />
+                            </div>
+                          </div>
+                        ) : null}
+                      </>
+                    }
+                    footer={
                       <div className="mt-4">
                         <Button size="sm" className="w-full" asChild>
                           <Link
                             href={
                               novel.currentChapterNumber
                                 ? `/novel/${novel.novelId}/read/${novel.currentChapterNumber}`
-                                : `/novel/${novel.novelId}`
+                                : novelHref
                             }
                           >
                             <BookOpen className="mr-2 h-4 w-4" />
-                            {novel.currentChapterNumber ? 'Continue' : 'Open Story'}
+                            {novel.currentChapterNumber ? "Continue" : "Open Story"}
                           </Link>
                         </Button>
                       </div>
-                    </div>
-                  </article>
+                    }
+                    coverOverlay={
+                      <button
+                        type="button"
+                        className="flex h-9 w-9 items-center justify-center border border-border bg-background text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={isSubmitting}
+                        onClick={() => void handleRemove(novel.novelId)}
+                        title="Remove from bookmarks"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    }
+                  />
                 )
               })}
             </div>

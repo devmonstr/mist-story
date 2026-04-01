@@ -8,11 +8,12 @@ import type {
   SearchFilterType,
   SearchSortBy,
 } from "@mist/shared"
+import { NovelCard } from "@/components/novel/novel-card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { resolveNovelCoverSrc } from "@/lib/novel-cover"
-import { BookOpen, Filter, Loader2, Search, UserRound } from "lucide-react"
+import { Filter, Loader2, Search, UserRound } from "lucide-react"
 import {
   loadSearchResults,
   type SearchPagination,
@@ -125,56 +126,33 @@ function SearchResultCard({ result }: { result: SearchResult }) {
       coverUrl: result.coverUrl,
       coverStorageKey: result.coverStorageKey,
     })
+    const novelHref = `/novel/${result.slug}`
 
     return (
-      <article className="flex h-full flex-col overflow-hidden border border-border/40 bg-card transition-all hover:border-border/80 hover:shadow-sm">
-        <Link
-          href={`/novel/${result.slug}`}
-          className="block border-b border-border/40 bg-muted/20"
-        >
-          {coverSrc ? (
-            <img
-              src={coverSrc}
-              alt={`${result.title} cover`}
-              className="aspect-[3/4] w-full object-cover sm:aspect-[2/3]"
-            />
-          ) : (
-            <div className="flex aspect-[3/4] w-full items-center justify-center bg-muted/40 text-muted-foreground sm:aspect-[2/3]">
-              <BookOpen className="h-8 w-8" />
-            </div>
-          )}
-        </Link>
-
-        <div className="flex flex-1 flex-col p-3 sm:p-4">
-          <div className="mb-3 flex-1">
-            <h3 className="line-clamp-2 font-serif text-sm font-semibold text-foreground sm:text-base">
-              <Link href={`/novel/${result.slug}`} className="hover:underline">
-                {result.title}
-              </Link>
-            </h3>
-            <p className="mt-2 text-xs text-muted-foreground">
-              by{" "}
-              <Link href={`/profile/${result.authorNpub}`} className="hover:underline">
-                {result.authorName}
-              </Link>
-            </p>
-            <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-foreground/80 sm:mt-3 sm:text-sm">
-              {result.summary}
-            </p>
-          </div>
-
-          <div className="space-y-3 border-t border-border/40 pt-3">
-            <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-              <span className="rounded-full bg-muted px-2.5 py-1">{result.genre}</span>
+      <NovelCard
+        href={novelHref}
+        title={result.title}
+        coverSrc={coverSrc}
+        authorName={result.authorName}
+        authorHref={`/profile/${result.authorNpub}`}
+        summary={result.summary}
+        titleAside={
+          <span className="border border-border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground">
+            {result.genre}
+          </span>
+        }
+        footer={
+          <div className="space-y-3 border-t border-border pt-4">
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
               <span>{result.chaptersCount} chapters</span>
               <span>{result.readsCount.toLocaleString()} reads</span>
             </div>
             <Button asChild size="sm" className="w-full">
-              <Link href={`/novel/${result.slug}`}>Read</Link>
+              <Link href={novelHref}>Read</Link>
             </Button>
           </div>
-        </div>
-      </article>
+        }
+      />
     )
   }
 
@@ -230,7 +208,7 @@ function SearchResultCard({ result }: { result: SearchResult }) {
 
 function ResultsGrid({ results }: { results: SearchResult[] }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5">
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 lg:gap-5 xl:grid-cols-4 2xl:grid-cols-5">
       {results.map((result) => (
         <SearchResultCard key={result.id} result={result} />
       ))}

@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
+import { NovelCard } from "@/components/novel/novel-card"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, BookOpen, RefreshCcw } from "lucide-react"
 import { resolveNovelCoverSrc } from "@/lib/novel-cover"
@@ -364,63 +365,34 @@ export function StoriesGrid() {
             coverUrl: story.coverUrl,
             coverStorageKey: story.coverStorageKey,
           })
+          const storyHref = `/novel/${story.slug}`
+          const publishedAt = formatStoryDate(story.publishedAt)
 
           return (
-            <article
+            <NovelCard
               key={story.id}
-              className="flex h-full flex-col overflow-hidden border border-border bg-card transition-colors hover:border-foreground"
-            >
-              <Link
-                href={`/novel/${story.slug}`}
-                className="block border-b border-border bg-muted/20"
-              >
-                {coverSrc ? (
-                  <img
-                    src={coverSrc}
-                    alt={`${story.title} cover`}
-                    className="aspect-[3/4] w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex aspect-[3/4] w-full items-center justify-center bg-muted/40 text-muted-foreground">
-                    <BookOpen className="h-8 w-8" />
-                  </div>
-                )}
-              </Link>
-
-              <div className="flex flex-1 flex-col p-4">
-                <div className="flex-1">
-                  <div className="mb-3 flex items-start justify-between gap-2">
-                    <h3 className="line-clamp-2 font-serif text-lg font-medium text-foreground">
-                      <Link href={`/novel/${story.slug}`} className="hover:underline">
-                        {story.title}
-                      </Link>
-                    </h3>
-                    <div className="flex flex-shrink-0 flex-col items-end gap-2">
-                      <span className="border border-border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground">
-                        {story.genre}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground">
-                        {formatWorkType(story.workType)}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="mb-4 text-sm text-muted-foreground">
-                    by{" "}
-                    <span className="font-medium">
-                      {story.author.displayName ?? "Anonymous"}
-                    </span>
-                  </p>
-                  <p className="mb-3 text-xs text-muted-foreground">
-                    {story.status}
-                    {formatStoryDate(story.publishedAt) ? (
-                      <> · {formatStoryDate(story.publishedAt)}</>
-                    ) : null}
-                  </p>
-                  <p className="mb-4 line-clamp-3 text-sm leading-relaxed text-foreground/80">
-                    {story.summary || "A new story is waiting to be explored."}
-                  </p>
-                </div>
-
+              href={storyHref}
+              title={story.title}
+              coverSrc={coverSrc}
+              authorName={story.author.displayName ?? "Anonymous"}
+              summary={story.summary}
+              titleAside={
+                <>
+                  <span className="border border-border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                    {story.genre}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {formatWorkType(story.workType)}
+                  </span>
+                </>
+              }
+              meta={
+                <>
+                  {story.status}
+                  {publishedAt ? ` / ${publishedAt}` : null}
+                </>
+              }
+              footer={
                 <div className="flex items-center justify-between border-t border-border pt-4">
                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                     <span>{story.chaptersCount} chapters</span>
@@ -428,11 +400,11 @@ export function StoriesGrid() {
                     <span>{story.bookmarksCount.toLocaleString()} saves</span>
                   </div>
                   <Button variant="ghost" size="sm" asChild>
-                    <Link href={`/novel/${story.slug}`}>Read</Link>
+                    <Link href={storyHref}>Read</Link>
                   </Button>
                 </div>
-              </div>
-            </article>
+              }
+            />
           )
         })}
       </div>
