@@ -15,6 +15,7 @@ next.user-config.*
 node_modules/
 .next/
 .turbo/
+.crush/
 *.tsbuildinfo
 **/.next/
 .DS_Store
