@@ -2658,13 +2658,28 @@ export default function SettingsPage() {
                     <div className="rounded border border-border/40 bg-card p-6">
                       <div className="grid gap-6 lg:grid-cols-[1.3fr_0.9fr]">
                         <div className="space-y-3">
-                          <h3 className="flex items-center gap-2 font-medium text-foreground">
-                            <Palette className="h-4 w-4" />
-                            Reader preview
-                          </h3>
-                          <p className="text-sm text-muted-foreground">
-                            Tune the mood of the interface and the pacing of your reading layout before it follows your account everywhere else.
-                          </p>
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="space-y-3">
+                              <h3 className="flex items-center gap-2 font-medium text-foreground">
+                                <Palette className="h-4 w-4" />
+                                Reader preview
+                              </h3>
+                              <p className="text-sm text-muted-foreground">
+                                Tune the mood of the interface and the pacing of your reading layout before it follows your account everywhere else.
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="gap-2"
+                              onClick={() => void handleResetAppearance()}
+                              disabled={appearanceSaving}
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                              Reset to default
+                            </Button>
+                          </div>
                           <div
                             className={cn(
                               'rounded-xl border px-5 py-5 transition-colors',
@@ -2738,7 +2753,10 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="rounded border border-border/40 bg-card p-6">
-                      <h3 className="text-sm font-medium text-foreground mb-4">Reader font size</h3>
+                      <h3 className="mb-4 flex items-center gap-2 text-sm font-medium text-foreground">
+                        <Type className="h-4 w-4" />
+                        Reader font size
+                      </h3>
                       <div className="grid gap-3 md:grid-cols-3">
                         {APPEARANCE_FONT_SIZE_OPTIONS.map((option) => {
                           const selected = appearanceSettings.fontSize === option.value
