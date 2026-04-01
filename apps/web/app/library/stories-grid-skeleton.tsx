@@ -11,7 +11,7 @@ export function StoriesGridSkeleton() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 lg:gap-5 xl:grid-cols-4 2xl:grid-cols-5">
         {[...Array(6)].map((_, i) => (
           <StoryCardSkeleton key={i} />
         ))}

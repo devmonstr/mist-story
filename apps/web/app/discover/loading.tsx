@@ -43,16 +43,16 @@ export default function Loading() {
   return (
     <div className="flex min-h-screen flex-col">
       {/* Hero Section Skeleton */}
-      <section className="border-b border-border/40 bg-background px-4 py-16 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
+      <section className="border-b border-border/40 bg-background py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="h-10 w-32 animate-pulse rounded bg-muted" />
           <div className="mt-4 h-5 w-96 animate-pulse rounded bg-muted" />
         </div>
       </section>
 
       {/* Categories Section Skeleton */}
-      <section className="border-b border-border/40 px-4 py-16 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
+      <section className="border-b border-border/40 py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-12">
             <div className="h-8 w-48 animate-pulse rounded bg-muted" />
             <div className="mt-2 h-4 w-64 animate-pulse rounded bg-muted" />
@@ -67,8 +67,8 @@ export default function Loading() {
       </section>
 
       {/* Collections Section Skeleton */}
-      <section className="px-4 py-16 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
+      <section className="py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-12">
             <div className="h-8 w-56 animate-pulse rounded bg-muted" />
             <div className="mt-2 h-4 w-72 animate-pulse rounded bg-muted" />

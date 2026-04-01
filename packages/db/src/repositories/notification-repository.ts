@@ -65,6 +65,30 @@ export async function listNotificationsForUser(userId: string) {
   })
 }
 
+export async function listNotificationsForUserPage(input: {
+  userId: string
+  page: number
+  pageSize: number
+}) {
+  return prisma.notification.findMany({
+    where: { userId: input.userId },
+    orderBy: { createdAt: "desc" },
+    skip: (input.page - 1) * input.pageSize,
+    take: input.pageSize,
+    include: {
+      actor: true,
+    },
+  })
+}
+
+export async function countNotificationsForUser(userId: string) {
+  return prisma.notification.count({
+    where: {
+      userId,
+    },
+  })
+}
+
 export async function countUnreadNotificationsForUser(userId: string) {
   return prisma.notification.count({
     where: {

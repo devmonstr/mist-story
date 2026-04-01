@@ -1,4 +1,5 @@
 import { Router } from "express"
+import { profileConnectionsQuerySchema } from "@mist/shared"
 import { requireAuth } from "../middleware/require-auth"
 import {
   followProfile,
@@ -24,7 +25,8 @@ profilesRouter.get("/:npub", async (request, response, next) => {
 
 profilesRouter.get("/:npub/followers", async (request, response, next) => {
   try {
-    const payload = await getProfileFollowers(String(request.params.npub))
+    const parsedQuery = profileConnectionsQuerySchema.parse(request.query)
+    const payload = await getProfileFollowers(String(request.params.npub), parsedQuery)
     return response.json(payload)
   } catch (error) {
     return next(error)
@@ -33,7 +35,8 @@ profilesRouter.get("/:npub/followers", async (request, response, next) => {
 
 profilesRouter.get("/:npub/following", async (request, response, next) => {
   try {
-    const payload = await getProfileFollowing(String(request.params.npub))
+    const parsedQuery = profileConnectionsQuerySchema.parse(request.query)
+    const payload = await getProfileFollowing(String(request.params.npub), parsedQuery)
     return response.json(payload)
   } catch (error) {
     return next(error)

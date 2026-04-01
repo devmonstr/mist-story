@@ -155,6 +155,22 @@ export async function listFollowerUsers(userId: string) {
   })
 }
 
+export async function listFollowerUsersPage(input: {
+  userId: string
+  page: number
+  pageSize: number
+}) {
+  return prisma.userFollow.findMany({
+    where: { followingId: input.userId },
+    orderBy: { createdAt: "desc" },
+    skip: (input.page - 1) * input.pageSize,
+    take: input.pageSize,
+    include: {
+      follower: true,
+    },
+  })
+}
+
 export async function listFollowingUsers(userId: string) {
   return prisma.userFollow.findMany({
     where: { followerId: userId },
@@ -163,6 +179,65 @@ export async function listFollowingUsers(userId: string) {
       following: true,
     },
   })
+}
+
+export async function listFollowingUsersPage(input: {
+  userId: string
+  page: number
+  pageSize: number
+}) {
+  return prisma.userFollow.findMany({
+    where: { followerId: input.userId },
+    orderBy: { createdAt: "desc" },
+    skip: (input.page - 1) * input.pageSize,
+    take: input.pageSize,
+    include: {
+      following: true,
+    },
+  })
+}
+
+export async function countFollowersForUser(userId: string) {
+  return prisma.userFollow.count({
+    where: { followingId: userId },
+  })
+}
+
+export async function countFollowingForUser(userId: string) {
+  return prisma.userFollow.count({
+    where: { followerId: userId },
+  })
+}
+
+export async function listFollowerNotificationRecipients(
+  userId: string,
+  excludeUserId?: string
+) {
+  const recipients = await prisma.userFollow.findMany({
+    where: {
+      followingId: userId,
+      ...(excludeUserId
+        ? {
+            followerId: {
+              not: excludeUserId,
+            },
+          }
+        : {}),
+      follower: {
+        notificationPreferences: {
+          none: {
+            type: "CHAPTER_PUBLISHED",
+            enabled: false,
+          },
+        },
+      },
+    },
+    select: {
+      followerId: true,
+    },
+  })
+
+  return recipients.map((recipient) => recipient.followerId)
 }
 
 export async function countFollowersForUsers(userIds: string[]) {

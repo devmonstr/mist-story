@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { truncateNpub } from "@/lib/nostr-utils"
-import { User, LogOut, PenSquare, BookOpen, Clock, Settings } from "lucide-react"
+import { User, LogOut, PenSquare, BookOpen, Clock, Settings, Shield } from "lucide-react"
 import Link from "next/link"
 
 interface AuthButtonProps {
@@ -131,6 +131,16 @@ export function AuthButton({ variant = "default", onAction }: AuthButtonProps) {
           <Settings className="h-4 w-4" />
           Settings
         </Link>
+        {user.isAdmin && (
+          <Link
+            href="/studio/admin"
+            onClick={onAction}
+            className="flex items-center gap-2 px-2 py-2.5 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <Shield className="h-4 w-4" />
+            Admin Studio
+          </Link>
+        )}
         <div className="border-t border-border my-2" />
         <button
           onClick={handleSignOut}
@@ -205,6 +215,14 @@ export function AuthButton({ variant = "default", onAction }: AuthButtonProps) {
             Settings
           </Link>
         </DropdownMenuItem>
+        {user.isAdmin && (
+          <DropdownMenuItem asChild>
+            <Link href="/studio/admin" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Admin Studio
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
           <LogOut className="mr-2 h-4 w-4" />

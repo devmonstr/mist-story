@@ -15,6 +15,7 @@ import {
   getNovelCoverAsset,
   uploadNovelCoverAsset,
 } from "./novel-cover-storage"
+import { notifyFollowersAboutPublishedNovel } from "./profile-service"
 
 function resolveNovelStatus(
   status: CreateNovelInput["status"] | UpdateNovelInput["status"],
@@ -143,6 +144,15 @@ export async function createNovel(userId: string, input: CreateNovelInput) {
     coverOriginalName: uploadedCover?.coverOriginalName ?? null,
     coverFileSizeBytes: uploadedCover?.coverFileSizeBytes ?? null,
   })
+
+  if (created.visibility === "PUBLISHED") {
+    await notifyFollowersAboutPublishedNovel({
+      authorId: created.authorId,
+      novelId: created.id,
+      novelTitle: created.title,
+    })
+  }
+
   return serializeNovel(created)
 }
 
@@ -172,6 +182,8 @@ export async function updateNovel(
     input.isComplete
   )
   const nextVisibility = input.visibility ?? existing.visibility
+  const shouldNotifyFollowers =
+    existing.visibility !== "PUBLISHED" && nextVisibility === "PUBLISHED"
 
   const nextCoverUrl = uploadedCover
     ? uploadedCover.coverUrl
@@ -227,5 +239,14 @@ export async function updateNovel(
           }
         : {}),
   })
+
+  if (shouldNotifyFollowers) {
+    await notifyFollowersAboutPublishedNovel({
+      authorId: updated.authorId,
+      novelId: updated.id,
+      novelTitle: updated.title,
+    })
+  }
+
   return serializeNovel(updated)
 }

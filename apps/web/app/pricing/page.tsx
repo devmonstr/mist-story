@@ -50,7 +50,7 @@ export default function PricingPage() {
       <Navbar />
       <main className="flex-1">
         <section className="border-b border-border/40 bg-background px-4 py-16 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-4xl text-center">
+        <div className="mx-auto max-w-7xl text-center">
             <h1 className="font-serif text-4xl font-light tracking-tight text-foreground sm:text-5xl">
               Simple Pricing
             </h1>
@@ -61,7 +61,7 @@ export default function PricingPage() {
         </section>
 
         <section className="px-4 py-16 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-5xl">
+        <div className="mx-auto max-w-7xl">
             <div className="grid gap-8 md:grid-cols-3">
               {plans.map((plan) => (
                 <div

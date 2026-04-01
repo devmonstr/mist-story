@@ -32,7 +32,7 @@ export default function ContactPage() {
       <main className="flex-1 bg-background">
       {/* Header */}
       <div className="border-b border-border">
-        <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
           <h1 className="font-serif text-4xl font-bold text-foreground mb-4">Get in Touch</h1>
           <p className="text-lg text-muted-foreground">
             Have questions? We'd love to hear from you. Send us a message and we'll respond as soon as possible.
@@ -40,7 +40,7 @@ export default function ContactPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid gap-12 lg:grid-cols-2">
           {/* Contact Form */}
           <div>

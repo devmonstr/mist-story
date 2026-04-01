@@ -10,8 +10,12 @@ export interface NostrEvent {
 }
 
 export interface NostrUser {
+  id?: string
   pubkey: string
   npub: string
+  isReader?: boolean
+  isWriter?: boolean
+  isAdmin?: boolean
   profile?: NostrProfile
 }
 

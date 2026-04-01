@@ -50,8 +50,8 @@ export function DiscoverShell({ children, activeFilters }: DiscoverShellProps) {
   return (
     <>
       {/* Hero Section */}
-      <section className="border-b border-border/40 bg-background px-4 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-16">
-        <div className="mx-auto max-w-7xl">
+      <section className="border-b border-border/40 bg-background py-10 sm:py-14 lg:py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <h1 className="font-serif text-3xl font-light tracking-tight text-foreground sm:text-5xl">
             Discover
           </h1>

@@ -1,6 +1,7 @@
 import {
   createNotification,
   findChapterVersionById,
+  listBookmarkNotificationRecipientsForNovel,
   markChapterVersionFailed,
   markChapterVersionPublished,
   upsertChapterVersionRelayPublish,
@@ -12,6 +13,12 @@ import { env } from "../config/env"
 import { publishChapterVersionToRelay } from "../adapters/relay-publisher"
 
 const redis = createRedisClient(env.REDIS_URL)
+
+async function enqueueCreatedNotification(notificationId: string) {
+  await enqueueNotificationDispatch(redis, {
+    notificationId,
+  })
+}
 
 export async function processChapterPublishJob(payload: ChapterPublishJobPayload) {
   const chapterVersion = await findChapterVersionById(payload.chapterVersionId)
@@ -35,7 +42,12 @@ export async function processChapterPublishJob(payload: ChapterPublishJobPayload
       publishedRelayCount: published.relayCount,
     })
 
-    const notification = await createNotification({
+    const recipientUserIds = await listBookmarkNotificationRecipientsForNovel(
+      chapterVersion.chapter.novel.id,
+      payload.actorUserId
+    )
+
+    const authorNotification = await createNotification({
       userId: payload.actorUserId,
       actorUserId: payload.actorUserId,
       type: "CHAPTER_PUBLISHED",
@@ -51,9 +63,27 @@ export async function processChapterPublishJob(payload: ChapterPublishJobPayload
       },
     })
 
-    await enqueueNotificationDispatch(redis, {
-      notificationId: notification.id,
-    })
+    await enqueueCreatedNotification(authorNotification.id)
+
+    for (const recipientUserId of recipientUserIds) {
+      const readerNotification = await createNotification({
+        userId: recipientUserId,
+        actorUserId: payload.actorUserId,
+        type: "CHAPTER_PUBLISHED",
+        novelId: chapterVersion.chapter.novel.id,
+        chapterId: chapterVersion.chapter.id,
+        chapterNumber: chapterVersion.chapter.number,
+        title: `New chapter in ${chapterVersion.chapter.novel.title}`,
+        message: `${chapterVersion.chapter.title} is now available to read.`,
+        targetUrl: `/novel/${chapterVersion.chapter.novel.id}/read/${chapterVersion.chapter.number}`,
+        metadata: {
+          eventType: "CHAPTER_PUBLISHED",
+          chapterVersionId: updated.id,
+        },
+      })
+
+      await enqueueCreatedNotification(readerNotification.id)
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Publish failed"
     await upsertChapterVersionRelayPublish({

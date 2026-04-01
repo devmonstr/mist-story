@@ -10,7 +10,7 @@ export default function AboutPage() {
       <main className="flex-1">
         {/* Hero Section */}
         <section className="border-b border-border/40 bg-background px-4 py-16 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-4xl">
+          <div className="mx-auto max-w-7xl">
             <h1 className="font-serif text-4xl font-light tracking-tight text-foreground sm:text-5xl">
               About Mist Story
             </h1>
@@ -22,7 +22,7 @@ export default function AboutPage() {
 
         {/* Mission Section */}
         <section className="border-b border-border/40 px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-4xl">
+          <div className="mx-auto max-w-7xl">
             <h2 className="font-serif text-3xl font-light tracking-tight text-foreground">
               Our Mission
             </h2>
@@ -34,7 +34,7 @@ export default function AboutPage() {
 
         {/* Values Section */}
         <section className="border-b border-border/40 px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-4xl">
+          <div className="mx-auto max-w-7xl">
             <h2 className="mb-12 font-serif text-3xl font-light tracking-tight text-foreground">
               Our Values
             </h2>
@@ -75,7 +75,7 @@ export default function AboutPage() {
 
         {/* Stats Section */}
         <section className="border-b border-border/40 bg-card/50 px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-4xl">
+          <div className="mx-auto max-w-7xl">
             <div className="grid gap-8 md:grid-cols-3">
               <div className="text-center">
                 <div className="font-serif text-3xl font-light text-foreground">15K+</div>
@@ -95,7 +95,7 @@ export default function AboutPage() {
 
         {/* Team Section */}
         <section className="border-b border-border/40 px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-4xl">
+          <div className="mx-auto max-w-7xl">
             <h2 className="mb-8 font-serif text-3xl font-light tracking-tight text-foreground">
               Behind the Pages
             </h2>
@@ -110,7 +110,7 @@ export default function AboutPage() {
 
         {/* CTA Section */}
         <section className="px-4 py-16 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl text-center">
+          <div className="mx-auto max-w-7xl text-center">
             <h2 className="font-serif text-3xl font-light tracking-tight text-foreground">
               Join Our Community
             </h2>

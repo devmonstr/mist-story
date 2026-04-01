@@ -11,7 +11,7 @@ export function ProfileNovels() {
 
   if (isLoading && !data) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -24,7 +24,7 @@ export function ProfileNovels() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <h2 className="font-serif text-2xl font-bold text-foreground mb-8">Novels</h2>
 
       {data.novels.length === 0 ? (

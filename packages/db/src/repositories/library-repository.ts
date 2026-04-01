@@ -1,13 +1,76 @@
 import { prisma } from "../client"
 
 export async function listBookmarkedNovelsForUser(userId: string) {
-  return prisma.novelBookmark.findMany({
+  const bookmarks = await prisma.novelBookmark.findMany({
     where: { userId },
     orderBy: { updatedAt: "desc" },
     include: {
-      novel: true,
+      novel: {
+        include: {
+          chapters: {
+            where: {
+              status: "PUBLISHED",
+            },
+            select: {
+              publishedAt: true,
+              updatedAt: true,
+            },
+            orderBy: [{ updatedAt: "desc" }, { publishedAt: "desc" }],
+            take: 1,
+          },
+        },
+      },
     },
   })
+
+  return bookmarks.sort((left, right) => {
+    const leftLatest =
+      left.novel.chapters[0]?.updatedAt ??
+      left.novel.chapters[0]?.publishedAt ??
+      left.novel.updatedAt
+    const rightLatest =
+      right.novel.chapters[0]?.updatedAt ??
+      right.novel.chapters[0]?.publishedAt ??
+      right.novel.updatedAt
+
+    const chapterDelta = rightLatest.getTime() - leftLatest.getTime()
+    if (chapterDelta !== 0) {
+      return chapterDelta
+    }
+
+    return right.updatedAt.getTime() - left.updatedAt.getTime()
+  })
+}
+
+export async function listBookmarkNotificationRecipientsForNovel(
+  novelId: string,
+  excludeUserId?: string
+) {
+  const recipients = await prisma.novelBookmark.findMany({
+    where: {
+      novelId,
+      ...(excludeUserId
+        ? {
+            userId: {
+              not: excludeUserId,
+            },
+          }
+        : {}),
+      user: {
+        notificationPreferences: {
+          none: {
+            type: "CHAPTER_PUBLISHED",
+            enabled: false,
+          },
+        },
+      },
+    },
+    select: {
+      userId: true,
+    },
+  })
+
+  return recipients.map((recipient) => recipient.userId)
 }
 
 export async function listReadingProgressForUser(userId: string) {

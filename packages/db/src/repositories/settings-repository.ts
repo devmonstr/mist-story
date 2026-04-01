@@ -46,6 +46,63 @@ export async function getNotificationPreferencesForUser(userId: string, types: N
   })
 }
 
+export async function getNotificationPreferencesForUsers(
+  userIds: string[],
+  types: NotificationType[]
+) {
+  if (userIds.length === 0) {
+    return []
+  }
+
+  return prisma.notificationPreference.findMany({
+    where: {
+      userId: {
+        in: userIds,
+      },
+      type: {
+        in: types,
+      },
+    },
+  })
+}
+
+export async function filterUserIdsByNotificationPreference(
+  userIds: string[],
+  type: NotificationType
+) {
+  if (userIds.length === 0) {
+    return []
+  }
+
+  const disabledPreferences = await prisma.notificationPreference.findMany({
+    where: {
+      userId: {
+        in: userIds,
+      },
+      type,
+      OR: [
+        {
+          enabled: false,
+        },
+        {
+          mutedUntil: {
+            gt: new Date(),
+          },
+        },
+      ],
+    },
+    select: {
+      userId: true,
+    },
+  })
+
+  const disabledUserIds = new Set(
+    disabledPreferences.map((preference) => preference.userId)
+  )
+
+  return userIds.filter((userId) => !disabledUserIds.has(userId))
+}
+
 export async function setNotificationPreferencesForUser(
   userId: string,
   entries: Array<{ type: NotificationType; enabled: boolean }>

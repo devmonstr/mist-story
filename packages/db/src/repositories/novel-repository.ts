@@ -36,6 +36,27 @@ export async function findNovelByIdOrSlug(identifier: string) {
   })
 }
 
+export async function listNovelNotificationCardsByIds(novelIds: string[]) {
+  if (novelIds.length === 0) {
+    return []
+  }
+
+  return prisma.novel.findMany({
+    where: {
+      id: {
+        in: [...new Set(novelIds)],
+      },
+    },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      coverUrl: true,
+      coverStorageKey: true,
+    },
+  })
+}
+
 export async function createNovelForAuthor(
   authorId: string,
   input: {

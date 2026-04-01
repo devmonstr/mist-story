@@ -15,6 +15,9 @@ export const authUserSchema = z.object({
   id: z.string(),
   pubkey: z.string(),
   npub: z.string(),
+  isReader: z.boolean(),
+  isWriter: z.boolean(),
+  isAdmin: z.boolean(),
   profile: nostrProfileSchema.nullable(),
 })
 

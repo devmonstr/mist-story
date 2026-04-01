@@ -45,7 +45,7 @@ export default function WritePage() {
       <main className="flex-1">
         {/* Hero Section */}
         <section className="border-b border-border/40 bg-background px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-4xl text-center">
+        <div className="mx-auto max-w-7xl text-center">
             <h1 className="font-serif text-4xl font-light tracking-tight text-foreground sm:text-5xl lg:text-6xl">
               Share Your Stories
             </h1>
@@ -99,7 +99,7 @@ export default function WritePage() {
 
         {/* CTA Section */}
         <section className="border-t border-border/40 bg-card/50 px-4 py-16 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl text-center">
+        <div className="mx-auto max-w-7xl text-center">
             <h2 className="font-serif text-3xl font-light tracking-tight text-foreground">
               Ready to Tell Your Story?
             </h2>

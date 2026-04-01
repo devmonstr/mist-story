@@ -1,5 +1,6 @@
 import { Router } from "express"
 import {
+  notificationListQuerySchema,
   profileImageAssetTypeSchema,
   updateMyProfileInputSchema,
   uploadProfileImageInputSchema,
@@ -20,6 +21,7 @@ import {
 import {
   deleteNotification,
   getNotifications,
+  getNotificationSummary,
   markAllNotificationsRead,
   markNotificationRead,
 } from "../services/notification-service"
@@ -104,9 +106,19 @@ meRouter.get("/library", requireAuth, async (_request, response, next) => {
   }
 })
 
-meRouter.get("/notifications", requireAuth, async (_request, response, next) => {
+meRouter.get("/notifications", requireAuth, async (request, response, next) => {
   try {
-    const payload = await getNotifications(response.locals.user.id as string)
+    const parsedQuery = notificationListQuerySchema.parse(request.query)
+    const payload = await getNotifications(response.locals.user.id as string, parsedQuery)
+    return response.json(payload)
+  } catch (error) {
+    return next(error)
+  }
+})
+
+meRouter.get("/notifications/summary", requireAuth, async (_request, response, next) => {
+  try {
+    const payload = await getNotificationSummary(response.locals.user.id as string)
     return response.json(payload)
   } catch (error) {
     return next(error)

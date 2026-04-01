@@ -66,12 +66,25 @@ export const profileConnectionSchema = z.object({
   novels: z.number().int().nonnegative(),
 })
 
+export const profileConnectionsPaginationSchema = z.object({
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  totalItems: z.number().int().nonnegative(),
+  totalPages: z.number().int().positive(),
+})
+
+export const profileConnectionsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+})
+
 export const profileConnectionsResponseSchema = z.object({
   profile: z.object({
     npub: z.string(),
     displayName: z.string().nullable(),
   }),
   users: z.array(profileConnectionSchema),
+  pagination: profileConnectionsPaginationSchema,
 })
 
 export const myProfileResponseSchema = z.object({
@@ -110,6 +123,8 @@ export type ProfileNovelDto = z.infer<typeof profileNovelSchema>
 export type ProfilePageResponse = z.infer<typeof profilePageResponseSchema>
 export type ProfileFollowState = z.infer<typeof profileFollowStateSchema>
 export type ProfileConnectionDto = z.infer<typeof profileConnectionSchema>
+export type ProfileConnectionsPagination = z.infer<typeof profileConnectionsPaginationSchema>
+export type ProfileConnectionsQuery = z.infer<typeof profileConnectionsQuerySchema>
 export type ProfileConnectionsResponse = z.infer<typeof profileConnectionsResponseSchema>
 export type MyProfileResponse = z.infer<typeof myProfileResponseSchema>
 export type UpdateMyProfileInput = z.infer<typeof updateMyProfileInputSchema>

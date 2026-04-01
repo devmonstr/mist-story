@@ -1,4 +1,11 @@
 import type {
+  AdminNovelListResponse,
+  AdminNovelListQuery,
+  AdminNovelSummary,
+  AdminStudioResponse,
+  AdminUserListQuery,
+  AdminUserListResponse,
+  AdminUserSummary,
   AuthChallengeResponse,
   AuthMeResponse,
   AuthReverifyResponse,
@@ -15,9 +22,12 @@ import type {
   MyLibraryResponse,
   MyProfileResponse,
   NotificationDto,
+  NotificationListQuery,
+  NotificationSummaryResponse,
   NotificationsResponse,
   NovelDto,
   ProfileConnectionsResponse,
+  ProfileConnectionsQuery,
   ProfileFollowState,
   ProfilePageResponse,
   PublicNovelDetailResponse,
@@ -158,6 +168,83 @@ export function getCurrentUser() {
   })
 }
 
+export function fetchAdminStudio() {
+  return apiFetch<AdminStudioResponse>("/api/v1/admin/studio")
+}
+
+export function fetchAdminUsers(input?: Partial<AdminUserListQuery>) {
+  const searchParams = new URLSearchParams()
+
+  if (input?.q?.trim()) {
+    searchParams.set("q", input.q.trim())
+  }
+  if (input?.role && input.role !== "all") {
+    searchParams.set("role", input.role)
+  }
+  if (input?.sort && input.sort !== "recent") {
+    searchParams.set("sort", input.sort)
+  }
+  if (input?.page && input.page > 1) {
+    searchParams.set("page", String(input.page))
+  }
+  if (input?.pageSize && input.pageSize !== 20) {
+    searchParams.set("pageSize", String(input.pageSize))
+  }
+
+  const queryString = searchParams.toString()
+  return apiFetch<AdminUserListResponse>(
+    queryString ? `/api/v1/admin/users?${queryString}` : "/api/v1/admin/users"
+  )
+}
+
+export function fetchAdminNovels(input?: Partial<AdminNovelListQuery>) {
+  const searchParams = new URLSearchParams()
+
+  if (input?.q?.trim()) {
+    searchParams.set("q", input.q.trim())
+  }
+  if (input?.visibility && input.visibility !== "all") {
+    searchParams.set("visibility", input.visibility)
+  }
+  if (input?.status && input.status !== "all") {
+    searchParams.set("status", input.status)
+  }
+  if (input?.sort && input.sort !== "updated") {
+    searchParams.set("sort", input.sort)
+  }
+  if (input?.page && input.page > 1) {
+    searchParams.set("page", String(input.page))
+  }
+  if (input?.pageSize && input.pageSize !== 20) {
+    searchParams.set("pageSize", String(input.pageSize))
+  }
+
+  const queryString = searchParams.toString()
+  return apiFetch<AdminNovelListResponse>(
+    queryString ? `/api/v1/admin/novels?${queryString}` : "/api/v1/admin/novels"
+  )
+}
+
+export function updateAdminUserRoles(
+  userId: string,
+  input: { isReader: boolean; isWriter: boolean; isAdmin: boolean }
+) {
+  return apiFetch<AdminUserSummary>(`/api/v1/admin/users/${userId}/roles`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  })
+}
+
+export function updateAdminNovelVisibility(
+  novelId: string,
+  input: { visibility: "PUBLISHED" | "HIDDEN" }
+) {
+  return apiFetch<AdminNovelSummary>(`/api/v1/admin/novels/${novelId}/visibility`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  })
+}
+
 export function requestAuthChallenge(pubkey: string) {
   return apiFetch<AuthChallengeResponse>("/api/v1/auth/challenge", {
     method: "POST",
@@ -202,8 +289,24 @@ export function fetchMyLibrary() {
   return apiFetch<MyLibraryResponse>("/api/v1/me/library")
 }
 
-export function fetchNotifications() {
-  return apiFetch<NotificationsResponse>("/api/v1/me/notifications")
+export function fetchNotifications(input?: Partial<NotificationListQuery>) {
+  const searchParams = new URLSearchParams()
+
+  if (input?.page && input.page > 1) {
+    searchParams.set("page", String(input.page))
+  }
+  if (input?.pageSize && input.pageSize !== 20) {
+    searchParams.set("pageSize", String(input.pageSize))
+  }
+
+  const queryString = searchParams.toString()
+  return apiFetch<NotificationsResponse>(
+    queryString ? `/api/v1/me/notifications?${queryString}` : "/api/v1/me/notifications"
+  )
+}
+
+export function fetchNotificationSummary() {
+  return apiFetch<NotificationSummaryResponse>("/api/v1/me/notifications/summary")
 }
 
 export function fetchMyProfile() {
@@ -581,12 +684,46 @@ export function fetchProfilePage(npub: string) {
   return apiFetch<ProfilePageResponse>(`/api/v1/profiles/${npub}`)
 }
 
-export function fetchProfileFollowers(npub: string) {
-  return apiFetch<ProfileConnectionsResponse>(`/api/v1/profiles/${npub}/followers`)
+export function fetchProfileFollowers(
+  npub: string,
+  input?: Partial<ProfileConnectionsQuery>
+) {
+  const searchParams = new URLSearchParams()
+
+  if (input?.page && input.page > 1) {
+    searchParams.set("page", String(input.page))
+  }
+  if (input?.pageSize && input.pageSize !== 20) {
+    searchParams.set("pageSize", String(input.pageSize))
+  }
+
+  const queryString = searchParams.toString()
+  const path = queryString
+    ? `/api/v1/profiles/${npub}/followers?${queryString}`
+    : `/api/v1/profiles/${npub}/followers`
+
+  return apiFetch<ProfileConnectionsResponse>(path)
 }
 
-export function fetchProfileFollowing(npub: string) {
-  return apiFetch<ProfileConnectionsResponse>(`/api/v1/profiles/${npub}/following`)
+export function fetchProfileFollowing(
+  npub: string,
+  input?: Partial<ProfileConnectionsQuery>
+) {
+  const searchParams = new URLSearchParams()
+
+  if (input?.page && input.page > 1) {
+    searchParams.set("page", String(input.page))
+  }
+  if (input?.pageSize && input.pageSize !== 20) {
+    searchParams.set("pageSize", String(input.pageSize))
+  }
+
+  const queryString = searchParams.toString()
+  const path = queryString
+    ? `/api/v1/profiles/${npub}/following?${queryString}`
+    : `/api/v1/profiles/${npub}/following`
+
+  return apiFetch<ProfileConnectionsResponse>(path)
 }
 
 export function followProfile(npub: string) {
@@ -680,8 +817,12 @@ export function publishChapter(chapterId: string, input: PublishChapterInput) {
 
 export function toNostrUser(user: AuthUserDto): NostrUser {
   return {
+    id: user.id,
     pubkey: user.pubkey,
     npub: user.npub,
+    isReader: user.isReader,
+    isWriter: user.isWriter,
+    isAdmin: user.isAdmin,
     profile: user.profile
       ? {
           name: user.profile.name ?? undefined,

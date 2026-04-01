@@ -145,6 +145,9 @@ export function serializeUser(user: User): AuthUserDto {
     id: user.id,
     pubkey: user.pubkey,
     npub: hexToNpub(user.pubkey),
+    isReader: user.isReader,
+    isWriter: user.isWriter,
+    isAdmin: user.isAdmin,
     profile: {
       name: user.handle ?? null,
       display_name: user.displayName ?? null,

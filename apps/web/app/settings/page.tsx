@@ -1930,7 +1930,7 @@ export default function SettingsPage() {
     <div className="flex min-h-screen flex-col">
       <Navbar />
       <main className="flex-1 bg-background">
-      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <h1 className="font-serif text-3xl font-bold text-foreground mb-8">Settings</h1>
 
         <div className="grid gap-8 lg:grid-cols-4">

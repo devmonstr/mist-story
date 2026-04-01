@@ -49,7 +49,7 @@ export default function SupportPage() {
       <main className="flex-1 bg-background">
       {/* Header */}
       <div className="border-b border-border">
-        <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 mb-4">
             <HelpCircle className="h-8 w-8 text-foreground" />
             <h1 className="font-serif text-3xl font-bold text-foreground">Help & Support</h1>
@@ -58,7 +58,7 @@ export default function SupportPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         {/* Support Options */}
         <div className="grid gap-6 md:grid-cols-3 mb-12">
           <div className="border border-border/40 rounded bg-card p-6 flex flex-col items-center text-center">

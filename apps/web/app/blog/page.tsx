@@ -9,7 +9,7 @@ export default function BlogPage() {
       <Navbar />
       <main className="flex-1">
         <section className="border-b border-border/40 bg-background px-4 py-16 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-4xl text-center">
+        <div className="mx-auto max-w-7xl text-center">
             <h1 className="font-serif text-4xl font-light tracking-tight text-foreground sm:text-5xl">
               Blog
             </h1>
@@ -20,7 +20,7 @@ export default function BlogPage() {
         </section>
 
         <section className="px-4 py-16 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-4xl">
+        <div className="mx-auto max-w-7xl">
             <div className="text-center py-16">
               <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <h2 className="font-serif text-2xl font-semibold text-foreground mb-4">

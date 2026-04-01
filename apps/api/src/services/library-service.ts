@@ -46,6 +46,10 @@ export async function getMyLibrary(userId: string): Promise<MyLibraryResponse> {
 
   const savedNovelDtos: MyLibrarySavedNovelDto[] = savedNovels.map((bookmark) => {
     const progress = progressByNovelId.get(bookmark.novelId)
+    const latestChapter =
+      bookmark.novel.chapters[0]?.updatedAt ??
+      bookmark.novel.chapters[0]?.publishedAt ??
+      null
 
     return {
       novelId: bookmark.novel.id,
@@ -55,7 +59,9 @@ export async function getMyLibrary(userId: string): Promise<MyLibraryResponse> {
       genre: bookmark.novel.genre,
       summary: bookmark.novel.summary,
       coverUrl: bookmark.novel.coverUrl,
+      coverStorageKey: bookmark.novel.coverStorageKey ?? null,
       savedAt: bookmark.createdAt.toISOString(),
+      latestChapterUpdatedAt: latestChapter?.toISOString() ?? null,
       progressPercent: progress
         ? calculateProgressPercent(progress.chapterNumber, progress.novel.chaptersCount)
         : 0,

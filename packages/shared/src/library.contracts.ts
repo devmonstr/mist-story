@@ -8,7 +8,9 @@ export const myLibrarySavedNovelSchema = z.object({
   genre: z.string(),
   summary: z.string(),
   coverUrl: z.string(),
+  coverStorageKey: z.string().nullable(),
   savedAt: z.string(),
+  latestChapterUpdatedAt: z.string().nullable(),
   progressPercent: z.number(),
   currentChapterNumber: z.number().nullable(),
 })

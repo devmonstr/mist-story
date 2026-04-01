@@ -98,12 +98,19 @@ export default function StudioPage() {
                   Manage your novels and track your writing progress
                 </p>
               </div>
-              <Button asChild>
-                <Link href="/studio/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  New Novel
-                </Link>
-              </Button>
+              <div className="flex flex-wrap items-center gap-3">
+                {user?.isAdmin && (
+                  <Button variant="outline" asChild>
+                    <Link href="/studio/admin">Admin Studio</Link>
+                  </Button>
+                )}
+                <Button asChild>
+                  <Link href="/studio/new">
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Novel
+                  </Link>
+                </Button>
+              </div>
             </div>
 
             <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">

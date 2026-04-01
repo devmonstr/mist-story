@@ -11,8 +11,8 @@ interface CategoriesGridProps {
 
 export function CategoriesGrid({ categories }: CategoriesGridProps) {
   return (
-    <section className="border-b border-border/40 px-4 py-10 sm:px-6 sm:py-16 lg:px-8">
-      <div className="mx-auto max-w-7xl">
+    <section className="border-b border-border/40 py-10 sm:py-16">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-8 sm:mb-12">
           <h2 className="font-serif text-xl font-light tracking-tight text-foreground sm:text-2xl">
             Browse by Genre

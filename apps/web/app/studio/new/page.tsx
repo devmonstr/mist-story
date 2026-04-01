@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   Loader2,
   Plus,
-  Sparkles,
   X,
 } from "lucide-react"
 import { Navbar } from "@/components/navbar"
@@ -180,8 +179,8 @@ export default function NewNovelPage() {
     <div className="flex min-h-screen flex-col">
       <Navbar />
 
-      <main className="flex-1 bg-[radial-gradient(circle_at_top,_rgba(120,119,198,0.08),transparent_40%),linear-gradient(to_bottom,rgba(255,255,255,0.5),transparent)]">
-        <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+      <main className="flex-1 bg-background">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
           <Link
             href="/studio"
             className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
@@ -190,11 +189,10 @@ export default function NewNovelPage() {
             Back to Studio
           </Link>
 
-          <div className="mb-8 overflow-hidden rounded-3xl border border-border/50 bg-card/80 shadow-sm backdrop-blur">
+          <div className="mb-8 overflow-hidden border border-border bg-card shadow-none">
             <div className="grid gap-8 px-6 py-8 md:grid-cols-[1.4fr_0.9fr] md:px-8">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/80 px-3 py-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                  <Sparkles className="h-3.5 w-3.5" />
+                <div className="inline-flex items-center border border-border bg-background px-3 py-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">
                   New Story
                 </div>
                 <h1 className="mt-4 font-serif text-3xl font-medium text-foreground sm:text-4xl">
@@ -208,7 +206,7 @@ export default function NewNovelPage() {
               </div>
 
               <div className="grid gap-3 self-start">
-                <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
+                <div className="border border-border bg-background p-4">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">
                     Quick checklist
                   </p>
@@ -218,7 +216,7 @@ export default function NewNovelPage() {
                     <li>Upload a polished cover to make the project feel real</li>
                   </ul>
                 </div>
-                <div className="rounded-2xl border border-border/50 bg-background/70 p-4 text-sm text-muted-foreground">
+                <div className="border border-border bg-background p-4 text-sm text-muted-foreground">
                   Draft novels stay private until you decide to make them visible.
                 </div>
               </div>
@@ -226,7 +224,7 @@ export default function NewNovelPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <Card>
+            <Card className="rounded-none border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle className="text-lg">Basic Information</CardTitle>
                 <CardDescription>Essential details about your novel</CardDescription>
@@ -241,7 +239,7 @@ export default function NewNovelPage() {
                     value={formData.title}
                     onChange={(e) => updateField("title", e.target.value)}
                     placeholder="Enter your novel's title"
-                    className={errors.title ? "border-destructive" : ""}
+                    className={errors.title ? "rounded-none border-destructive" : "rounded-none"}
                   />
                   {errors.title && <p className="text-xs text-destructive">{errors.title}</p>}
                   <p className="text-xs text-muted-foreground">
@@ -257,7 +255,7 @@ export default function NewNovelPage() {
                     onChange={(e) => updateField("description", e.target.value)}
                     placeholder="A short synopsis, premise, or hook for your story..."
                     rows={5}
-                    className={errors.description ? "border-destructive" : ""}
+                    className={errors.description ? "rounded-none border-destructive" : "rounded-none"}
                   />
                   {errors.description && (
                     <p className="text-xs text-destructive">{errors.description}</p>
@@ -276,7 +274,7 @@ export default function NewNovelPage() {
                       value={formData.genre}
                       onValueChange={(value) => updateField("genre", value)}
                     >
-                      <SelectTrigger className={errors.genre ? "border-destructive" : ""}>
+                      <SelectTrigger className={errors.genre ? "rounded-none border-destructive" : "rounded-none"}>
                         <SelectValue placeholder="Select a genre" />
                       </SelectTrigger>
                       <SelectContent>
@@ -296,7 +294,7 @@ export default function NewNovelPage() {
                       value={formData.workType}
                       onValueChange={(value) => updateField("workType", value as StudioNovelFormData["workType"])}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="rounded-none">
                         <SelectValue placeholder="Choose original or translation" />
                       </SelectTrigger>
                       <SelectContent>
@@ -320,7 +318,7 @@ export default function NewNovelPage() {
                         updateField("status", value as StudioNovelFormData["status"])
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="rounded-none">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -337,7 +335,7 @@ export default function NewNovelPage() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-border/50 bg-muted/30 p-4">
+                <div className="border border-border bg-background p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">
                       <Label htmlFor="is-complete" className="text-sm font-medium text-foreground">
@@ -365,7 +363,7 @@ export default function NewNovelPage() {
               onChange={handleCoverImageChange}
             />
 
-            <Card>
+            <Card className="rounded-none border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle className="text-lg">Tags</CardTitle>
                 <CardDescription>
@@ -386,6 +384,7 @@ export default function NewNovelPage() {
                         }
                       }}
                       placeholder="Add a tag and press Enter"
+                      className="rounded-none"
                     />
                     <Button
                       type="button"
@@ -393,6 +392,7 @@ export default function NewNovelPage() {
                       size="icon"
                       onClick={handleAddTag}
                       disabled={!tagInput.trim()}
+                      className="rounded-none"
                     >
                       <Plus className="h-4 w-4" />
                     </Button>
@@ -402,7 +402,7 @@ export default function NewNovelPage() {
                       {formData.tags.map((tag) => (
                         <span
                           key={tag}
-                          className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-sm"
+                          className="inline-flex items-center gap-1 border border-border bg-background px-3 py-1 text-sm"
                         >
                           {tag}
                           <button
@@ -413,7 +413,7 @@ export default function NewNovelPage() {
                                 formData.tags.filter((item) => item !== tag)
                               )
                             }
-                            className="rounded-full p-0.5 transition-colors hover:bg-muted-foreground/20"
+                            className="p-0.5 transition-colors hover:bg-muted"
                           >
                             <X className="h-3 w-3" />
                           </button>
@@ -428,7 +428,7 @@ export default function NewNovelPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="rounded-none border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle className="text-lg">Content Warning</CardTitle>
                 <CardDescription>
@@ -441,6 +441,7 @@ export default function NewNovelPage() {
                   onChange={(e) => updateField("contentWarning", e.target.value)}
                   placeholder="Contains violence, strong language, mature themes..."
                   rows={3}
+                  className="rounded-none"
                 />
                 <p className="text-xs text-muted-foreground">
                   This warning is saved with the novel metadata and can be shown to readers later.
@@ -448,7 +449,7 @@ export default function NewNovelPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border/60 bg-card/90">
+            <Card className="rounded-none border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle className="text-lg">Story Snapshot</CardTitle>
                 <CardDescription>
@@ -460,13 +461,13 @@ export default function NewNovelPage() {
                   {storySnapshot.map((item) => (
                     <span
                       key={item}
-                      className="rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-medium text-foreground"
+                      className="border border-border bg-background px-3 py-1 text-xs font-medium text-foreground"
                     >
                       {item}
                     </span>
                   ))}
                 </div>
-                <div className="rounded-2xl border border-dashed border-border/60 bg-muted/30 p-4">
+                <div className="border border-dashed border-border bg-background p-4">
                   <p className="font-serif text-xl text-foreground">
                     {formData.title.trim() || "Your novel title"}
                   </p>
@@ -479,19 +480,19 @@ export default function NewNovelPage() {
             </Card>
 
             {submitError ? (
-              <div className="rounded-2xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              <div className="border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
                 {submitError}
               </div>
             ) : null}
 
             <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" asChild className="sm:min-w-[120px]">
+              <Button type="button" variant="outline" asChild className="rounded-none sm:min-w-[120px]">
                 <Link href="/studio">Cancel</Link>
               </Button>
               <Button
                 type="submit"
                 disabled={isSubmitting || !formData.title.trim()}
-                className="sm:min-w-[140px]"
+                className="rounded-none sm:min-w-[140px]"
               >
                 {isSubmitting ? (
                   <>

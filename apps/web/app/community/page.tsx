@@ -9,7 +9,7 @@ export default function CommunityPage() {
       <Navbar />
       <main className="flex-1">
         <section className="border-b border-border/40 bg-background px-4 py-16 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-4xl text-center">
+        <div className="mx-auto max-w-7xl text-center">
             <h1 className="font-serif text-4xl font-light tracking-tight text-foreground sm:text-5xl">
               Community
             </h1>
@@ -20,7 +20,7 @@ export default function CommunityPage() {
         </section>
 
         <section className="px-4 py-16 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-4xl">
+        <div className="mx-auto max-w-7xl">
             <div className="grid gap-8 md:grid-cols-3 text-center">
               <div className="flex flex-col items-center">
                 <div className="inline-flex rounded-lg bg-muted p-4 mb-4">

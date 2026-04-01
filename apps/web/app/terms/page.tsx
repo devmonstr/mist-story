@@ -6,7 +6,7 @@ export default function TermsPage() {
     <div className="flex min-h-screen flex-col">
       <Navbar />
       <main className="flex-1 bg-background">
-        <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <h1 className="font-serif text-4xl font-bold text-foreground mb-2">Terms of Service</h1>
         <p className="text-sm text-muted-foreground mb-12">Last updated: March 16, 2026</p>
 

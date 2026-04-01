@@ -6,6 +6,7 @@ import { errorHandler } from "./middleware/error-handler"
 import { requestLogger } from "./middleware/request-logger"
 import { sessionMiddleware } from "./middleware/session"
 import { authRouter } from "./routes/auth"
+import { adminRouter } from "./routes/admin"
 import { chaptersRouter } from "./routes/chapters"
 import { discoverRouter } from "./routes/discover"
 import { libraryRouter } from "./routes/library"
@@ -33,6 +34,7 @@ export function createApp() {
   })
 
   app.use("/api/v1/auth", authRouter)
+  app.use("/api/v1/admin", adminRouter)
   app.use("/api/v1/discover", discoverRouter)
   app.use("/api/v1/library", libraryRouter)
   app.use("/api/v1/me", meRouter)

@@ -1,18 +1,47 @@
 import {
+  countNotificationsForUser,
   countUnreadNotificationsForUser,
   deleteNotificationForUser,
   findNotificationForUser,
-  listNotificationsForUser,
+  listNovelNotificationCardsByIds,
+  listNotificationsForUserPage,
   markAllNotificationsReadForUser,
   markNotificationReadForUser,
 } from "@mist/db"
-import type { NotificationDto, NotificationsResponse } from "@mist/shared"
+import type {
+  NotificationDto,
+  NotificationListQuery,
+  NotificationNovelDto,
+  NotificationsResponse,
+  NotificationSummaryResponse,
+} from "@mist/shared"
 import { HttpError } from "../utils/http-error"
 
+type NotificationRecord = Awaited<
+  ReturnType<typeof listNotificationsForUserPage>
+>[number]
+
+async function getNotificationNovelMap(novelIds: Array<string | null | undefined>) {
+  const normalizedNovelIds = novelIds.filter((novelId): novelId is string => Boolean(novelId))
+  const novels = await listNovelNotificationCardsByIds(normalizedNovelIds)
+
+  return new Map<string, NotificationNovelDto>(
+    novels.map((novel) => [
+      novel.id,
+      {
+        id: novel.id,
+        slug: novel.slug,
+        title: novel.title,
+        coverUrl: novel.coverUrl,
+        coverStorageKey: novel.coverStorageKey,
+      },
+    ])
+  )
+}
+
 function serializeNotification(
-  notification: Awaited<ReturnType<typeof findNotificationForUser>> extends infer T
-    ? NonNullable<T>
-    : never
+  notification: NotificationRecord | NonNullable<Awaited<ReturnType<typeof findNotificationForUser>>>,
+  novel?: NotificationNovelDto | null
 ): NotificationDto {
   return {
     id: notification.id,
@@ -33,20 +62,56 @@ function serializeNotification(
           avatarUrl: notification.actor.avatarUrl ?? null,
         }
       : null,
+    novel: novel ?? null,
   }
 }
 
-export async function getNotifications(userId: string): Promise<NotificationsResponse> {
-  const [notifications, unreadCount] = await Promise.all([
-    listNotificationsForUser(userId),
+function buildPagination(page: number, pageSize: number, totalItems: number) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
+
+  return {
+    page: Math.min(page, totalPages),
+    pageSize,
+    totalItems,
+    totalPages,
+  }
+}
+
+export async function getNotifications(
+  userId: string,
+  input: NotificationListQuery
+): Promise<NotificationsResponse> {
+  const [totalItems, unreadCount] = await Promise.all([
+    countNotificationsForUser(userId),
     countUnreadNotificationsForUser(userId),
   ])
+  const pagination = buildPagination(input.page, input.pageSize, totalItems)
+  const notifications = await listNotificationsForUserPage({
+    userId,
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+  })
+  const novelMap = await getNotificationNovelMap(
+    notifications.map((notification) => notification.novelId)
+  )
 
   return {
     notifications: notifications.map((notification) =>
-      serializeNotification(notification)
+      serializeNotification(
+        notification,
+        novelMap.get(notification.novelId ?? "") ?? null
+      )
     ),
     unreadCount,
+    pagination,
+  }
+}
+
+export async function getNotificationSummary(
+  userId: string
+): Promise<NotificationSummaryResponse> {
+  return {
+    unreadCount: await countUnreadNotificationsForUser(userId),
   }
 }
 
@@ -56,7 +121,11 @@ export async function markNotificationRead(userId: string, notificationId: strin
     throw new HttpError(404, "Notification not found")
   }
 
-  return serializeNotification(notification)
+  const novelMap = await getNotificationNovelMap([notification.novelId])
+  return serializeNotification(
+    notification,
+    novelMap.get(notification.novelId ?? "") ?? null
+  )
 }
 
 export async function markAllNotificationsRead(userId: string) {

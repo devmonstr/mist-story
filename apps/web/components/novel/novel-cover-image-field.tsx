@@ -414,7 +414,7 @@ export function NovelCoverImageField({
       >
         {pendingCoverImageEdit && activeMetrics ? (
           <DialogContent
-            className="w-full max-w-[min(36rem,calc(100%-1.5rem))] gap-5 p-0 sm:max-w-2xl"
+            className="w-full max-w-[min(36rem,calc(100%-1.5rem))] gap-5 rounded-none p-0 sm:max-w-2xl"
             showCloseButton={false}
           >
             <DialogHeader className="flex-row items-center justify-between gap-3 border-b px-5 py-4 text-left">
@@ -426,7 +426,7 @@ export function NovelCoverImageField({
               </div>
               <Button
                 type="button"
-                className="rounded-full px-5"
+                className="rounded-none px-5"
                 onClick={() => void handleApplyCoverImageEdit()}
                 disabled={isApplyingCoverImageEdit}
               >
@@ -435,10 +435,10 @@ export function NovelCoverImageField({
             </DialogHeader>
 
             <div className="space-y-4 px-5 pb-5">
-              <div className="rounded-2xl bg-slate-100 p-4 dark:bg-slate-900/60">
+              <div className="border border-border bg-background p-4">
                 <div
                   className={cn(
-                    "relative mx-auto overflow-hidden rounded-[1.5rem] border-4 border-sky-500 bg-black/90 shadow-inner touch-none select-none",
+                    "relative mx-auto overflow-hidden border-2 border-foreground bg-black touch-none select-none",
                     isDraggingCoverImageEditor ? "cursor-grabbing" : "cursor-grab"
                   )}
                   style={{
@@ -463,7 +463,7 @@ export function NovelCoverImageField({
                 </div>
               </div>
 
-              <div className="space-y-3 rounded-2xl border border-border/50 bg-background/80 px-4 py-3">
+              <div className="space-y-3 border border-border bg-background px-4 py-3">
                 <p className="text-sm text-muted-foreground">
                   Recommended ratio: 2:3 portrait. We keep the cropped result as the cover upload.
                 </p>
@@ -499,7 +499,7 @@ export function NovelCoverImageField({
         ) : null}
       </Dialog>
 
-      <Card>
+      <Card className="rounded-none border-border bg-card shadow-none">
         <CardHeader>
           <CardTitle className="text-lg">Cover Image</CardTitle>
           <CardDescriptionText>Upload and frame the cover shown to readers.</CardDescriptionText>
@@ -511,12 +511,12 @@ export function NovelCoverImageField({
                 <img
                   src={coverImage}
                   alt="Cover preview"
-                  className="h-52 w-36 rounded-xl border border-border/50 object-cover shadow-sm"
+                  className="h-52 w-36 border border-border object-cover shadow-none"
                 />
                 <button
                   type="button"
                   onClick={handleRemoveCoverImage}
-                  className="absolute -right-2 -top-2 rounded-full bg-destructive p-1 text-destructive-foreground transition-colors hover:bg-destructive/90"
+                  className="absolute -right-2 -top-2 border border-destructive bg-background p-1 text-destructive transition-colors hover:bg-destructive/10"
                   aria-label="Remove cover image"
                 >
                   <X className="h-4 w-4" />
@@ -526,7 +526,7 @@ export function NovelCoverImageField({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex h-52 w-36 shrink-0 flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/60 px-4 text-center transition-colors hover:border-foreground/40 hover:bg-muted"
+                className="flex h-52 w-36 shrink-0 flex-col items-center justify-center border-2 border-dashed border-border bg-background px-4 text-center transition-colors hover:border-foreground hover:bg-muted/20"
               >
                 <ImageIcon className="h-8 w-8 text-muted-foreground" />
                 <span className="mt-3 text-sm font-medium text-foreground">
@@ -550,6 +550,7 @@ export function NovelCoverImageField({
                 type="button"
                 variant="outline"
                 onClick={() => fileInputRef.current?.click()}
+                className="rounded-none"
               >
                 {coverImage ? "Replace image" : "Upload cover"}
               </Button>

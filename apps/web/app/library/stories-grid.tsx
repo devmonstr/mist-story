@@ -357,7 +357,7 @@ export function StoriesGrid() {
         ) : null}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 lg:gap-5 xl:grid-cols-4 2xl:grid-cols-5">
         {stories.map((story) => {
           const coverSrc = resolveNovelCoverSrc({
             novelId: story.id,
@@ -368,26 +368,26 @@ export function StoriesGrid() {
           return (
             <article
               key={story.id}
-              className="flex flex-col overflow-hidden border border-border/40 bg-card transition-all hover:border-border/80 hover:shadow-sm"
+              className="flex h-full flex-col overflow-hidden border border-border bg-card transition-colors hover:border-foreground"
             >
               <Link
                 href={`/novel/${story.slug}`}
-                className="block border-b border-border/40 bg-muted/20"
+                className="block border-b border-border bg-muted/20"
               >
                 {coverSrc ? (
                   <img
                     src={coverSrc}
                     alt={`${story.title} cover`}
-                    className="aspect-[16/9] w-full object-cover"
+                    className="aspect-[3/4] w-full object-cover"
                   />
                 ) : (
-                  <div className="flex aspect-[16/9] w-full items-center justify-center bg-muted/40 text-muted-foreground">
+                  <div className="flex aspect-[3/4] w-full items-center justify-center bg-muted/40 text-muted-foreground">
                     <BookOpen className="h-8 w-8" />
                   </div>
                 )}
               </Link>
 
-              <div className="flex flex-1 flex-col p-6">
+              <div className="flex flex-1 flex-col p-4">
                 <div className="flex-1">
                   <div className="mb-3 flex items-start justify-between gap-2">
                     <h3 className="line-clamp-2 font-serif text-lg font-medium text-foreground">
@@ -396,7 +396,7 @@ export function StoriesGrid() {
                       </Link>
                     </h3>
                     <div className="flex flex-shrink-0 flex-col items-end gap-2">
-                      <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+                      <span className="border border-border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground">
                         {story.genre}
                       </span>
                       <span className="text-[11px] text-muted-foreground">
@@ -410,19 +410,19 @@ export function StoriesGrid() {
                       {story.author.displayName ?? "Anonymous"}
                     </span>
                   </p>
-                  <p className="mb-4 text-xs text-muted-foreground">
+                  <p className="mb-3 text-xs text-muted-foreground">
                     {story.status}
                     {formatStoryDate(story.publishedAt) ? (
                       <> · {formatStoryDate(story.publishedAt)}</>
                     ) : null}
                   </p>
-                  <p className="mb-4 line-clamp-3 text-sm text-foreground/80">
+                  <p className="mb-4 line-clamp-3 text-sm leading-relaxed text-foreground/80">
                     {story.summary || "A new story is waiting to be explored."}
                   </p>
                 </div>
 
-                <div className="flex items-center justify-between border-t border-border/40 pt-4">
-                  <div className="flex gap-4 text-xs text-muted-foreground">
+                <div className="flex items-center justify-between border-t border-border pt-4">
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                     <span>{story.chaptersCount} chapters</span>
                     <span>{story.readsCount.toLocaleString()} reads</span>
                     <span>{story.bookmarksCount.toLocaleString()} saves</span>

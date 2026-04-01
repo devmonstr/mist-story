@@ -23,7 +23,7 @@ const navLinks = [
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
-  const { user } = useAuth()
+  const { user, unreadNotificationCount } = useAuth()
   const isLoggedIn = !!user
 
   return (
@@ -68,7 +68,14 @@ export function Navbar() {
               </Button>
               <Button variant="ghost" size="icon" asChild>
                 <Link href="/notifications" aria-label="Notifications">
-                  <Bell className="h-5 w-5" />
+                  <span className="relative block">
+                    <Bell className="h-5 w-5" />
+                    {unreadNotificationCount > 0 ? (
+                      <span className="absolute -right-2 -top-2 min-w-[1rem] border border-background bg-foreground px-1 text-center text-[10px] leading-4 text-background">
+                        {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+                      </span>
+                    ) : null}
+                  </span>
                 </Link>
               </Button>
             </>
@@ -97,7 +104,14 @@ export function Navbar() {
               </Button>
               <Button variant="ghost" size="icon" asChild>
                 <Link href="/notifications" aria-label="Notifications">
-                  <Bell className="h-5 w-5" />
+                  <span className="relative block">
+                    <Bell className="h-5 w-5" />
+                    {unreadNotificationCount > 0 ? (
+                      <span className="absolute -right-2 -top-2 min-w-[1rem] border border-background bg-foreground px-1 text-center text-[10px] leading-4 text-background">
+                        {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+                      </span>
+                    ) : null}
+                  </span>
                 </Link>
               </Button>
             </>

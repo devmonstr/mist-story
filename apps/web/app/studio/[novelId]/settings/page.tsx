@@ -166,7 +166,7 @@ export default function NovelSettingsPage({
       <Navbar />
 
       <main className="flex-1">
-        <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
           <Link
             href={`/studio/${novelId}`}
             className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
@@ -380,3 +380,4 @@ export default function NovelSettingsPage({
     </div>
   )
 }
+

@@ -1,4 +1,6 @@
 import {
+  countFollowersForUser,
+  countFollowingForUser,
   createNotification,
   countFollowersForUsers,
   countFollowingForUsers,
@@ -11,8 +13,9 @@ import {
   getProfileSiteStats,
   hexToNpub,
   isFollowingUser,
-  listFollowerUsers,
-  listFollowingUsers,
+  listFollowerNotificationRecipients,
+  listFollowerUsersPage,
+  listFollowingUsersPage,
   listPublishedProfileNovels,
   npubToHex,
   saveUserNostrProfileSnapshot,
@@ -29,6 +32,7 @@ import type {
   MyProfileResponse,
   ProfileImageAssetType,
   ProfileConnectionsResponse,
+  ProfileConnectionsQuery,
   ProfileFollowState,
   ProfilePageResponse,
   ProfileSummaryDto,
@@ -50,6 +54,17 @@ import {
 } from "./profile-sync-service"
 
 const redis = createRedisClient(env.REDIS_URL)
+
+function buildPagination(page: number, pageSize: number, totalItems: number) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
+
+  return {
+    page: Math.min(page, totalPages),
+    pageSize,
+    totalItems,
+    totalPages,
+  }
+}
 
 function serializeProfileSummary(user: {
   id: string
@@ -240,9 +255,18 @@ export async function getProfilePage(
   }
 }
 
-export async function getProfileFollowers(npub: string): Promise<ProfileConnectionsResponse> {
+export async function getProfileFollowers(
+  npub: string,
+  input: ProfileConnectionsQuery
+): Promise<ProfileConnectionsResponse> {
   const user = await resolveProfileUserByNpub(npub)
-  const relations = await listFollowerUsers(user.id)
+  const totalItems = await countFollowersForUser(user.id)
+  const pagination = buildPagination(input.page, input.pageSize, totalItems)
+  const relations = await listFollowerUsersPage({
+    userId: user.id,
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+  })
 
   return {
     profile: {
@@ -250,12 +274,22 @@ export async function getProfileFollowers(npub: string): Promise<ProfileConnecti
       displayName: user.displayName ?? null,
     },
     users: await serializeConnectionUsers(relations.map((relation) => relation.follower)),
+    pagination,
   }
 }
 
-export async function getProfileFollowing(npub: string): Promise<ProfileConnectionsResponse> {
+export async function getProfileFollowing(
+  npub: string,
+  input: ProfileConnectionsQuery
+): Promise<ProfileConnectionsResponse> {
   const user = await resolveProfileUserByNpub(npub)
-  const relations = await listFollowingUsers(user.id)
+  const totalItems = await countFollowingForUser(user.id)
+  const pagination = buildPagination(input.page, input.pageSize, totalItems)
+  const relations = await listFollowingUsersPage({
+    userId: user.id,
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+  })
 
   return {
     profile: {
@@ -263,6 +297,7 @@ export async function getProfileFollowing(npub: string): Promise<ProfileConnecti
       displayName: user.displayName ?? null,
     },
     users: await serializeConnectionUsers(relations.map((relation) => relation.following)),
+    pagination,
   }
 }
 
@@ -331,6 +366,37 @@ export async function unfollowProfile(
     npub: hexToNpub(user.pubkey),
     isFollowing: false,
     followersCount: stats.followers,
+  }
+}
+
+export async function notifyFollowersAboutPublishedNovel(input: {
+  authorId: string
+  novelId: string
+  novelTitle: string
+}) {
+  const recipientUserIds = await listFollowerNotificationRecipients(
+    input.authorId,
+    input.authorId
+  )
+
+  for (const recipientUserId of recipientUserIds) {
+    const notification = await createNotification({
+      userId: recipientUserId,
+      actorUserId: input.authorId,
+      type: "CHAPTER_PUBLISHED",
+      novelId: input.novelId,
+      title: "New story published",
+      message: `A writer you follow published "${input.novelTitle}".`,
+      targetUrl: `/novel/${input.novelId}`,
+      metadata: {
+        eventType: "NOVEL_PUBLISHED",
+        authorUserId: input.authorId,
+      },
+    })
+
+    await enqueueNotificationDispatch(redis, {
+      notificationId: notification.id,
+    })
   }
 }
 

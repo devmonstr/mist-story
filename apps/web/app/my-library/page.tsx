@@ -80,7 +80,7 @@ export default function MyLibraryPage() {
       <Navbar />
       <main className="flex-1 bg-background">
         <section className="border-b border-border/40">
-          <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
             <div className="flex items-start gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                 <LibraryBig className="h-6 w-6 text-foreground" />
@@ -115,7 +115,7 @@ export default function MyLibraryPage() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+        <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-muted-foreground" />
@@ -180,7 +180,7 @@ export default function MyLibraryPage() {
           )}
         </section>
 
-        <section className="mx-auto max-w-6xl px-4 pb-12 sm:px-6 lg:px-8">
+        <section className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Bookmark className="h-5 w-5 text-muted-foreground" />
