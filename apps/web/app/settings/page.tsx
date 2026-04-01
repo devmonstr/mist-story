@@ -29,6 +29,7 @@ import { useTheme } from 'next-themes'
 import { useToast } from '@/hooks/use-toast'
 import { useRequireAuth } from '@/hooks/use-require-auth'
 import {
+  downloadSecurityAuditLog,
   createRelay,
   deleteRelay,
   fetchAppearanceSettings,
@@ -38,14 +39,19 @@ import {
   fetchSecuritySettings,
   publishMyProfile,
   refreshMyProfile as refreshMyProfileFromApi,
+  requestReauthChallenge,
+  revokeCurrentSecuritySession,
+  signOutAllSecuritySessions,
   uploadMyProfileImage,
   updateRelay,
   updateAppearanceSettings,
   updateNotificationSettings,
+  verifyReauthChallenge,
   type AppearanceSettingsDto,
   type IntegrationsSettingsDto,
   type NotificationSettingsDto,
   type RelayDto,
+  type SecuritySessionDto,
   type SecuritySettingsDto,
   type UploadProfileImageResponse,
 } from '@/lib/api'
@@ -53,7 +59,9 @@ import {
   DEFAULT_NOSTR_PROFILE_RELAYS,
   buildProfileMetadataContent,
   fetchLatestProfileMetadata,
+  getPublicKey,
   publishEventToRelays,
+  signAuthChallengeWithExtension,
   signKind0MetadataEvent,
   type RelayPublishResult,
 } from '@/lib/nostr-utils'
@@ -61,21 +69,32 @@ import type { NostrProfile } from '@/lib/nostr-types'
 import { cn } from '@/lib/utils'
 import {
   Bell,
+  BookOpen,
   Camera,
   Check,
   Copy,
+  Download,
   ImagePlus,
   KeyRound,
   Loader2,
   Lock,
   LogOut,
+  Mail,
+  Monitor,
+  Moon,
+  MessageSquare,
   Palette,
   Pencil,
   Plus,
   RadioTower,
+  RotateCcw,
   Shield,
+  ShieldAlert,
+  Sun,
   Trash2,
+  Type,
   User,
+  Users,
   X,
   ZoomIn,
   ZoomOut,
@@ -98,6 +117,58 @@ function compactValue(value: string, head = 14, tail = 10) {
   }
 
   return `${value.slice(0, head)}...${value.slice(-tail)}`
+}
+
+function inferDeviceLabel(userAgent: string | null) {
+  if (!userAgent) {
+    return 'Unknown device'
+  }
+
+  const normalized = userAgent.toLowerCase()
+  if (normalized.includes('iphone')) return 'iPhone'
+  if (normalized.includes('ipad')) return 'iPad'
+  if (normalized.includes('android')) return 'Android device'
+  if (normalized.includes('mac os')) return 'Mac'
+  if (normalized.includes('windows')) return 'Windows PC'
+  if (normalized.includes('linux')) return 'Linux device'
+
+  return 'Browser session'
+}
+
+function downloadBlobFile(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.append(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+function resolveDownloadFileName(headerValue: string | null, fallback: string) {
+  if (!headerValue) {
+    return fallback
+  }
+
+  const quotedMatch = /filename="([^"]+)"/i.exec(headerValue)
+  if (quotedMatch?.[1]) {
+    return quotedMatch[1]
+  }
+
+  const simpleMatch = /filename=([^;]+)/i.exec(headerValue)
+  if (simpleMatch?.[1]) {
+    return simpleMatch[1].trim()
+  }
+
+  return fallback
+}
+
+function countEnabledNotificationSettings(settings: NotificationSettingsDto) {
+  return NOTIFICATION_SETTING_DEFINITIONS.reduce(
+    (count, setting) => count + (settings[setting.key] ? 1 : 0),
+    0
+  )
 }
 
 type MyProfilePayload = Awaited<ReturnType<typeof fetchMyProfile>>
@@ -160,6 +231,8 @@ type RelayFormState = {
   write: boolean
 }
 
+type DirtyProfileFields = Record<keyof ProfileFormState, boolean>
+
 const EMPTY_PROFILE_FORM: ProfileFormState = {
   name: '',
   displayName: '',
@@ -175,6 +248,17 @@ const EMPTY_RELAY_FORM: RelayFormState = {
   url: '',
   read: true,
   write: true,
+}
+
+const EMPTY_DIRTY_PROFILE_FIELDS: DirtyProfileFields = {
+  name: false,
+  displayName: false,
+  about: false,
+  picture: false,
+  banner: false,
+  website: false,
+  nip05: false,
+  lud16: false,
 }
 
 const MAX_PROFILE_IMAGE_FILE_SIZE_BYTES = 5 * 1024 * 1024
@@ -200,6 +284,95 @@ const PROFILE_IMAGE_EDITOR_CONFIG: Record<ProfileImageAssetType, ProfileImageEdi
   },
 }
 
+const NOTIFICATION_SETTING_DEFINITIONS: Array<{
+  key: keyof NotificationSettingsDto
+  label: string
+  description: string
+  icon: typeof Mail
+  accentClassName: string
+}> = [
+  {
+    key: 'emailNotifications',
+    label: 'Email updates',
+    description: 'Receive important account updates and product news by email.',
+    icon: Mail,
+    accentClassName: 'text-sky-600',
+  },
+  {
+    key: 'newChapterNotifications',
+    label: 'New chapter alerts',
+    description: 'Hear when authors you follow publish a new chapter.',
+    icon: BookOpen,
+    accentClassName: 'text-emerald-600',
+  },
+  {
+    key: 'commentNotifications',
+    label: 'Comment activity',
+    description: 'Stay on top of replies and engagement around your work.',
+    icon: MessageSquare,
+    accentClassName: 'text-amber-600',
+  },
+  {
+    key: 'followNotifications',
+    label: 'Follower activity',
+    description: 'Know when a new reader starts following your account.',
+    icon: Users,
+    accentClassName: 'text-rose-600',
+  },
+]
+
+const APPEARANCE_THEME_OPTIONS: Array<{
+  value: AppearanceSettingsDto['theme']
+  label: string
+  description: string
+  icon: typeof Sun
+}> = [
+  {
+    value: 'light',
+    label: 'Light',
+    description: 'Bright surfaces with crisp contrast for daytime reading.',
+    icon: Sun,
+  },
+  {
+    value: 'dark',
+    label: 'Dark',
+    description: 'Muted backgrounds that reduce glare in low light.',
+    icon: Moon,
+  },
+  {
+    value: 'system',
+    label: 'Auto',
+    description: 'Follow your device setting and switch automatically.',
+    icon: Monitor,
+  },
+]
+
+const APPEARANCE_FONT_SIZE_OPTIONS: Array<{
+  value: AppearanceSettingsDto['fontSize']
+  label: string
+  description: string
+  previewClassName: string
+}> = [
+  {
+    value: 'small',
+    label: 'Compact',
+    description: 'Fits more text on screen with a tighter rhythm.',
+    previewClassName: 'text-sm',
+  },
+  {
+    value: 'medium',
+    label: 'Balanced',
+    description: 'Default density for steady reading across devices.',
+    previewClassName: 'text-base',
+  },
+  {
+    value: 'large',
+    label: 'Comfort',
+    description: 'More generous sizing for long reading sessions.',
+    previewClassName: 'text-lg',
+  },
+]
+
 const EDITABLE_METADATA_KEYS = [
   'name',
   'display_name',
@@ -221,6 +394,42 @@ function createProfileForm(profile: ProfileSummary): ProfileFormState {
     website: profile.website ?? '',
     nip05: profile.nip05 ?? '',
     lud16: profile.lud16 ?? '',
+  }
+}
+
+function stringValueOrEmpty(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function createProfileFormFromMetadata(metadata: Partial<Record<string, unknown>>) {
+  return {
+    name: stringValueOrEmpty(metadata.name),
+    displayName: stringValueOrEmpty(metadata.display_name),
+    about: stringValueOrEmpty(metadata.about),
+    picture: stringValueOrEmpty(metadata.picture),
+    banner: stringValueOrEmpty(metadata.banner),
+    website: stringValueOrEmpty(metadata.website),
+    nip05: stringValueOrEmpty(metadata.nip05),
+    lud16: stringValueOrEmpty(metadata.lud16),
+  }
+}
+
+function mergeProfileFormWithMetadata(
+  currentForm: ProfileFormState,
+  metadata: Partial<Record<string, unknown>>,
+  dirtyFields: DirtyProfileFields
+) {
+  const nextForm = createProfileFormFromMetadata(metadata)
+
+  return {
+    name: dirtyFields.name ? currentForm.name : nextForm.name,
+    displayName: dirtyFields.displayName ? currentForm.displayName : nextForm.displayName,
+    about: dirtyFields.about ? currentForm.about : nextForm.about,
+    picture: dirtyFields.picture ? currentForm.picture : nextForm.picture,
+    banner: dirtyFields.banner ? currentForm.banner : nextForm.banner,
+    website: dirtyFields.website ? currentForm.website : nextForm.website,
+    nip05: dirtyFields.nip05 ? currentForm.nip05 : nextForm.nip05,
+    lud16: dirtyFields.lud16 ? currentForm.lud16 : nextForm.lud16,
   }
 }
 
@@ -353,6 +562,19 @@ function getEffectiveRelayDetails(relays: RelayDto[], mode: 'read' | 'write') {
     source: 'fallback' as const,
     urls: DEFAULT_NOSTR_PROFILE_RELAYS,
   }
+}
+
+function isDefaultRelayConfiguration(relays: RelayDto[]) {
+  if (relays.length !== DEFAULT_NOSTR_PROFILE_RELAYS.length) {
+    return false
+  }
+
+  const expected = new Set(DEFAULT_NOSTR_PROFILE_RELAYS)
+  const actual = new Set(relays.map((relay) => relay.url))
+  return (
+    actual.size === expected.size &&
+    relays.every((relay) => relay.read && relay.write && expected.has(relay.url))
+  )
 }
 
 function clampNumber(value: number, min: number, max: number) {
@@ -498,7 +720,10 @@ export default function SettingsPage() {
   const [isProfileLoading, setIsProfileLoading] = useState(true)
   const [isRefreshingProfile, setIsRefreshingProfile] = useState(false)
   const [profileForm, setProfileForm] = useState<ProfileFormState>(EMPTY_PROFILE_FORM)
+  const [dirtyProfileFields, setDirtyProfileFields] =
+    useState<DirtyProfileFields>(EMPTY_DIRTY_PROFILE_FIELDS)
   const [additionalMetadata, setAdditionalMetadata] = useState('{}')
+  const [hasLoadedLiveProfileMetadata, setHasLoadedLiveProfileMetadata] = useState(false)
   const [isProfileMetadataLoading, setIsProfileMetadataLoading] = useState(false)
   const [profileMetadataError, setProfileMetadataError] = useState<string | null>(null)
   const [profileSaving, setProfileSaving] = useState(false)
@@ -521,17 +746,24 @@ export default function SettingsPage() {
   const [notificationSaving, setNotificationSaving] = useState(false)
   const [notificationError, setNotificationError] = useState<string | null>(null)
   const [notificationLoaded, setNotificationLoaded] = useState(false)
+  const [notificationSavedAt, setNotificationSavedAt] = useState<string | null>(null)
 
   const [appearanceSettings, setAppearanceSettings] = useState<AppearanceSettingsDto | null>(null)
   const [appearanceLoading, setAppearanceLoading] = useState(false)
   const [appearanceSaving, setAppearanceSaving] = useState(false)
   const [appearanceError, setAppearanceError] = useState<string | null>(null)
   const [appearanceLoaded, setAppearanceLoaded] = useState(false)
+  const [appearanceSavedAt, setAppearanceSavedAt] = useState<string | null>(null)
 
   const [securitySettings, setSecuritySettings] = useState<SecuritySettingsDto | null>(null)
   const [securityLoading, setSecurityLoading] = useState(false)
   const [securityError, setSecurityError] = useState<string | null>(null)
   const [securityLoaded, setSecurityLoaded] = useState(false)
+  const [securityRequiresReauth, setSecurityRequiresReauth] = useState(false)
+  const [securityActionError, setSecurityActionError] = useState<string | null>(null)
+  const [securityActionInFlight, setSecurityActionInFlight] = useState<
+    'reauth' | 'revoke-current' | 'sign-out-all' | 'download-audit' | null
+  >(null)
 
   const [integrationsSettings, setIntegrationsSettings] = useState<IntegrationsSettingsDto | null>(null)
   const [integrationsLoading, setIntegrationsLoading] = useState(false)
@@ -540,6 +772,7 @@ export default function SettingsPage() {
   const [relayForm, setRelayForm] = useState<RelayFormState>(EMPTY_RELAY_FORM)
   const [editingRelayId, setEditingRelayId] = useState<string | null>(null)
   const [isSavingRelayForm, setIsSavingRelayForm] = useState(false)
+  const [isResettingRelays, setIsResettingRelays] = useState(false)
   const [relayActionId, setRelayActionId] = useState<string | null>(null)
   const [copiedValue, setCopiedValue] = useState<string | null>(null)
 
@@ -547,6 +780,7 @@ export default function SettingsPage() {
   const avatarInputRef = useRef<HTMLInputElement | null>(null)
   const bannerInputRef = useRef<HTMLInputElement | null>(null)
   const profileImageEditorDragRef = useRef<ProfileImageEditorDragState | null>(null)
+  const dirtyProfileFieldsRef = useRef<DirtyProfileFields>(EMPTY_DIRTY_PROFILE_FIELDS)
 
   const handleCopy = async (value: string) => {
     try {
@@ -592,6 +826,53 @@ export default function SettingsPage() {
     return DEFAULT_NOSTR_PROFILE_RELAYS
   }, [ensureIntegrationsSettings])
 
+  const loadSecuritySettings = useCallback(async (options?: { force?: boolean }) => {
+    if (!isAuthenticated) {
+      return null
+    }
+
+    if (securityLoading) {
+      return null
+    }
+
+    if (!options?.force && securityLoaded) {
+      return securitySettings
+    }
+
+    setSecurityLoading(true)
+    setSecurityError(null)
+
+    try {
+      const payload = await fetchSecuritySettings()
+      setSecuritySettings(payload)
+      setSecurityRequiresReauth(false)
+      setSecurityLoaded(true)
+      return payload
+    } catch (error) {
+      const status =
+        typeof error === 'object' && error !== null && 'status' in error
+          ? Number((error as { status?: number }).status)
+          : null
+
+      if (status === 403) {
+        setSecurityRequiresReauth(true)
+        setSecuritySettings(null)
+        setSecurityError(null)
+      } else {
+        const message = error instanceof Error ? error.message : 'Failed to load security settings'
+        setSecurityError(message)
+      }
+      setSecurityLoaded(true)
+      return null
+    } finally {
+      setSecurityLoading(false)
+    }
+  }, [isAuthenticated, securityLoaded, securityLoading, securitySettings])
+
+  useEffect(() => {
+    dirtyProfileFieldsRef.current = dirtyProfileFields
+  }, [dirtyProfileFields])
+
   useEffect(() => {
     if (!isAuthenticated) {
       return
@@ -621,6 +902,8 @@ export default function SettingsPage() {
     }
 
     setProfileForm(createProfileForm(profileData.profile))
+    setDirtyProfileFields(EMPTY_DIRTY_PROFILE_FIELDS)
+    setHasLoadedLiveProfileMetadata(false)
     setAvatarImageSelection(null)
     setBannerImageSelection(null)
     setPendingProfileImageEdit(null)
@@ -660,7 +943,28 @@ export default function SettingsPage() {
           return
         }
 
-        setAdditionalMetadata(formatExtraMetadata(stripEditableMetadata(metadata ?? {})))
+        if (metadata) {
+          setProfileForm((current) =>
+            mergeProfileFormWithMetadata(
+              current,
+              metadata,
+              dirtyProfileFieldsRef.current
+            )
+          )
+          setAdditionalMetadata(formatExtraMetadata(stripEditableMetadata(metadata)))
+          setHasLoadedLiveProfileMetadata(true)
+          return
+        }
+
+        if (!profileData.profile.profileEventCreatedAt) {
+          setAdditionalMetadata('{}')
+          setHasLoadedLiveProfileMetadata(true)
+          return
+        }
+
+        setProfileMetadataError(
+          'Could not load your latest live Nostr metadata. Refresh it before broadcasting profile changes.'
+        )
       } catch (error) {
         if (cancelled) {
           return
@@ -669,7 +973,6 @@ export default function SettingsPage() {
         const message =
           error instanceof Error ? error.message : 'Failed to load live Nostr metadata'
         setProfileMetadataError(message)
-        setAdditionalMetadata('{}')
       } finally {
         if (!cancelled) {
           setIsProfileMetadataLoading(false)
@@ -743,24 +1046,8 @@ export default function SettingsPage() {
       return
     }
 
-    const loadSecurity = async () => {
-      setSecurityLoading(true)
-      setSecurityError(null)
-
-      try {
-        const payload = await fetchSecuritySettings()
-        setSecuritySettings(payload)
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to load security settings'
-        setSecurityError(message)
-      } finally {
-        setSecurityLoading(false)
-        setSecurityLoaded(true)
-      }
-    }
-
-    void loadSecurity()
-  }, [activeTab, isAuthenticated, securityLoaded, securityLoading])
+    void loadSecuritySettings()
+  }, [activeTab, isAuthenticated, loadSecuritySettings, securityLoaded, securityLoading])
 
   useEffect(() => {
     if (!isAuthenticated || activeTab !== 'api' || integrationsLoaded || integrationsLoading) {
@@ -806,6 +1093,10 @@ export default function SettingsPage() {
     setProfileForm((current) => ({
       ...current,
       [key]: value,
+    }))
+    setDirtyProfileFields((current) => ({
+      ...current,
+      [key]: true,
     }))
     setProfileImageError(null)
     setProfileSaveError(null)
@@ -998,6 +1289,15 @@ export default function SettingsPage() {
       return
     }
 
+    if (isProfileMetadataLoading || !hasLoadedLiveProfileMetadata) {
+      setProfileSaveError(
+        profileMetadataError
+          ? `${profileMetadataError}. Load live Nostr metadata before broadcasting profile changes.`
+          : 'Live Nostr metadata is still loading. Wait for it to finish before broadcasting profile changes.'
+      )
+      return
+    }
+
     setProfileSaving(true)
     setProfileSaveError(null)
     setProfileSaveSuccess(null)
@@ -1084,6 +1384,7 @@ export default function SettingsPage() {
 
         setProfileData(payload)
         setProfileForm(nextProfileForm)
+        setDirtyProfileFields(EMPTY_DIRTY_PROFILE_FIELDS)
         setProfileSaveSuccess(
           `Published kind 0 metadata to ${successfulRelayCount}/${relayResults.length} relays and refreshed Mist Story's cache.`
         )
@@ -1103,30 +1404,67 @@ export default function SettingsPage() {
     }
   }
 
+  const saveNotificationSettings = async (nextSettings: NotificationSettingsDto) => {
+    const previous = notificationSettings
+    setNotificationSettings(nextSettings)
+    setNotificationSaving(true)
+    setNotificationError(null)
+    setNotificationSavedAt(null)
+
+    try {
+      const saved = await updateNotificationSettings(nextSettings)
+      setNotificationSettings(saved)
+      setNotificationSavedAt(new Date().toISOString())
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save notification settings'
+      setNotificationError(message)
+      setNotificationSettings(previous ?? nextSettings)
+    } finally {
+      setNotificationSaving(false)
+    }
+  }
+
   const handleToggleNotification = async (key: keyof NotificationSettingsDto) => {
     if (!notificationSettings) {
       return
     }
 
-    const nextSettings = {
+    await saveNotificationSettings({
       ...notificationSettings,
       [key]: !notificationSettings[key],
+    })
+  }
+
+  const handleApplyNotificationPreset = async (
+    mode: 'all' | 'reading-only' | 'mute'
+  ) => {
+    if (!notificationSettings) {
+      return
     }
 
-    setNotificationSettings(nextSettings)
-    setNotificationSaving(true)
-    setNotificationError(null)
+    const nextSettings: NotificationSettingsDto =
+      mode === 'all'
+        ? {
+            emailNotifications: true,
+            newChapterNotifications: true,
+            commentNotifications: true,
+            followNotifications: true,
+          }
+        : mode === 'reading-only'
+          ? {
+              emailNotifications: true,
+              newChapterNotifications: true,
+              commentNotifications: false,
+              followNotifications: false,
+            }
+          : {
+              emailNotifications: false,
+              newChapterNotifications: false,
+              commentNotifications: false,
+              followNotifications: false,
+            }
 
-    try {
-      const saved = await updateNotificationSettings(nextSettings)
-      setNotificationSettings(saved)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to save notification settings'
-      setNotificationError(message)
-      setNotificationSettings(notificationSettings)
-    } finally {
-      setNotificationSaving(false)
-    }
+    await saveNotificationSettings(nextSettings)
   }
 
   const saveAppearanceSettings = async (
@@ -1137,10 +1475,12 @@ export default function SettingsPage() {
     setAppearanceSettings(nextSettings)
     setAppearanceSaving(true)
     setAppearanceError(null)
+    setAppearanceSavedAt(null)
 
     try {
       const saved = await updateAppearanceSettings(nextSettings)
       setAppearanceSettings(saved)
+      setAppearanceSavedAt(new Date().toISOString())
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to save appearance settings'
       setAppearanceError(message)
@@ -1175,6 +1515,118 @@ export default function SettingsPage() {
       ...appearanceSettings,
       fontSize: nextFontSize,
     })
+  }
+
+  const handleResetAppearance = async () => {
+    setTheme('system')
+    await saveAppearanceSettings({
+      theme: 'system',
+      fontSize: 'medium',
+    }, appearanceSettings?.theme)
+  }
+
+  const runSecurityReauth = useCallback(async () => {
+    if (!isExtensionAvailable) {
+      throw new Error('Sensitive actions require a Nostr signing extension with NIP-07 support.')
+    }
+
+    const accountPubkey = securitySettings?.pubkey ?? user?.pubkey ?? profileData?.profile.pubkey ?? null
+    if (!accountPubkey) {
+      throw new Error('Could not determine the current account pubkey for re-authentication.')
+    }
+
+    const pubkey = await getPublicKey()
+    if (!pubkey) {
+      throw new Error('Could not read your Nostr public key from the extension.')
+    }
+
+    if (pubkey !== accountPubkey) {
+      throw new Error('The connected Nostr extension does not match the current Mist Story account.')
+    }
+
+    setSecurityActionInFlight('reauth')
+    const { challenge } = await requestReauthChallenge()
+    const signedEvent = await signAuthChallengeWithExtension(pubkey, challenge)
+
+    if (!signedEvent) {
+      throw new Error('Re-authentication was cancelled or the extension could not sign the challenge.')
+    }
+
+    await verifyReauthChallenge({
+      challenge,
+      signedEvent,
+    })
+  }, [isExtensionAvailable, profileData?.profile.pubkey, securitySettings?.pubkey, user?.pubkey])
+
+  const handleUnlockSecurityDetails = async () => {
+    setSecurityActionError(null)
+
+    try {
+      await runSecurityReauth()
+      await loadSecuritySettings({ force: true })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to unlock security details'
+      setSecurityActionError(message)
+    } finally {
+      setSecurityActionInFlight(null)
+    }
+  }
+
+  const handleRevokeCurrentSecuritySession = async () => {
+    setSecurityActionError(null)
+
+    try {
+      await runSecurityReauth()
+      setSecurityActionInFlight('revoke-current')
+      await revokeCurrentSecuritySession()
+      signOut()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to revoke the current session'
+      setSecurityActionError(message)
+    } finally {
+      setSecurityActionInFlight(null)
+    }
+  }
+
+  const handleSignOutAllSecuritySessions = async () => {
+    setSecurityActionError(null)
+
+    try {
+      await runSecurityReauth()
+      setSecurityActionInFlight('sign-out-all')
+      await signOutAllSecuritySessions()
+      signOut()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to sign out all sessions'
+      setSecurityActionError(message)
+    } finally {
+      setSecurityActionInFlight(null)
+    }
+  }
+
+  const handleDownloadSecurityAuditLog = async () => {
+    setSecurityActionError(null)
+
+    try {
+      await runSecurityReauth()
+      setSecurityActionInFlight('download-audit')
+      const payload = await downloadSecurityAuditLog()
+      const fallbackFileName = `mist-security-audit-${new Date().toISOString().slice(0, 10)}.json`
+      downloadBlobFile(
+        payload.blob,
+        resolveDownloadFileName(payload.fileName, fallbackFileName)
+      )
+      toast({
+        title: 'Security audit log downloaded',
+        description: 'Your latest authentication activity has been exported as JSON.',
+      })
+      await loadSecuritySettings({ force: true })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to download the security audit log'
+      setSecurityActionError(message)
+    } finally {
+      setSecurityActionInFlight(null)
+    }
   }
 
   const resetRelayForm = () => {
@@ -1346,6 +1798,64 @@ export default function SettingsPage() {
     }
   }
 
+  const handleResetRelaysToDefault = async () => {
+    setIsResettingRelays(true)
+    setIntegrationsError(null)
+
+    try {
+      const currentRelays = integrationsSettings?.relays ?? []
+      const defaultRelayUrls = new Set(DEFAULT_NOSTR_PROFILE_RELAYS)
+      const seenDefaultRelayUrls = new Set<string>()
+
+      for (const relay of currentRelays) {
+        if (!defaultRelayUrls.has(relay.url) || seenDefaultRelayUrls.has(relay.url)) {
+          await deleteRelay(relay.id)
+          continue
+        }
+
+        seenDefaultRelayUrls.add(relay.url)
+
+        if (!relay.read || !relay.write) {
+          await updateRelay(relay.id, {
+            url: relay.url,
+            read: true,
+            write: true,
+          })
+        }
+      }
+
+      const configuredUrls = new Set(currentRelays.map((relay) => relay.url))
+      for (const relayUrl of DEFAULT_NOSTR_PROFILE_RELAYS) {
+        if (!configuredUrls.has(relayUrl)) {
+          await createRelay({
+            url: relayUrl,
+            read: true,
+            write: true,
+          })
+        }
+      }
+
+      const payload = await fetchIntegrationsSettings()
+      setIntegrationsSettings(payload)
+      setIntegrationsLoaded(true)
+      resetRelayForm()
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to reset relays to the default set'
+      setIntegrationsError(message)
+
+      try {
+        const payload = await fetchIntegrationsSettings()
+        setIntegrationsSettings(payload)
+        setIntegrationsLoaded(true)
+      } catch {
+        // Keep the original reset error visible if the refresh also fails.
+      }
+    } finally {
+      setIsResettingRelays(false)
+    }
+  }
+
   const settingsSections = [
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'notifications', label: 'Notifications', icon: Bell },
@@ -1388,9 +1898,26 @@ export default function SettingsPage() {
   const recommendedRelayUrls = DEFAULT_NOSTR_PROFILE_RELAYS.filter(
     (relayUrl) => !configuredRelays.some((relay) => relay.url === relayUrl)
   )
+  const isUsingDefaultRelaySet = isDefaultRelayConfiguration(configuredRelays)
   const relayFormHasChanges = editingRelay ? hasRelayFormChanges(editingRelay, relayForm) : true
   const relayFormSubmitDisabled =
-    isSavingRelayForm || !isRelayFormValid(relayForm) || (editingRelay ? !relayFormHasChanges : false)
+    isSavingRelayForm ||
+    isResettingRelays ||
+    !isRelayFormValid(relayForm) ||
+    (editingRelay ? !relayFormHasChanges : false)
+  const activeSecuritySessions = [...(securitySettings?.activeSessions ?? [])].sort(
+    (left, right) => right.authenticatedAt.localeCompare(left.authenticatedAt)
+  )
+  const enabledNotificationCount = notificationSettings
+    ? countEnabledNotificationSettings(notificationSettings)
+    : 0
+  const emailNotificationsEnabled = notificationSettings?.emailNotifications ?? false
+  const selectedThemeOption =
+    APPEARANCE_THEME_OPTIONS.find((option) => option.value === appearanceSettings?.theme) ?? null
+  const selectedFontSizeOption =
+    APPEARANCE_FONT_SIZE_OPTIONS.find((option) => option.value === appearanceSettings?.fontSize) ?? null
+  const securityReauth = securitySettings?.reauth ?? null
+  const isSecurityActionPending = securityActionInFlight !== null
 
   const activeProfileImageEditorConfig = pendingProfileImageEdit
     ? PROFILE_IMAGE_EDITOR_CONFIG[pendingProfileImageEdit.assetType]
@@ -1861,6 +2388,12 @@ export default function SettingsPage() {
                                     ? 'Saving will sign and broadcast a new kind 0 event.'
                                     : 'Install or enable a Nostr extension to sign and publish profile metadata.'}
                                 </p>
+                                {!hasLoadedLiveProfileMetadata ? (
+                                  <p className="text-xs text-muted-foreground">
+                                    Load the latest live metadata before broadcasting so Mist Story can
+                                    preserve unmanaged kind 0 fields.
+                                  </p>
+                                ) : null}
                                 {profileSaveError ? (
                                   <p className="text-sm text-destructive">{profileSaveError}</p>
                                 ) : profileSaveSuccess ? (
@@ -1870,7 +2403,12 @@ export default function SettingsPage() {
 
                               <Button
                                 onClick={() => void handleSaveProfile()}
-                                disabled={profileSaving || !isExtensionAvailable}
+                                disabled={
+                                  profileSaving ||
+                                  !isExtensionAvailable ||
+                                  isProfileMetadataLoading ||
+                                  !hasLoadedLiveProfileMetadata
+                                }
                               >
                                 {profileSaving ? 'Publishing...' : 'Save & Broadcast'}
                               </Button>
@@ -1978,53 +2516,126 @@ export default function SettingsPage() {
                     {notificationError}
                   </div>
                 ) : notificationSettings ? (
-                  <div className="space-y-4">
-                    {[
-                      {
-                        key: 'emailNotifications',
-                        label: 'Email Notifications',
-                        description: 'Receive updates and news via email',
-                      },
-                      {
-                        key: 'newChapterNotifications',
-                        label: 'New Chapter Alerts',
-                        description: 'Get notified when authors you follow publish new chapters',
-                      },
-                      {
-                        key: 'commentNotifications',
-                        label: 'Comment Notifications',
-                        description: 'Be notified when readers comment on your work',
-                      },
-                      {
-                        key: 'followNotifications',
-                        label: 'New Follower Alerts',
-                        description: 'Get notified when someone follows you',
-                      },
-                    ].map((setting) => {
-                      const checked = notificationSettings[setting.key as keyof NotificationSettingsDto]
-
-                      return (
-                        <div
-                          key={setting.key}
-                          className="flex items-center justify-between gap-4 border border-border/40 rounded bg-card p-4"
-                        >
-                          <div>
-                            <p className="font-medium text-foreground">{setting.label}</p>
-                            <p className="text-sm text-muted-foreground">{setting.description}</p>
-                          </div>
-                          <Switch
-                            checked={checked}
-                            onCheckedChange={() =>
-                              void handleToggleNotification(setting.key as keyof NotificationSettingsDto)
-                            }
-                            disabled={notificationSaving}
-                          />
+                  <div className="space-y-6">
+                    <div className="rounded border border-border/40 bg-card p-6">
+                      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="space-y-2">
+                          <h3 className="flex items-center gap-2 font-medium text-foreground">
+                            <Bell className="h-4 w-4" />
+                            Delivery overview
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            Choose how much Mist Story should tap you on the shoulder. Changes save automatically as you toggle.
+                          </p>
                         </div>
-                      )
-                    })}
-                    <p className="text-sm text-muted-foreground">
-                      {notificationSaving ? 'Saving notification preferences...' : 'Preferences save automatically.'}
-                    </p>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="rounded border border-border/40 bg-background px-4 py-3">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Enabled channels</p>
+                            <p className="mt-2 text-2xl font-semibold text-foreground">{enabledNotificationCount}/4</p>
+                          </div>
+                          <div className="rounded border border-border/40 bg-background px-4 py-3">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Email delivery</p>
+                            <p className="mt-2 text-sm font-medium text-foreground">
+                              {emailNotificationsEnabled ? 'Inbox enabled' : 'Email paused'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => void handleApplyNotificationPreset('all')}
+                          disabled={notificationSaving}
+                        >
+                          <Check className="h-4 w-4" />
+                          Enable all
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => void handleApplyNotificationPreset('reading-only')}
+                          disabled={notificationSaving}
+                        >
+                          <BookOpen className="h-4 w-4" />
+                          Reading only
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => void handleApplyNotificationPreset('mute')}
+                          disabled={notificationSaving}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          Mute all
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4">
+                      {NOTIFICATION_SETTING_DEFINITIONS.map((setting) => {
+                        const checked = notificationSettings[setting.key]
+                        const Icon = setting.icon
+
+                        return (
+                          <div
+                            key={setting.key}
+                            className={cn(
+                              'rounded border bg-card p-5 transition-colors',
+                              checked ? 'border-primary/40 bg-primary/5' : 'border-border/40'
+                            )}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex items-start gap-4">
+                                <div
+                                  className={cn(
+                                    'mt-0.5 flex h-10 w-10 items-center justify-center rounded-full border',
+                                    checked
+                                      ? 'border-primary/30 bg-primary/10 text-primary'
+                                      : 'border-border/40 bg-background text-muted-foreground',
+                                    checked ? setting.accentClassName : null
+                                  )}
+                                >
+                                  <Icon className="h-4 w-4" />
+                                </div>
+                                <div className="space-y-2">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="font-medium text-foreground">{setting.label}</p>
+                                    <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                                      {checked ? 'Active' : 'Muted'}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">{setting.description}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {checked ? 'Currently active for this account.' : 'Currently muted for this account.'}
+                                  </p>
+                                </div>
+                              </div>
+                              <Switch
+                                checked={checked}
+                                onCheckedChange={() => void handleToggleNotification(setting.key)}
+                                disabled={notificationSaving}
+                              />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    <div className="rounded border border-border/40 bg-card px-4 py-3 text-sm text-muted-foreground">
+                      {notificationSaving
+                        ? 'Saving notification preferences...'
+                        : notificationSavedAt
+                          ? `Saved ${formatDateTime(notificationSavedAt)}. Preferences sync to your account automatically across devices.`
+                          : 'Preferences sync to your account automatically, so the same choices follow you across devices.'}
+                    </div>
                   </div>
                 ) : null}
               </div>
@@ -2045,54 +2656,122 @@ export default function SettingsPage() {
                 ) : appearanceSettings ? (
                   <div className="space-y-6">
                     <div className="rounded border border-border/40 bg-card p-6">
-                      <label className="block text-sm font-medium text-foreground mb-3">Theme</label>
-                      <div className="space-y-3">
-                        {(['light', 'dark', 'system'] as const).map((themeOption) => (
-                          <label key={themeOption} className="flex items-center gap-3 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="theme"
-                              value={themeOption}
-                              checked={appearanceSettings.theme === themeOption}
-                              onChange={() => void handleAppearanceThemeChange(themeOption)}
-                              className="h-4 w-4"
-                            />
-                            <span className="text-foreground capitalize">
-                              {themeOption === 'system' ? 'Auto (system)' : themeOption}
-                            </span>
-                          </label>
-                        ))}
+                      <div className="grid gap-6 lg:grid-cols-[1.3fr_0.9fr]">
+                        <div className="space-y-3">
+                          <h3 className="flex items-center gap-2 font-medium text-foreground">
+                            <Palette className="h-4 w-4" />
+                            Reader preview
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            Tune the mood of the interface and the pacing of your reading layout before it follows your account everywhere else.
+                          </p>
+                          <div
+                            className={cn(
+                              'rounded-xl border px-5 py-5 transition-colors',
+                              appearanceSettings.theme === 'dark'
+                                ? 'border-slate-700 bg-slate-950 text-slate-100'
+                                : appearanceSettings.theme === 'light'
+                                  ? 'border-stone-200 bg-stone-50 text-stone-900'
+                                  : 'border-sky-200 bg-gradient-to-br from-sky-50 via-stone-50 to-white text-stone-900'
+                            )}
+                          >
+                            <p className="text-xs uppercase tracking-[0.25em] opacity-70">Mist Story Reader</p>
+                            <p className={cn('mt-3 font-serif leading-relaxed', selectedFontSizeOption?.previewClassName ?? 'text-base')}>
+                              The lantern at the harbor flickered once, then steadied. Mina turned the page and kept reading.
+                            </p>
+                            <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                              <span className="rounded-full border border-current/15 px-2.5 py-1 opacity-80">
+                                Theme: {selectedThemeOption?.label ?? 'System'}
+                              </span>
+                              <span className="rounded-full border border-current/15 px-2.5 py-1 opacity-80">
+                                Font size: {selectedFontSizeOption?.label ?? 'Medium'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                          <div className="rounded border border-border/40 bg-background px-4 py-3">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Theme mode</p>
+                            <p className="mt-2 text-sm font-medium text-foreground">{selectedThemeOption?.label ?? 'System'}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{selectedThemeOption?.description}</p>
+                          </div>
+                          <div className="rounded border border-border/40 bg-background px-4 py-3">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Reader scale</p>
+                            <p className="mt-2 text-sm font-medium text-foreground">{selectedFontSizeOption?.label ?? 'Medium'}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{selectedFontSizeOption?.description}</p>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
                     <div className="rounded border border-border/40 bg-card p-6">
-                      <label className="block text-sm font-medium text-foreground mb-3">Reader Font Size</label>
-                      <div className="space-y-3">
-                        {(['small', 'medium', 'large'] as const).map((size) => (
-                          <label key={size} className="flex items-center gap-3 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="fontSize"
-                              value={size}
-                              checked={appearanceSettings.fontSize === size}
-                              onChange={() => void handleAppearanceFontSizeChange(size)}
-                              className="h-4 w-4"
-                            />
-                            <span
-                              className={`text-foreground capitalize ${
-                                size === 'small' ? 'text-sm' : size === 'large' ? 'text-lg' : 'text-base'
-                              }`}
+                      <h3 className="text-sm font-medium text-foreground mb-4">Theme</h3>
+                      <div className="grid gap-3 md:grid-cols-3">
+                        {APPEARANCE_THEME_OPTIONS.map((option) => {
+                          const selected = appearanceSettings.theme === option.value
+                          const Icon = option.icon
+
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => void handleAppearanceThemeChange(option.value)}
+                              disabled={appearanceSaving}
+                              aria-pressed={selected}
+                              className={cn(
+                                'rounded border p-4 text-left transition-colors',
+                                selected
+                                  ? 'border-primary bg-primary/5'
+                                  : 'border-border/40 bg-background hover:border-border'
+                              )}
                             >
-                              {size}
-                            </span>
-                          </label>
-                        ))}
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border/40 bg-background">
+                                <Icon className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                              <p className="mt-4 font-medium text-foreground">{option.label}</p>
+                              <p className="mt-2 text-sm text-muted-foreground">{option.description}</p>
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
 
-                    <p className="text-sm text-muted-foreground">
-                      {appearanceSaving ? 'Saving appearance preferences...' : 'Theme and font size sync to your account.'}
-                    </p>
+                    <div className="rounded border border-border/40 bg-card p-6">
+                      <h3 className="text-sm font-medium text-foreground mb-4">Reader font size</h3>
+                      <div className="grid gap-3 md:grid-cols-3">
+                        {APPEARANCE_FONT_SIZE_OPTIONS.map((option) => {
+                          const selected = appearanceSettings.fontSize === option.value
+
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => void handleAppearanceFontSizeChange(option.value)}
+                              disabled={appearanceSaving}
+                              aria-pressed={selected}
+                              className={cn(
+                                'rounded border p-4 text-left transition-colors',
+                                selected
+                                  ? 'border-primary bg-primary/5'
+                                  : 'border-border/40 bg-background hover:border-border'
+                              )}
+                            >
+                              <p className={cn('font-medium text-foreground', option.previewClassName)}>{option.label}</p>
+                              <p className="mt-2 text-sm text-muted-foreground">{option.description}</p>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="rounded border border-border/40 bg-card px-4 py-3 text-sm text-muted-foreground">
+                      {appearanceSaving
+                        ? 'Saving appearance preferences...'
+                        : appearanceSavedAt
+                          ? `Saved ${formatDateTime(appearanceSavedAt)}. Theme and font size sync to your account so your reading setup stays consistent across devices.`
+                          : 'Theme and font size sync to your account, so your reading setup stays consistent when you move between devices.'}
+                    </div>
                   </div>
                 ) : null}
               </div>
@@ -2109,6 +2788,42 @@ export default function SettingsPage() {
                 ) : securityError ? (
                   <div className="rounded border border-destructive/30 bg-card p-6 text-destructive">
                     {securityError}
+                  </div>
+                ) : securityRequiresReauth ? (
+                  <div className="space-y-6">
+                    <div className="rounded border border-border/40 bg-card p-6">
+                      <div className="flex items-start gap-3">
+                        <ShieldAlert className="mt-1 h-5 w-5 text-foreground" />
+                        <div className="space-y-3">
+                          <div>
+                            <h3 className="font-medium text-foreground">Unlock security details</h3>
+                            <p className="mt-2 text-sm text-muted-foreground">
+                              Device, IP, user-agent, and session history are protected behind a recent
+                              Nostr signature. Re-authenticate to view this section.
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="gap-2"
+                            onClick={() => void handleUnlockSecurityDetails()}
+                            disabled={isSecurityActionPending}
+                          >
+                            {securityActionInFlight === 'reauth' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Shield className="h-4 w-4" />
+                            )}
+                            Re-authenticate to continue
+                          </Button>
+                          {securityActionError ? (
+                            <div className="rounded border border-destructive/30 bg-background p-4 text-sm text-destructive">
+                              {securityActionError}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ) : securitySettings ? (
                   <div className="space-y-6">
@@ -2183,6 +2898,144 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="rounded border border-border/40 bg-card p-6">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="space-y-2">
+                          <h3 className="flex items-center gap-2 font-medium text-foreground">
+                            <ShieldAlert className="h-4 w-4" />
+                            Sensitive Actions
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            Session revocation and audit export require a fresh Nostr signature before the action runs.
+                          </p>
+                          {securityReauth ? (
+                            <div className="space-y-1 text-sm text-muted-foreground">
+                              <p>
+                                Recent re-auth status:{' '}
+                                <span className={securityReauth.required ? 'text-amber-600' : 'text-emerald-600'}>
+                                  {securityReauth.required ? 'Required now' : 'Valid'}
+                                </span>
+                              </p>
+                              <p>Last re-authenticated: {formatDateTime(securityReauth.reauthenticatedAt)}</p>
+                              <p>Valid until: {formatDateTime(securityReauth.validUntil)}</p>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div className="flex flex-col gap-3 sm:min-w-64">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="justify-start gap-2"
+                            onClick={() => void handleDownloadSecurityAuditLog()}
+                            disabled={isSecurityActionPending}
+                          >
+                            {securityActionInFlight === 'download-audit' || securityActionInFlight === 'reauth' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Download className="h-4 w-4" />
+                            )}
+                            Download auth audit log
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="justify-start gap-2"
+                            onClick={() => void handleRevokeCurrentSecuritySession()}
+                            disabled={isSecurityActionPending}
+                          >
+                            {securityActionInFlight === 'revoke-current' || securityActionInFlight === 'reauth' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <LogOut className="h-4 w-4" />
+                            )}
+                            Revoke current session
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            className="justify-start gap-2"
+                            onClick={() => void handleSignOutAllSecuritySessions()}
+                            disabled={isSecurityActionPending}
+                          >
+                            {securityActionInFlight === 'sign-out-all' || securityActionInFlight === 'reauth' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <ShieldAlert className="h-4 w-4" />
+                            )}
+                            Sign out all sessions
+                          </Button>
+                        </div>
+                      </div>
+
+                      {securityActionError ? (
+                        <div className="mt-4 rounded border border-destructive/30 bg-background p-4 text-sm text-destructive">
+                          {securityActionError}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="rounded border border-border/40 bg-card p-6">
+                      <h3 className="flex items-center gap-2 font-medium text-foreground mb-4">
+                        <Monitor className="h-4 w-4" />
+                        Active Sessions
+                      </h3>
+                      {activeSecuritySessions.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No active sessions are currently recorded.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {activeSecuritySessions.map((session: SecuritySessionDto) => (
+                            <div
+                              key={session.id}
+                              className="rounded border border-border/40 bg-background p-4"
+                            >
+                              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                <div className="space-y-3">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="font-medium text-foreground">
+                                      {session.deviceLabel ?? inferDeviceLabel(session.userAgent)}
+                                    </p>
+                                    {session.current ? (
+                                      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                                        Current session
+                                      </span>
+                                    ) : null}
+                                  </div>
+
+                                  <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
+                                    <div>
+                                      <p className="text-xs uppercase tracking-wide">IP address</p>
+                                      <p className="mt-1 break-all text-foreground">
+                                        {session.ipAddress ?? 'Unknown'}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs uppercase tracking-wide">Origin</p>
+                                      <p className="mt-1 break-all text-foreground">
+                                        {session.origin ?? 'Unknown'}
+                                      </p>
+                                    </div>
+                                    <div className="sm:col-span-2">
+                                      <p className="text-xs uppercase tracking-wide">User agent</p>
+                                      <p className="mt-1 break-all text-foreground">
+                                        {session.userAgent ?? 'Unknown'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1 text-sm text-muted-foreground lg:text-right">
+                                  <p>Signed in: {formatDateTime(session.authenticatedAt)}</p>
+                                  <p>Re-authenticated: {formatDateTime(session.reauthenticatedAt)}</p>
+                                  <p>Session created: {formatDateTime(session.createdAt)}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded border border-border/40 bg-card p-6">
                       <h3 className="flex items-center gap-2 font-medium text-foreground mb-4">
                         <KeyRound className="h-4 w-4" />
                         Recent Auth Activity
@@ -2197,12 +3050,21 @@ export default function SettingsPage() {
                               className="rounded border border-border/40 bg-background p-4"
                             >
                               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                <div>
+                                <div className="space-y-2">
                                   <p className="font-medium text-foreground">{activity.action}</p>
                                   <p className="text-sm text-muted-foreground">
                                     {activity.resultCode}
                                     {activity.detail ? ` · ${activity.detail}` : ''}
                                   </p>
+                                  {activity.context ? (
+                                    <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                                      <p>Device: {activity.context.deviceLabel ?? inferDeviceLabel(activity.context.userAgent)}</p>
+                                      <p>IP: {activity.context.ipAddress ?? 'Unknown'}</p>
+                                      <p className="sm:col-span-2 break-all">
+                                        User agent: {activity.context.userAgent ?? 'Unknown'}
+                                      </p>
+                                    </div>
+                                  ) : null}
                                 </div>
                                 <p className="text-xs text-muted-foreground">{formatDateTime(activity.createdAt)}</p>
                               </div>
@@ -2418,6 +3280,21 @@ export default function SettingsPage() {
                             </span>
                           </div>
 
+                          <div className="mt-4 flex flex-wrap items-center gap-3">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void handleResetRelaysToDefault()}
+                              disabled={isResettingRelays || isUsingDefaultRelaySet}
+                            >
+                              {isResettingRelays ? 'Resetting...' : 'Reset to default'}
+                            </Button>
+                            <p className="text-xs text-muted-foreground">
+                              Keeps only the built-in relay set and enables both read and write for each.
+                            </p>
+                          </div>
+
                           <div className="mt-5 space-y-3">
                             {configuredRelays.length === 0 ? (
                               <p className="text-sm text-muted-foreground">
@@ -2425,7 +3302,7 @@ export default function SettingsPage() {
                               </p>
                             ) : (
                               sortedConfiguredRelays.map((relay) => {
-                                const isBusy = relayActionId === relay.id
+                                const isBusy = relayActionId === relay.id || isResettingRelays
 
                                 return (
                                   <div
@@ -2546,7 +3423,9 @@ export default function SettingsPage() {
                                     size="sm"
                                     className="gap-2"
                                     onClick={() => void handleAddRecommendedRelay(relayUrl)}
-                                    disabled={relayActionId === relayUrl || isSavingRelayForm}
+                                    disabled={
+                                      relayActionId === relayUrl || isSavingRelayForm || isResettingRelays
+                                    }
                                   >
                                     <Plus className="h-3.5 w-3.5" />
                                     {relayActionId === relayUrl ? 'Adding...' : 'Add relay'}

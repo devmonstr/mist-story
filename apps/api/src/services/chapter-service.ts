@@ -3,6 +3,7 @@ import {
   createChapterForNovel,
   createChapterVersionFromDraft,
   deleteChapterById,
+  findMaxChapterNumberForNovel,
   findChapterById,
   findChapterWithNovelById,
   findNovelByIdOrSlug,
@@ -39,6 +40,7 @@ function normalizeChapterPage(page: number | undefined, totalPages: number) {
 
 function buildStudioChapterList(input: {
   totalChapters: number
+  maxChapterNumber: number
   currentPage: number
   pageSize: number
 }): StudioChapterListResponse["chapterList"] {
@@ -56,7 +58,7 @@ function buildStudioChapterList(input: {
 
   return {
     totalChapters: input.totalChapters,
-    maxChapterNumber: input.totalChapters,
+    maxChapterNumber: input.maxChapterNumber,
     currentPage: safeCurrentPage,
     pageSize: input.pageSize,
     totalPages,
@@ -91,6 +93,10 @@ export async function listChapters(
         novelId: novel.id,
         status: "PUBLISHED",
       })
+  const maxChapterNumber = await findMaxChapterNumberForNovel({
+    novelId: novel.id,
+    status: isOwner ? undefined : "PUBLISHED",
+  })
 
   if (options?.all) {
     const chapters = await listChaptersForNovel(novel.id)
@@ -102,6 +108,7 @@ export async function listChapters(
       chapters: visibleChapters.map(serializeChapter),
       chapterList: buildStudioChapterList({
         totalChapters: visibleChapters.length,
+        maxChapterNumber,
         currentPage: 1,
         pageSize: Math.max(visibleChapters.length, 1),
       }),
@@ -110,6 +117,7 @@ export async function listChapters(
 
   const chapterList = buildStudioChapterList({
     totalChapters,
+    maxChapterNumber,
     currentPage: options?.chapterPage ?? 1,
     pageSize: STUDIO_CHAPTER_LIST_PAGE_SIZE,
   })
@@ -263,6 +271,9 @@ export async function reorderChaptersForAuthor(
 
     const chapterList = buildStudioChapterList({
       totalChapters: novel.chaptersCount,
+      maxChapterNumber: await findMaxChapterNumberForNovel({
+        novelId: novel.id,
+      }),
       currentPage: input.chapterPage,
       pageSize: STUDIO_CHAPTER_LIST_PAGE_SIZE,
     })

@@ -81,12 +81,21 @@ export async function setNotificationPreferencesForUser(
   })
 }
 
-export async function listRecentAuthAuditLogsForUser(userId: string, limit = 10) {
+export async function listAuthAuditLogsForUser(
+  userId: string,
+  options?: {
+    limit?: number
+  }
+) {
   return prisma.authAuditLog.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
-    take: limit,
+    ...(options?.limit ? { take: options.limit } : {}),
   })
+}
+
+export async function listRecentAuthAuditLogsForUser(userId: string, limit = 10) {
+  return listAuthAuditLogsForUser(userId, { limit })
 }
 
 export async function listApiKeysForUser(userId: string) {

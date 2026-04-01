@@ -1,6 +1,7 @@
 import type {
   AuthChallengeResponse,
   AuthMeResponse,
+  AuthReverifyResponse,
   AuthUserDto,
   AuthVerifyResponse,
   BookmarkState,
@@ -26,6 +27,10 @@ import type {
   SearchFilterType,
   SearchResponse,
   SearchSortBy,
+  SecurityActivityItem,
+  SecurityAuditExport,
+  SecuritySessionItem,
+  SecuritySettings,
   SignedNostrEvent,
   StudioChapterListResponse,
   UpsertReadingProgressInput,
@@ -46,19 +51,10 @@ export type AppearanceSettingsDto = {
   fontSize: "small" | "medium" | "large"
 }
 
-export type SecurityActivityDto = {
-  id: string
-  action: string
-  resultCode: string
-  detail: string | null
-  createdAt: string
-}
-
-export type SecuritySettingsDto = {
-  npub: string
-  pubkey: string
-  recentAuthActivity: SecurityActivityDto[]
-}
+export type SecurityActivityDto = SecurityActivityItem
+export type SecuritySessionDto = SecuritySessionItem
+export type SecuritySettingsDto = SecuritySettings
+export type SecurityAuditLogExportDto = SecurityAuditExport
 
 export type ApiKeyDto = {
   id: string
@@ -108,7 +104,7 @@ function getApiBaseUrl() {
   )
 }
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number
@@ -169,12 +165,28 @@ export function requestAuthChallenge(pubkey: string) {
   })
 }
 
+export function requestReauthChallenge() {
+  return apiFetch<AuthChallengeResponse>("/api/v1/auth/re-auth/challenge", {
+    method: "POST",
+  })
+}
+
 export function verifyAuthChallenge(input: {
   pubkey: string
   challenge: string
   signedEvent: SignedNostrEvent
 }) {
   return apiFetch<AuthVerifyResponse>("/api/v1/auth/verify", {
+    method: "POST",
+    body: JSON.stringify(input),
+  })
+}
+
+export function verifyReauthChallenge(input: {
+  challenge: string
+  signedEvent: SignedNostrEvent
+}) {
+  return apiFetch<AuthReverifyResponse>("/api/v1/auth/re-auth/verify", {
     method: "POST",
     body: JSON.stringify(input),
   })
@@ -255,6 +267,36 @@ export function updateAppearanceSettings(input: AppearanceSettingsDto) {
 
 export function fetchSecuritySettings() {
   return apiFetch<SecuritySettingsDto>("/api/v1/me/settings/security")
+}
+
+export function revokeCurrentSecuritySession() {
+  return apiFetch<void>("/api/v1/me/settings/security/sessions/current", {
+    method: "DELETE",
+  })
+}
+
+export function signOutAllSecuritySessions() {
+  return apiFetch<void>("/api/v1/me/settings/security/sessions", {
+    method: "DELETE",
+  })
+}
+
+export async function downloadSecurityAuditLog() {
+  const response = await fetch(`${getApiBaseUrl()}/api/v1/me/settings/security/audit-log`, {
+    method: "GET",
+    credentials: "include",
+  })
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string }
+    throw new ApiError(body.error || "Request failed", response.status)
+  }
+
+  return {
+    blob: await response.blob(),
+    contentType: response.headers.get("Content-Type"),
+    fileName: response.headers.get("Content-Disposition"),
+  }
 }
 
 export function fetchIntegrationsSettings() {

@@ -25,6 +25,7 @@ export const DEFAULT_NOSTR_PROFILE_RELAYS = [
   "wss://relay.damus.io",
   "wss://nos.lol",
   "wss://relay.nostr.band",
+  "wss://relay.primal.net",
 ]
 
 hashes.hmacSha256 = (key, message) => hmac(sha256, key, message)

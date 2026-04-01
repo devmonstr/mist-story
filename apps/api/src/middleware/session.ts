@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express"
 import { findUserById, serializeUser } from "@mist/db"
-import { createRedisClient, redisKeys } from "@mist/redis"
+import { SESSION_TTL_SECONDS, createRedisClient, redisKeys } from "@mist/redis"
+import { authSessionPayloadSchema } from "@mist/shared"
 import { env } from "../config/env"
 import { SESSION_COOKIE_NAME } from "../config/constants"
 
@@ -23,11 +24,19 @@ export async function sessionMiddleware(
       return next()
     }
 
-    const parsed = JSON.parse(payload) as { userId: string }
+    const parsed = authSessionPayloadSchema.parse(JSON.parse(payload))
     const user = await findUserById(parsed.userId)
 
     if (user) {
+      await redis
+        .multi()
+        .expire(redisKeys.session(sessionId), SESSION_TTL_SECONDS)
+        .sadd(redisKeys.userSessions(parsed.userId), sessionId)
+        .expire(redisKeys.userSessions(parsed.userId), SESSION_TTL_SECONDS)
+        .exec()
+
       response.locals.sessionId = sessionId
+      response.locals.session = parsed
       response.locals.user = serializeUser(user)
     }
 

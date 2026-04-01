@@ -2,14 +2,18 @@ import { Router } from "express"
 import {
   authChallengeRequestSchema,
   authMeResponseSchema,
+  authReverifyRequestSchema,
   authVerifyRequestSchema,
 } from "@mist/shared"
 import { SESSION_COOKIE_NAME } from "../config/constants"
+import { requireAuth } from "../middleware/require-auth"
 import { sessionMiddleware } from "../middleware/session"
 import { validateBody } from "../middleware/validate"
 import {
   destroySession,
   issueChallenge,
+  issueReauthChallenge,
+  verifyReauthChallenge,
   verifyChallenge,
 } from "../services/auth-service"
 
@@ -20,7 +24,7 @@ authRouter.post(
   validateBody(authChallengeRequestSchema),
   async (request, response, next) => {
     try {
-      const payload = await issueChallenge(request.body.pubkey)
+      const payload = await issueChallenge(request.body.pubkey, request)
       return response.json(payload)
     } catch (error) {
       return next(error)
@@ -33,7 +37,7 @@ authRouter.post(
   validateBody(authVerifyRequestSchema),
   async (request, response, next) => {
     try {
-      const result = await verifyChallenge(request.body)
+      const result = await verifyChallenge(request.body, request)
 
       response.cookie(SESSION_COOKIE_NAME, result.sessionId, {
         httpOnly: true,
@@ -46,6 +50,61 @@ authRouter.post(
       return response.json({
         user: result.user,
       })
+    } catch (error) {
+      return next(error)
+    }
+  }
+)
+
+authRouter.post(
+  "/re-auth/challenge",
+  requireAuth,
+  async (request, response, next) => {
+    try {
+      const sessionId = response.locals.sessionId as string | undefined
+      const user = response.locals.user as { id: string; pubkey: string } | undefined
+
+      if (!sessionId || !user) {
+        return response.status(401).json({ error: "Unauthorized" })
+      }
+
+      const payload = await issueReauthChallenge({
+        sessionId,
+        pubkey: user.pubkey,
+        userId: user.id,
+        request,
+      })
+
+      return response.json(payload)
+    } catch (error) {
+      return next(error)
+    }
+  }
+)
+
+authRouter.post(
+  "/re-auth/verify",
+  requireAuth,
+  validateBody(authReverifyRequestSchema),
+  async (request, response, next) => {
+    try {
+      const sessionId = response.locals.sessionId as string | undefined
+      const user = response.locals.user as { id: string; pubkey: string } | undefined
+
+      if (!sessionId || !user) {
+        return response.status(401).json({ error: "Unauthorized" })
+      }
+
+      const payload = await verifyReauthChallenge({
+        sessionId,
+        pubkey: user.pubkey,
+        userId: user.id,
+        challenge: request.body.challenge,
+        signedEvent: request.body.signedEvent,
+        request,
+      })
+
+      return response.json(payload)
     } catch (error) {
       return next(error)
     }

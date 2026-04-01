@@ -27,6 +27,18 @@ export const authChallengeResponseSchema = z.object({
   expiresAt: z.string(),
 })
 
+export const authSessionPayloadSchema = z.object({
+  userId: z.string(),
+  createdAt: z.string(),
+  lastVerifiedAt: z.string(),
+  lastReauthenticatedAt: z.string().nullable(),
+  ipAddress: z.string().nullable().optional(),
+  ipHash: z.string().nullable().optional(),
+  userAgent: z.string().nullable().optional(),
+  origin: z.string().nullable().optional(),
+  deviceLabel: z.string().nullable().optional(),
+})
+
 export const signedNostrEventSchema = z.object({
   id: z.string().optional(),
   pubkey: z.string(),
@@ -51,11 +63,24 @@ export const authMeResponseSchema = z.object({
   user: authUserSchema,
 })
 
+export const authReverifyRequestSchema = z.object({
+  challenge: z.string().min(1),
+  signedEvent: signedNostrEventSchema,
+})
+
+export const authReverifyResponseSchema = z.object({
+  reauthenticatedAt: z.string(),
+  validUntil: z.string(),
+})
+
 export type NostrProfileDto = z.infer<typeof nostrProfileSchema>
 export type AuthUserDto = z.infer<typeof authUserSchema>
 export type AuthChallengeRequest = z.infer<typeof authChallengeRequestSchema>
 export type AuthChallengeResponse = z.infer<typeof authChallengeResponseSchema>
+export type AuthSessionPayload = z.infer<typeof authSessionPayloadSchema>
 export type SignedNostrEvent = z.infer<typeof signedNostrEventSchema>
 export type AuthVerifyRequest = z.infer<typeof authVerifyRequestSchema>
 export type AuthVerifyResponse = z.infer<typeof authVerifyResponseSchema>
 export type AuthMeResponse = z.infer<typeof authMeResponseSchema>
+export type AuthReverifyRequest = z.infer<typeof authReverifyRequestSchema>
+export type AuthReverifyResponse = z.infer<typeof authReverifyResponseSchema>

@@ -36,6 +36,23 @@ export async function countChaptersForNovel(input: {
   })
 }
 
+export async function findMaxChapterNumberForNovel(input: {
+  novelId: string
+  status?: "DRAFT" | "PUBLISHED" | "ARCHIVED"
+}) {
+  const aggregate = await prisma.chapter.aggregate({
+    where: {
+      novelId: input.novelId,
+      ...(input.status ? { status: input.status } : {}),
+    },
+    _max: {
+      number: true,
+    },
+  })
+
+  return aggregate._max.number ?? 0
+}
+
 export async function findChapterById(chapterId: string) {
   return prisma.chapter.findUnique({
     where: { id: chapterId },

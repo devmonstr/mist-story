@@ -7,6 +7,7 @@ import {
   getNotificationPreferencesForUser,
   getOrCreateUserSetting,
   hexToNpub,
+  listAuthAuditLogsForUser,
   listApiKeysForUser,
   listRecentAuthAuditLogsForUser,
   listRelaysForUser,
@@ -15,17 +16,32 @@ import {
   updateRelayForUser,
   setNotificationPreferencesForUser,
 } from "@mist/db"
+import { REAUTH_TTL_SECONDS } from "@mist/redis"
+import {
+  normalizeRelayUrl,
+  parseSecurityAuditDetail,
+} from "@mist/shared"
 import type {
   AppearanceSettings,
+  AuthSessionPayload,
   CreateApiKeyInput,
   CreateApiKeyResponse,
   CreateRelayInput,
   IntegrationSettings,
   NotificationSettings,
+  SecurityActivityItem,
+  SecurityAuditExport,
   SecuritySettings,
+  SecuritySessionItem,
   UpdateRelayInput,
 } from "@mist/shared"
 import { HttpError } from "../utils/http-error"
+import {
+  destroyAllSessionsForUser,
+  destroySession,
+  hasRecentReauthentication,
+  listSessionRecordsForUser,
+} from "./auth-service"
 
 const NEW_CHAPTER_TYPES = ["CHAPTER_PUBLISHED"] as const
 const COMMENT_TYPES = ["COMMENT_REPLY", "COMMENT_LIKE"] as const
@@ -64,11 +80,131 @@ function fromFontSize(fontSize: AppearanceSettings["fontSize"]) {
   return fontSize.toUpperCase() as "SMALL" | "MEDIUM" | "LARGE"
 }
 
+async function findRelayWithEquivalentUrl(
+  userId: string,
+  url: string,
+  options?: {
+    excludeRelayId?: string
+  }
+) {
+  const normalizedUrl = normalizeRelayUrl(url)
+  const relays = await listRelaysForUser(userId)
+
+  return (
+    relays.find(
+      (relay) =>
+        relay.id !== options?.excludeRelayId &&
+        normalizeRelayUrl(relay.url) === normalizedUrl
+    ) ?? null
+  )
+}
+
 function isGroupEnabled(
   enabledMap: Map<string, boolean>,
   types: readonly string[]
 ) {
   return types.every((type) => enabledMap.get(type) ?? true)
+}
+
+function deriveDeviceLabel(userAgent: string | null) {
+  if (!userAgent) {
+    return null
+  }
+
+  const normalized = userAgent.toLowerCase()
+  const platform = normalized.includes("iphone") || normalized.includes("ios")
+    ? "iPhone"
+    : normalized.includes("ipad")
+      ? "iPad"
+      : normalized.includes("android")
+        ? "Android"
+        : normalized.includes("mac os")
+          ? "Mac"
+          : normalized.includes("windows")
+            ? "Windows"
+            : normalized.includes("linux")
+              ? "Linux"
+              : "Unknown device"
+
+  const browser = normalized.includes("edg/")
+    ? "Edge"
+    : normalized.includes("chrome/")
+      ? "Chrome"
+      : normalized.includes("firefox/")
+        ? "Firefox"
+        : normalized.includes("safari/") && !normalized.includes("chrome/")
+          ? "Safari"
+          : normalized.includes("opr/")
+            ? "Opera"
+            : "Browser"
+
+  return `${platform} · ${browser}`
+}
+
+function serializeSecurityActivity(input: {
+  id: string
+  action: string
+  resultCode: string
+  detail: string | null
+  createdAt: Date
+}): SecurityActivityItem {
+  const parsed = parseSecurityAuditDetail(input.detail)
+
+  return {
+    id: input.id,
+    action: input.action,
+    resultCode: input.resultCode,
+    detail: parsed.message,
+    context: {
+      deviceLabel: parsed.deviceLabel ?? deriveDeviceLabel(parsed.userAgent),
+      ipAddress: parsed.ipAddress,
+      ipHash: parsed.ipHash,
+      userAgent: parsed.userAgent,
+      origin: parsed.origin,
+    },
+    createdAt: input.createdAt.toISOString(),
+  }
+}
+
+function serializeSecuritySession(input: {
+  sessionId: string
+  currentSessionId?: string
+  session: AuthSessionPayload
+}): SecuritySessionItem {
+  const userAgent = input.session.userAgent ?? null
+  const ipAddress = input.session.ipAddress ?? null
+  const origin = input.session.origin ?? null
+
+  return {
+    id: input.sessionId,
+    current: input.sessionId === input.currentSessionId,
+    createdAt: input.session.createdAt,
+    authenticatedAt: input.session.lastVerifiedAt,
+    reauthenticatedAt: input.session.lastReauthenticatedAt,
+    expiresAt: null,
+    deviceLabel: input.session.deviceLabel ?? deriveDeviceLabel(userAgent),
+    ipAddress,
+    ipHash: null,
+    userAgent,
+    origin,
+  }
+}
+
+function buildReauthStatus(session: AuthSessionPayload | null) {
+  const reference = session
+    ? session.lastReauthenticatedAt ?? session.lastVerifiedAt
+    : null
+
+  return {
+    required: !hasRecentReauthentication(session),
+    windowSeconds: REAUTH_TTL_SECONDS,
+    reauthenticatedAt: session?.lastReauthenticatedAt ?? null,
+    validUntil: reference
+      ? new Date(
+          new Date(reference).getTime() + REAUTH_TTL_SECONDS * 1000
+        ).toISOString()
+      : null,
+  }
 }
 
 export async function getNotificationSettings(
@@ -138,10 +274,17 @@ export async function updateAppearanceSettings(
   return getAppearanceSettings(userId)
 }
 
-export async function getSecuritySettings(userId: string): Promise<SecuritySettings> {
-  const [user, activity] = await Promise.all([
+export async function getSecuritySettings(
+  userId: string,
+  options?: {
+    currentSessionId?: string
+    currentSession?: AuthSessionPayload | null
+  }
+): Promise<SecuritySettings> {
+  const [user, activity, sessions] = await Promise.all([
     findUserById(userId),
     listRecentAuthAuditLogsForUser(userId, 10),
+    listSessionRecordsForUser(userId),
   ])
 
   if (!user) {
@@ -151,14 +294,35 @@ export async function getSecuritySettings(userId: string): Promise<SecuritySetti
   return {
     npub: hexToNpub(user.pubkey),
     pubkey: user.pubkey,
-    recentAuthActivity: activity.map((item) => ({
-      id: item.id,
-      action: item.action,
-      resultCode: item.resultCode,
-      detail: item.detail ?? null,
-      createdAt: item.createdAt.toISOString(),
-    })),
+    recentAuthActivity: activity.map(serializeSecurityActivity),
+    activeSessions: sessions.map((entry) =>
+      serializeSecuritySession({
+        sessionId: entry.sessionId,
+        currentSessionId: options?.currentSessionId,
+        session: entry.session,
+      })
+    ),
+    reauth: buildReauthStatus(options?.currentSession ?? null),
   }
+}
+
+export async function exportSecurityAuditLog(
+  userId: string
+): Promise<SecurityAuditExport> {
+  const logs = await listAuthAuditLogsForUser(userId)
+
+  return {
+    exportedAt: new Date().toISOString(),
+    items: logs.map(serializeSecurityActivity),
+  }
+}
+
+export async function revokeCurrentSecuritySession(sessionId: string) {
+  await destroySession(sessionId)
+}
+
+export async function revokeAllSecuritySessions(userId: string) {
+  return destroyAllSessionsForUser(userId)
 }
 
 export async function getIntegrationSettings(userId: string): Promise<IntegrationSettings> {
@@ -178,7 +342,7 @@ export async function getIntegrationSettings(userId: string): Promise<Integratio
     })),
     relays: relays.map((relay) => ({
       id: relay.id,
-      url: relay.url,
+      url: normalizeRelayUrl(relay.url),
       read: relay.read,
       write: relay.write,
       createdAt: relay.createdAt.toISOString(),
@@ -214,12 +378,18 @@ export async function revokeApiKey(userId: string, apiKeyId: string) {
 }
 
 export async function createRelay(userId: string, input: CreateRelayInput) {
+  const normalizedUrl = normalizeRelayUrl(input.url)
+  const existingRelay = await findRelayWithEquivalentUrl(userId, normalizedUrl)
+  if (existingRelay) {
+    throw new HttpError(409, "You already have a relay with this URL")
+  }
+
   let relay
 
   try {
     relay = await createRelayForUser({
       userId,
-      url: input.url,
+      url: normalizedUrl,
       read: input.read,
       write: input.write,
     })
@@ -233,7 +403,7 @@ export async function createRelay(userId: string, input: CreateRelayInput) {
 
   return {
     id: relay.id,
-    url: relay.url,
+    url: normalizeRelayUrl(relay.url),
     read: relay.read,
     write: relay.write,
     createdAt: relay.createdAt.toISOString(),
@@ -251,13 +421,21 @@ export async function updateRelay(
     throw new HttpError(404, "Relay not found")
   }
 
+  const normalizedUrl = normalizeRelayUrl(input.url)
+  const existingRelay = await findRelayWithEquivalentUrl(userId, normalizedUrl, {
+    excludeRelayId: relayId,
+  })
+  if (existingRelay) {
+    throw new HttpError(409, "You already have a relay with this URL")
+  }
+
   let relay
 
   try {
     relay = await updateRelayForUser({
       userId,
       relayId,
-      url: input.url,
+      url: normalizedUrl,
       read: input.read,
       write: input.write,
     })
@@ -275,7 +453,7 @@ export async function updateRelay(
 
   return {
     id: relay.id,
-    url: relay.url,
+    url: normalizeRelayUrl(relay.url),
     read: relay.read,
     write: relay.write,
     createdAt: relay.createdAt.toISOString(),

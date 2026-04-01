@@ -391,7 +391,7 @@ export async function updateMyProfile(
     throw new HttpError(400, "Signed event content does not match submitted profile metadata")
   }
 
-  await saveUserNostrProfileSnapshot({
+  const updatedUser = await saveUserNostrProfileSnapshot({
     pubkey: user.pubkey,
     handle: normalizedEvent.name,
     displayName: normalizedEvent.display_name ?? normalizedEvent.name,
@@ -406,11 +406,13 @@ export async function updateMyProfile(
     profileFetchedAt: new Date(),
   })
 
-  if (user.avatarUrl !== normalizedEvent.picture) {
+  const appliedSnapshot = updatedUser?.profileEventId === input.signedEvent.id
+
+  if (appliedSnapshot && user.avatarUrl !== updatedUser.avatarUrl) {
     await deleteManagedProfileImageAsset(user.avatarUrl)
   }
 
-  if (user.bannerUrl !== normalizedEvent.banner) {
+  if (appliedSnapshot && user.bannerUrl !== updatedUser.bannerUrl) {
     await deleteManagedProfileImageAsset(user.bannerUrl)
   }
 

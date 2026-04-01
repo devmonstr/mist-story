@@ -1,21 +1,27 @@
 import { Router } from "express"
 import {
+  type AuthSessionPayload,
   appearanceSettingsSchema,
   createApiKeyInputSchema,
   createRelayInputSchema,
   notificationSettingsSchema,
   updateRelayInputSchema,
 } from "@mist/shared"
+import { SESSION_COOKIE_NAME } from "../config/constants"
 import { requireAuth } from "../middleware/require-auth"
+import { requireRecentAuth } from "../middleware/require-recent-auth"
 import { validateBody } from "../middleware/validate"
 import {
   createApiKey,
   createRelay,
   deleteRelay,
+  exportSecurityAuditLog,
   getAppearanceSettings,
   getIntegrationSettings,
   getNotificationSettings,
   getSecuritySettings,
+  revokeAllSecuritySessions,
+  revokeCurrentSecuritySession,
   revokeApiKey,
   updateRelay,
   updateAppearanceSettings,
@@ -76,14 +82,84 @@ settingsRouter.put(
   }
 )
 
-settingsRouter.get("/security", async (_request, response, next) => {
-  try {
-    const payload = await getSecuritySettings(response.locals.user.id as string)
-    return response.json(payload)
-  } catch (error) {
-    return next(error)
+settingsRouter.get(
+  "/security",
+  requireRecentAuth,
+  async (_request, response, next) => {
+    try {
+      const payload = await getSecuritySettings(response.locals.user.id as string, {
+        currentSessionId: response.locals.sessionId as string | undefined,
+        currentSession:
+          (response.locals.session as AuthSessionPayload | undefined) ?? null,
+      })
+      return response.json(payload)
+    } catch (error) {
+      return next(error)
+    }
   }
-})
+)
+
+settingsRouter.get(
+  "/security/audit-log",
+  requireRecentAuth,
+  async (_request, response, next) => {
+    try {
+      const payload = await exportSecurityAuditLog(response.locals.user.id as string)
+      const fileStamp = payload.exportedAt.slice(0, 10)
+      response.setHeader("Content-Type", "application/json; charset=utf-8")
+      response.setHeader(
+        "Content-Disposition",
+        `attachment; filename="mist-security-audit-${fileStamp}.json"`
+      )
+      return response.send(JSON.stringify(payload, null, 2))
+    } catch (error) {
+      return next(error)
+    }
+  }
+)
+
+settingsRouter.delete(
+  "/security/sessions/current",
+  requireRecentAuth,
+  async (_request, response, next) => {
+    try {
+      const sessionId = response.locals.sessionId as string | undefined
+      if (!sessionId) {
+        return response.status(401).json({ error: "Unauthorized" })
+      }
+
+      await revokeCurrentSecuritySession(sessionId)
+      response.clearCookie(SESSION_COOKIE_NAME, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+      })
+      return response.status(204).send()
+    } catch (error) {
+      return next(error)
+    }
+  }
+)
+
+settingsRouter.delete(
+  "/security/sessions",
+  requireRecentAuth,
+  async (_request, response, next) => {
+    try {
+      await revokeAllSecuritySessions(response.locals.user.id as string)
+      response.clearCookie(SESSION_COOKIE_NAME, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+      })
+      return response.status(204).send()
+    } catch (error) {
+      return next(error)
+    }
+  }
+)
 
 settingsRouter.get("/integrations", async (_request, response, next) => {
   try {
