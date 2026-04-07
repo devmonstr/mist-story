@@ -1,6 +1,12 @@
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
+import {
+  pageContentContainerClassName,
+  pageHeadingLeadClassName,
+  pageHeadingTitleClassName,
+  pageSectionPaddingClassName,
+} from "@/components/page-heading"
 import { BookOpen, PenTool, Sparkles, ArrowRight } from "lucide-react"
 
 const guides = [
@@ -26,19 +32,19 @@ export default function GuidesPage() {
     <div className="flex min-h-screen flex-col">
       <Navbar />
       <main className="flex-1">
-        <section className="border-b border-border/40 bg-background px-4 py-16 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl text-center">
-            <h1 className="font-serif text-4xl font-light tracking-tight text-foreground sm:text-5xl">
+        <section className={`border-b border-border/40 bg-background ${pageSectionPaddingClassName}`}>
+          <div className={`${pageContentContainerClassName} text-center`}>
+            <h1 className={pageHeadingTitleClassName}>
               Writing Guides
             </h1>
-            <p className="mt-4 text-lg text-muted-foreground">
+            <p className={pageHeadingLeadClassName}>
               Resources to help you become a better writer and reader.
             </p>
           </div>
         </section>
 
-        <section className="px-4 py-16 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
+        <section className={pageSectionPaddingClassName}>
+          <div className={pageContentContainerClassName}>
             <div className="grid gap-6 md:grid-cols-3">
               {guides.map((guide) => (
                 <div

@@ -1,13 +1,18 @@
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
+import {
+  pageContentContainerClassName,
+  pageHeadingTitleClassName,
+  pageSectionPaddingClassName,
+} from "@/components/page-heading"
 
 export default function CookiesPage() {
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
       <main className="flex-1 bg-background">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <h1 className="font-serif text-4xl font-bold text-foreground mb-2">Cookie Policy</h1>
+      <div className={`${pageContentContainerClassName} ${pageSectionPaddingClassName}`}>
+          <h1 className={pageHeadingTitleClassName}>Cookie Policy</h1>
           <p className="text-sm text-muted-foreground mb-12">Last updated: March 16, 2026</p>
 
           <div className="prose prose-neutral max-w-none space-y-8">

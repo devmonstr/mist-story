@@ -2,6 +2,12 @@
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  pageContentContainerClassName,
+  pageHeadingLeadClassName,
+  pageHeadingTitleClassName,
+  pageSectionPaddingClassName,
+} from "@/components/page-heading"
 import { Search } from "lucide-react"
 import type { ReactNode } from "react"
 import { useLibraryCatalogContext } from "./library-catalog-context"
@@ -29,13 +35,13 @@ export function LibraryShell({ children }: LibraryShellProps) {
 
   return (
     <>
-      <section className="border-b border-border/40 bg-background py-10 sm:py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <section className={`border-b border-border/40 bg-background ${pageSectionPaddingClassName}`}>
+        <div className={pageContentContainerClassName}>
           <div className="mb-6 sm:mb-8">
-            <h1 className="font-serif text-3xl font-light tracking-tight text-foreground sm:text-5xl">
+            <h1 className={pageHeadingTitleClassName}>
               Library
             </h1>
-            <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:mt-4 sm:text-lg">
+            <p className={pageHeadingLeadClassName}>
               Browse thousands of stories from talented writers around the world.
             </p>
           </div>
@@ -154,8 +160,8 @@ export function LibraryShell({ children }: LibraryShellProps) {
         </div>
       </section>
 
-      <section className="py-10 sm:py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">{children}</div>
+      <section className={pageSectionPaddingClassName}>
+        <div className={pageContentContainerClassName}>{children}</div>
       </section>
     </>
   )

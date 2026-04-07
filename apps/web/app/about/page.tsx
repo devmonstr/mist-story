@@ -1,6 +1,12 @@
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
+import {
+  pageContentContainerClassName,
+  pageHeadingLeadClassName,
+  pageHeadingTitleClassName,
+  pageSectionPaddingClassName,
+} from "@/components/page-heading"
 import { Heart, Globe, Sparkles } from "lucide-react"
 
 export default function AboutPage() {
@@ -9,20 +15,20 @@ export default function AboutPage() {
       <Navbar />
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="border-b border-border/40 bg-background py-20">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <h1 className="font-serif text-4xl font-light tracking-tight text-foreground sm:text-5xl">
+        <section className={`border-b border-border/40 bg-background ${pageSectionPaddingClassName}`}>
+          <div className={pageContentContainerClassName}>
+            <h1 className={pageHeadingTitleClassName}>
               About Mist Story
             </h1>
-            <p className="mt-4 max-w-3xl text-lg text-muted-foreground">
+            <p className={`${pageHeadingLeadClassName} max-w-3xl`}>
               A platform dedicated to connecting writers and readers, celebrating stories that move us.
             </p>
           </div>
         </section>
 
         {/* Mission Section */}
-        <section className="border-b border-border/40 py-20">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <section className={`border-b border-border/40 ${pageSectionPaddingClassName}`}>
+          <div className={pageContentContainerClassName}>
             <h2 className="font-serif text-3xl font-light tracking-tight text-foreground">
               Our Mission
             </h2>
@@ -33,8 +39,8 @@ export default function AboutPage() {
         </section>
 
         {/* Values Section */}
-        <section className="border-b border-border/40 py-20">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <section className={`border-b border-border/40 ${pageSectionPaddingClassName}`}>
+          <div className={pageContentContainerClassName}>
             <h2 className="mb-12 font-serif text-3xl font-light tracking-tight text-foreground">
               Our Values
             </h2>
@@ -74,8 +80,8 @@ export default function AboutPage() {
         </section>
 
         {/* Stats Section */}
-        <section className="border-b border-border/40 bg-card/50 py-20">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <section className={`border-b border-border/40 bg-card/50 ${pageSectionPaddingClassName}`}>
+          <div className={pageContentContainerClassName}>
             <div className="grid gap-8 md:grid-cols-3">
               <div className="text-center">
                 <div className="font-serif text-3xl font-light text-foreground">15K+</div>
@@ -94,8 +100,8 @@ export default function AboutPage() {
         </section>
 
         {/* Team Section */}
-        <section className="border-b border-border/40 py-20">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <section className={`border-b border-border/40 ${pageSectionPaddingClassName}`}>
+          <div className={pageContentContainerClassName}>
             <h2 className="mb-8 font-serif text-3xl font-light tracking-tight text-foreground">
               Behind the Pages
             </h2>
@@ -109,8 +115,8 @@ export default function AboutPage() {
         </section>
 
         {/* CTA Section */}
-        <section className="py-16">
-          <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
+        <section className={pageSectionPaddingClassName}>
+          <div className={`${pageContentContainerClassName} text-center`}>
             <h2 className="font-serif text-3xl font-light tracking-tight text-foreground">
               Join Our Community
             </h2>

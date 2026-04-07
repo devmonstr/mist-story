@@ -5,7 +5,13 @@ import { useEffect, useMemo, useState } from "react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { BookMarked, Bookmark, Clock, LibraryBig, Loader2 } from "lucide-react"
+import {
+  pageContentContainerClassName,
+  pageHeadingLeadClassName,
+  pageHeadingTitleClassName,
+  pageSectionPaddingClassName,
+} from "@/components/page-heading"
+import { BookMarked, Bookmark, Clock, Loader2 } from "lucide-react"
 import { useRequireAuth } from "@/hooks/use-require-auth"
 import { fetchMyLibrary } from "@/lib/api"
 import type { MyLibraryResponse } from "@mist/shared"
@@ -94,20 +100,15 @@ export default function MyLibraryPage() {
       <Navbar />
       <main className="flex-1 bg-background">
         <section className="border-b border-border/40">
-          <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-            <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                <LibraryBig className="h-6 w-6 text-foreground" />
-              </div>
-              <div>
-                <h1 className="font-serif text-3xl font-medium text-foreground">
-                  My Library
-                </h1>
-                <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                  Your personal shelf for saved stories, reading progress, and quick access to
-                  what you want to pick up next.
-                </p>
-              </div>
+          <div className={`${pageContentContainerClassName} ${pageSectionPaddingClassName}`}>
+            <div>
+              <h1 className={pageHeadingTitleClassName}>
+                My Library
+              </h1>
+              <p className={`${pageHeadingLeadClassName} max-w-2xl`}>
+                Your personal shelf for saved stories, reading progress, and quick access to
+                what you want to pick up next.
+              </p>
             </div>
 
             <div className="mt-8 grid gap-4 sm:grid-cols-3">

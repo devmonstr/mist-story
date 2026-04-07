@@ -4,7 +4,13 @@ import Link from 'next/link'
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
-import { HelpCircle, MessageCircle, Mail, BookOpen } from 'lucide-react'
+import {
+  pageContentContainerClassName,
+  pageHeadingLeadClassName,
+  pageHeadingTitleClassName,
+  pageSectionPaddingClassName,
+} from "@/components/page-heading"
+import { MessageCircle, Mail, BookOpen } from 'lucide-react'
 import { useState } from 'react'
 
 export default function SupportPage() {
@@ -49,16 +55,13 @@ export default function SupportPage() {
       <main className="flex-1 bg-background">
       {/* Header */}
       <div className="border-b border-border">
-        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 mb-4">
-            <HelpCircle className="h-8 w-8 text-foreground" />
-            <h1 className="font-serif text-3xl font-bold text-foreground">Help & Support</h1>
-          </div>
-          <p className="text-muted-foreground">Get answers to common questions or reach out to our team</p>
+        <div className={`${pageContentContainerClassName} ${pageSectionPaddingClassName}`}>
+          <h1 className={pageHeadingTitleClassName}>Help & Support</h1>
+          <p className={pageHeadingLeadClassName}>Get answers to common questions or reach out to our team</p>
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className={`${pageContentContainerClassName} ${pageSectionPaddingClassName}`}>
         {/* Support Options */}
         <div className="grid gap-6 md:grid-cols-3 mb-12">
           <div className="border border-border/40 rounded bg-card p-6 flex flex-col items-center text-center">

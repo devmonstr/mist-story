@@ -4,6 +4,12 @@ import { useState } from 'react'
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
+import {
+  pageContentContainerClassName,
+  pageHeadingLeadClassName,
+  pageHeadingTitleClassName,
+  pageSectionPaddingClassName,
+} from "@/components/page-heading"
 import { Mail, Phone, MapPin } from 'lucide-react'
 
 export default function ContactPage() {
@@ -32,15 +38,15 @@ export default function ContactPage() {
       <main className="flex-1 bg-background">
       {/* Header */}
       <div className="border-b border-border">
-        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <h1 className="font-serif text-4xl font-bold text-foreground mb-4">Get in Touch</h1>
-          <p className="text-lg text-muted-foreground">
+        <div className={`${pageContentContainerClassName} ${pageSectionPaddingClassName}`}>
+          <h1 className={pageHeadingTitleClassName}>Get in Touch</h1>
+          <p className={pageHeadingLeadClassName}>
             Have questions? We'd love to hear from you. Send us a message and we'll respond as soon as possible.
           </p>
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className={pageContentContainerClassName}>
         <div className="grid gap-12 lg:grid-cols-2">
           {/* Contact Form */}
           <div>

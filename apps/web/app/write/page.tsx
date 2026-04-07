@@ -3,6 +3,12 @@
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
+import {
+  pageContentContainerClassName,
+  pageHeadingLeadClassName,
+  pageHeadingTitleClassName,
+  pageSectionPaddingClassName,
+} from "@/components/page-heading"
 import { FileText, Save, Share2, Settings, Users, Zap } from "lucide-react"
 
 const features = [
@@ -44,12 +50,12 @@ export default function WritePage() {
       <Navbar />
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="border-b border-border/40 bg-background py-20">
-          <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
-            <h1 className="font-serif text-4xl font-light tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+        <section className={`border-b border-border/40 bg-background ${pageSectionPaddingClassName}`}>
+          <div className={`${pageContentContainerClassName} text-center`}>
+            <h1 className={pageHeadingTitleClassName}>
               Share Your Stories
             </h1>
-            <p className="mt-6 text-lg text-muted-foreground">
+            <p className={`${pageHeadingLeadClassName} mx-auto`}>
               Write, publish, and connect with readers. Bring your imagination to life on Mist Story.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
@@ -64,8 +70,8 @@ export default function WritePage() {
         </section>
 
         {/* Features Grid */}
-        <section className="py-20">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <section className={pageSectionPaddingClassName}>
+          <div className={pageContentContainerClassName}>
             <div className="mb-16 text-center">
               <h2 className="font-serif text-3xl font-light tracking-tight text-foreground">
                 Everything You Need to Write
@@ -98,8 +104,8 @@ export default function WritePage() {
         </section>
 
         {/* CTA Section */}
-        <section className="border-t border-border/40 bg-card/50 py-16">
-          <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
+        <section className={`border-t border-border/40 bg-card/50 ${pageSectionPaddingClassName}`}>
+          <div className={`${pageContentContainerClassName} text-center`}>
             <h2 className="font-serif text-3xl font-light tracking-tight text-foreground">
               Ready to Tell Your Story?
             </h2>

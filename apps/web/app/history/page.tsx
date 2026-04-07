@@ -5,6 +5,12 @@ import { useEffect, useState } from 'react'
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
+import {
+  pageContentContainerClassName,
+  pageHeadingLeadClassName,
+  pageHeadingTitleClassName,
+  pageSectionPaddingClassName,
+} from "@/components/page-heading"
 import { Clock, Loader2, Trash2 } from 'lucide-react'
 import { useRequireAuth } from '@/hooks/use-require-auth'
 import { clearReadingProgress, fetchMyLibrary, removeReadingProgress } from '@/lib/api'
@@ -107,16 +113,13 @@ export default function HistoryPage() {
       <Navbar />
       <main className="flex-1 bg-background">
         <div className="border-b border-border">
-        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        <div className={`${pageContentContainerClassName} ${pageSectionPaddingClassName}`}>
             <div className="mb-4 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <Clock className="h-8 w-8 text-foreground" />
-                <div>
-                  <h1 className="font-serif text-3xl font-bold text-foreground">Reading History</h1>
-                  <p className="text-muted-foreground">
-                    {history.length} {history.length === 1 ? 'story' : 'stories'} in progress
-                  </p>
-                </div>
+              <div>
+                <h1 className={pageHeadingTitleClassName}>Reading History</h1>
+                <p className={pageHeadingLeadClassName}>
+                  {history.length} {history.length === 1 ? 'story' : 'stories'} in progress
+                </p>
               </div>
               {history.length > 0 && (
                 <Button variant="outline" size="sm" disabled={isSubmitting} onClick={() => void handleClearAll()}>
@@ -127,7 +130,7 @@ export default function HistoryPage() {
           </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className={pageContentContainerClassName}>
         {history.length === 0 ? (
           <div className="py-12 text-center">
             <Clock className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />

@@ -12,6 +12,12 @@ import {
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
+import {
+  pageContentContainerClassName,
+  pageHeadingLeadClassName,
+  pageHeadingTitleClassName,
+  pageSectionPaddingClassName,
+} from "@/components/page-heading"
 import { useRequireAuth } from "@/hooks/use-require-auth"
 import { fetchStudioNovels } from "@/lib/api"
 import { mapNovelToCard, type StudioNovelCard } from "@/lib/studio"
@@ -88,13 +94,13 @@ export default function StudioPage() {
 
       <main className="flex-1">
         <section className="border-b border-border/40">
-          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className={`${pageContentContainerClassName} ${pageSectionPaddingClassName}`}>
             <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h1 className="font-serif text-2xl font-medium text-foreground sm:text-3xl">
+                <h1 className={pageHeadingTitleClassName}>
                   Writer Studio
                 </h1>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className={pageHeadingLeadClassName}>
                   Manage your novels and track your writing progress
                 </p>
               </div>

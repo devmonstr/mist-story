@@ -1,5 +1,11 @@
 import Link from "next/link"
 import type { DiscoverResponse } from "@mist/shared"
+import {
+  pageContentContainerClassName,
+  pageHeadingLeadClassName,
+  pageHeadingTitleClassName,
+  pageSectionPaddingClassName,
+} from "@/components/page-heading"
 import { Button } from "@/components/ui/button"
 import type { ReactNode } from "react"
 
@@ -50,12 +56,12 @@ export function DiscoverShell({ children, activeFilters }: DiscoverShellProps) {
   return (
     <>
       {/* Hero Section */}
-      <section className="border-b border-border/40 bg-background py-10 sm:py-14 lg:py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h1 className="font-serif text-3xl font-light tracking-tight text-foreground sm:text-5xl">
+      <section className={`border-b border-border/40 bg-background ${pageSectionPaddingClassName}`}>
+        <div className={pageContentContainerClassName}>
+          <h1 className={pageHeadingTitleClassName}>
             Discover
           </h1>
-          <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:mt-4 sm:text-lg">
+          <p className={pageHeadingLeadClassName}>
             Explore new worlds, genres, and voices. Find your next favorite story.
           </p>
 

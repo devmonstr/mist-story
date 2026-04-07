@@ -6,6 +6,12 @@ import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Button } from '@/components/ui/button'
 import {
+  pageContentContainerClassName,
+  pageHeadingLeadClassName,
+  pageHeadingTitleClassName,
+  pageSectionPaddingClassName,
+} from "@/components/page-heading"
+import {
   Bell,
   BookOpen,
   Bookmark,
@@ -228,18 +234,15 @@ export default function NotificationsPage() {
       <Navbar />
       <main className="flex-1 bg-background">
         <div className="border-b border-border">
-          <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+          <div className={`${pageContentContainerClassName} ${pageSectionPaddingClassName}`}>
             <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <Bell className="h-8 w-8 text-foreground" />
-                <div>
-                  <h1 className="font-serif text-3xl font-bold text-foreground">Notifications</h1>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {unreadCount > 0
-                      ? `${unreadCount} unread ${unreadCount === 1 ? "notification" : "notifications"}`
-                      : "Everything is up to date"}
-                  </p>
-                </div>
+              <div>
+                <h1 className={pageHeadingTitleClassName}>Notifications</h1>
+                <p className={pageHeadingLeadClassName}>
+                  {unreadCount > 0
+                    ? `${unreadCount} unread ${unreadCount === 1 ? "notification" : "notifications"}`
+                    : "Everything is up to date"}
+                </p>
               </div>
               {notifications.length > 0 && unreadCount > 0 && (
                 <Button variant="outline" size="sm" onClick={handleMarkAllAsRead} disabled={isSubmitting}>

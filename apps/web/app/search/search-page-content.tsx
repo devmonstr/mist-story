@@ -12,6 +12,12 @@ import { NovelCard } from "@/components/novel/novel-card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  pageContentContainerClassName,
+  pageHeadingLeadClassName,
+  pageHeadingTitleClassName,
+  pageSectionPaddingClassName,
+} from "@/components/page-heading"
 import { resolveNovelCoverSrc } from "@/lib/novel-cover"
 import { Filter, Loader2, Search, UserRound } from "lucide-react"
 import {
@@ -470,16 +476,14 @@ export function SearchPageContent() {
 
   return (
     <>
-      <section className="border-b border-border bg-card">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-          <div className="mb-4 flex items-center gap-3">
-            <Search className="h-5 w-5 text-foreground sm:h-6 sm:w-6" />
-            <h1 className="font-serif text-xl font-bold text-foreground sm:text-2xl">
-              Search Results
-            </h1>
-          </div>
+      <section className={`border-b border-border bg-card ${pageSectionPaddingClassName}`}>
+        <div className={pageContentContainerClassName}>
+          <h1 className={pageHeadingTitleClassName}>Search Results</h1>
+          <p className={pageHeadingLeadClassName}>
+            Search stories and writers across Mist Story.
+          </p>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:flex-row">
+          <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-2 sm:mt-8 sm:flex-row">
             <div className="relative flex-1">
               <Input
                 value={queryInput}
@@ -496,7 +500,7 @@ export function SearchPageContent() {
         </div>
       </section>
 
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <div className={`${pageContentContainerClassName} pt-6 sm:pt-8`}>
         {hasQuery && !isLoading && !error && results.length > 0 ? (
           <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <ResultsCount
