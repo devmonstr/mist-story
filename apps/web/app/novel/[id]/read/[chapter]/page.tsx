@@ -1,11 +1,20 @@
 import type { Metadata } from "next"
+import { notFound, redirect } from "next/navigation"
 import { fetchPublicNovelChapter } from "@/lib/api"
 import { buildCanonicalUrl, resolveMetadataImageUrl } from "@/lib/site-url"
 import { ReadPageClient } from "./read-page-client"
 
-async function loadReaderPageData(id: string, chapter: string) {
+function parseChapterNumber(chapter: string): number {
+  const parsed = Number.parseInt(chapter, 10)
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return -1
+  }
+  return parsed
+}
+
+async function loadReaderPageData(novelId: string, chapterNumber: number) {
   try {
-    const data = await fetchPublicNovelChapter(id, chapter)
+    const data = await fetchPublicNovelChapter(novelId, String(chapterNumber))
     return {
       data,
       error: null,
@@ -27,7 +36,16 @@ export async function generateMetadata({
   params: Promise<{ id: string; chapter: string }>
 }): Promise<Metadata> {
   const { id, chapter } = await params
-  const result = await loadReaderPageData(id, chapter)
+  const chapterNumber = parseChapterNumber(chapter)
+
+  if (chapterNumber < 1) {
+    return {
+      title: "Chapter unavailable",
+      description: "This chapter could not be loaded right now.",
+    }
+  }
+
+  const result = await loadReaderPageData(id, chapterNumber)
 
   if (!result.data) {
     return {
@@ -70,10 +88,41 @@ export async function generateMetadata({
   }
 }
 
-export default function ReadPage({
+export default async function ReadPage({
   params,
 }: {
   params: Promise<{ id: string; chapter: string }>
 }) {
-  return <ReadPageClient params={params} />
+  const { id, chapter } = await params
+  const chapterNumber = parseChapterNumber(chapter)
+
+  // Redirect to 404 if chapter number is invalid
+  if (chapterNumber < 1) {
+    notFound()
+  }
+
+  // Load chapter data once and pass to client to prevent duplicate fetch
+  const result = await loadReaderPageData(id, chapterNumber)
+
+  if (!result.data) {
+    // Show error state in client component
+    return (
+      <ReadPageClient
+        params={Promise.resolve({ id, chapter: String(chapterNumber) })}
+        initialError={result.error}
+      />
+    )
+  }
+
+  // If the URL chapter doesn't match the canonical number, redirect
+  if (result.data.chapter.number !== chapterNumber) {
+    redirect(`/novel/${result.data.novel.slug}/read/${result.data.chapter.number}`)
+  }
+
+  return (
+    <ReadPageClient
+      params={Promise.resolve({ id, chapter: String(chapterNumber) })}
+      initialData={result.data}
+    />
+  )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { use } from "react"
@@ -14,9 +14,11 @@ import {
   Coffee,
   Home,
   List,
+  Loader2,
   Minus,
   Moon,
   Plus,
+  RotateCcw,
   Settings,
   Sun,
 } from "lucide-react"
@@ -24,6 +26,7 @@ import { Button } from "@/components/ui/button"
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -60,6 +63,10 @@ function getDefaultThemeStyles(readerTheme: "light" | "dark" | "sepia") {
       border: "bg-border",
       icon: "text-muted-foreground/50",
       contentText: "text-foreground/90",
+      progressBar: "bg-primary",
+      highlightBg: "bg-primary/5",
+      highlightText: "text-primary",
+      skeleton: "bg-muted",
     },
     dark: {
       bg: "bg-[#1a1a1a] text-[#e0e0e0]",
@@ -70,6 +77,10 @@ function getDefaultThemeStyles(readerTheme: "light" | "dark" | "sepia") {
       border: "bg-[#333]",
       icon: "text-[#555]",
       contentText: "text-[#d0d0d0]",
+      progressBar: "bg-[#4a9eff]",
+      highlightBg: "bg-[#333]",
+      highlightText: "text-[#4a9eff]",
+      skeleton: "bg-[#333]",
     },
     sepia: {
       bg: "bg-[#f4ecd8] text-[#5b4636]",
@@ -80,6 +91,10 @@ function getDefaultThemeStyles(readerTheme: "light" | "dark" | "sepia") {
       border: "bg-[#d4c4a8]",
       icon: "text-[#a89880]",
       contentText: "text-[#433422]",
+      progressBar: "bg-[#8b6914]",
+      highlightBg: "bg-[#d4c4a8]",
+      highlightText: "text-[#8b6914]",
+      skeleton: "bg-[#d4c4a8]",
     },
   }[readerTheme]
 }
@@ -88,12 +103,19 @@ function getGroupPageForChapter(chapterNumber: number, pageSize: number) {
   return Math.max(1, Math.ceil(chapterNumber / pageSize))
 }
 
+interface ReadPageClientProps {
+  params: Promise<{ id: string; chapter: string }>
+  initialData?: PublicNovelReaderResponse
+  initialError?: string | null
+}
+
 export function ReadPageClient({
   params,
-}: {
-  params: Promise<{ id: string; chapter: string }>
-}) {
+  initialData,
+  initialError,
+}: ReadPageClientProps) {
   const { id, chapter } = use(params)
+  const chapterNumber = useMemo(() => Number.parseInt(chapter, 10), [chapter])
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -103,13 +125,15 @@ export function ReadPageClient({
   const [readerTheme, setReaderTheme] = useState<"light" | "dark" | "sepia">("light")
   const [isChapterListOpen, setIsChapterListOpen] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
-  const [isFetching, setIsFetching] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [data, setData] = useState<PublicNovelReaderResponse | null>(null)
-  const [isBookmarked, setIsBookmarked] = useState(false)
+  const [isFetching, setIsFetching] = useState(!initialData)
+  const [error, setError] = useState<string | null>(initialError ?? null)
+  const [data, setData] = useState<PublicNovelReaderResponse | null>(initialData ?? null)
+  const [isBookmarked, setIsBookmarked] = useState(initialData?.viewer.isBookmarked ?? false)
   const [isBookmarkSubmitting, setIsBookmarkSubmitting] = useState(false)
   const [readingProgress, setReadingProgress] = useState(0)
-  const [isUnlocked, setIsUnlocked] = useState(true)
+  const [isUnlocked, setIsUnlocked] = useState(
+    initialData ? !initialData.chapter.isPaid || isChapterUnlocked(id, chapter) : true
+  )
   const [openGroupPage, setOpenGroupPage] = useState<number | null>(null)
   const [loadingGroupPage, setLoadingGroupPage] = useState<number | null>(null)
   const [chapterGroupCache, setChapterGroupCache] = useState<
@@ -124,13 +148,17 @@ export function ReadPageClient({
   const chapterGroupRefs = useRef<Record<number, HTMLDivElement | null>>({})
   const theme = getDefaultThemeStyles(readerTheme)
   const chapterPage = Number.parseInt(searchParams.get("chapterPage") ?? "", 10)
+  const scrollRestored = useRef(false)
 
+  // Clear cache when novel changes
   useEffect(() => {
     setOpenGroupPage(null)
     setLoadingGroupPage(null)
     setChapterGroupCache({})
+    scrollRestored.current = false
   }, [id])
 
+  // Load reader settings and restore scroll position
   useEffect(() => {
     try {
       const saved = localStorage.getItem(READER_SETTINGS_KEY)
@@ -148,10 +176,13 @@ export function ReadPageClient({
         }
       }
 
-      const progress = localStorage.getItem(`${READING_PROGRESS_KEY}-${id}-${chapter}`)
-      if (progress) {
-        const parsed = JSON.parse(progress) as { scrollY?: number; progress?: number }
-        if (typeof parsed.scrollY === "number") {
+      // Restore scroll position using numeric chapter number
+      const progressKey = `${READING_PROGRESS_KEY}-${id}-${chapterNumber}`
+      const savedProgress = localStorage.getItem(progressKey)
+      if (savedProgress) {
+        const parsed = JSON.parse(savedProgress) as { scrollY?: number; progress?: number }
+        if (typeof parsed.scrollY === "number" && !scrollRestored.current) {
+          scrollRestored.current = true
           setTimeout(() => {
             window.scrollTo({ top: parsed.scrollY ?? 0, behavior: "auto" })
           }, 100)
@@ -165,7 +196,7 @@ export function ReadPageClient({
     } finally {
       setIsLoaded(true)
     }
-  }, [chapter, id])
+  }, [chapterNumber, id])
 
   useEffect(() => {
     let cancelled = false
@@ -175,7 +206,7 @@ export function ReadPageClient({
       setError(null)
 
       try {
-        const payload = await fetchPublicNovelChapter(id, chapter, {
+        const payload = await fetchPublicNovelChapter(id, String(chapterNumber), {
           chapterPage:
             Number.isFinite(chapterPage) && chapterPage > 1 ? chapterPage : undefined,
         })
@@ -203,12 +234,15 @@ export function ReadPageClient({
       }
     }
 
-    void loadChapter()
+    // Only fetch if no initial data was provided (prevents duplicate fetch)
+    if (!initialData) {
+      void loadChapter()
+    }
 
     return () => {
       cancelled = true
     }
-  }, [chapter, chapterPage, id])
+  }, [chapterNumber, chapterPage, id, initialData])
 
   useEffect(() => {
     if (!data) {
@@ -239,8 +273,9 @@ export function ReadPageClient({
       setReadingProgress(progress)
 
       try {
+        // Use numeric chapter number for consistent keys
         localStorage.setItem(
-          `${READING_PROGRESS_KEY}-${id}-${chapter}`,
+          `${READING_PROGRESS_KEY}-${id}-${chapterNumber}`,
           JSON.stringify({
             scrollY,
             progress,
@@ -254,7 +289,7 @@ export function ReadPageClient({
 
     window.addEventListener("scroll", handleScroll, { passive: true })
     return () => window.removeEventListener("scroll", handleScroll)
-  }, [chapter, data, id, isLoaded])
+  }, [chapterNumber, data, id, isLoaded])
 
   useEffect(() => {
     const chapterNumberValue = data?.chapter.number
@@ -275,10 +310,42 @@ export function ReadPageClient({
     }
 
     void persistProgress()
-  }, [chapter, data, id, isAuthLoading, user])
+  }, [chapterNumber, data, id, isAuthLoading, user])
 
-  const toggleBookmark = async () => {
-    if (isAuthLoading) {
+  // Keyboard navigation for chapters (arrow keys)
+  useEffect(() => {
+    if (!data || !data.chapter) {
+      return
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" && data.chapter?.previousChapterNumber) {
+        e.preventDefault()
+        const prevGroupPage = getGroupPageForChapter(
+          data.chapter.previousChapterNumber,
+          data.chapterList?.pageSize ?? 100
+        )
+        router.push(
+          `/novel/${id}/read/${data.chapter.previousChapterNumber}?chapterPage=${prevGroupPage}`
+        )
+      } else if (e.key === "ArrowRight" && data.chapter?.nextChapterNumber) {
+        e.preventDefault()
+        const nextGroupPage = getGroupPageForChapter(
+          data.chapter.nextChapterNumber,
+          data.chapterList?.pageSize ?? 100
+        )
+        router.push(
+          `/novel/${id}/read/${data.chapter.nextChapterNumber}?chapterPage=${nextGroupPage}`
+        )
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [data, id, router])
+
+  const toggleBookmark = useCallback(async () => {
+    if (isAuthLoading || isBookmarkSubmitting) {
       return
     }
 
@@ -296,11 +363,11 @@ export function ReadPageClient({
     } finally {
       setIsBookmarkSubmitting(false)
     }
-  }
+  }, [isAuthLoading, isBookmarkSubmitting, user, isBookmarked, id, pathname, router])
 
-  const adjustFontSize = (delta: number) => {
+  const adjustFontSize = useCallback((delta: number) => {
     setFontSize((prev) => Math.min(Math.max(prev + delta, 14), 24))
-  }
+  }, [])
 
   useEffect(() => {
     if (isLoaded) {
@@ -318,10 +385,10 @@ export function ReadPageClient({
     }
   }, [fontSize, isLoaded, readerTheme])
 
-  const chapters = data?.chapters ?? []
   const currentChapter = data?.chapter ?? null
   const chapterList = data?.chapterList ?? null
   const novel = data?.novel ?? null
+  const novelSlug = novel?.slug ?? id
   const author = data?.author ?? null
   const authorPubkey = useMemo(() => (author ? npubToHex(author.npub) : null), [author])
   const chapterGroups = useMemo(() => {
@@ -357,31 +424,55 @@ export function ReadPageClient({
     return () => window.cancelAnimationFrame(frame)
   }, [isChapterListOpen, openGroupPage])
 
+  // Loading skeleton for better perceived performance
   if (isFetching) {
     return (
-      <div className={`flex min-h-screen items-center justify-center transition-colors ${theme.bg}`}>
-        <div className="flex items-center gap-3 text-muted-foreground">
-          <BookOpen className="h-5 w-5 animate-pulse" />
-          <span>Loading chapter...</span>
-        </div>
+      <div className={`min-h-screen transition-colors duration-300 ${theme.bg}`}>
+        <header className={`sticky top-0 z-50 border-b ${theme.header} backdrop-blur-sm`}>
+          <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4">
+            <div className={`h-4 w-32 ${theme.skeleton} animate-pulse rounded`} />
+            <div className="flex items-center gap-1">
+              <div className={`h-8 w-8 ${theme.skeleton} animate-pulse rounded`} />
+              <div className={`h-8 w-8 ${theme.skeleton} animate-pulse rounded`} />
+              <div className={`h-8 w-8 ${theme.skeleton} animate-pulse rounded`} />
+            </div>
+          </div>
+        </header>
+
+        <main className="mx-auto max-w-2xl px-4 py-12 sm:px-6 sm:py-16">
+          <div className="mb-12 text-center">
+            <div className={`mx-auto h-4 w-24 ${theme.skeleton} animate-pulse rounded`} />
+            <div className={`mx-auto mt-4 h-8 w-3/4 ${theme.skeleton} animate-pulse rounded`} />
+            <div className={`mx-auto mt-3 h-4 w-40 ${theme.skeleton} animate-pulse rounded`} />
+          </div>
+          <div className="space-y-4">
+            <div className={`h-4 w-full ${theme.skeleton} animate-pulse rounded`} />
+            <div className={`h-4 w-full ${theme.skeleton} animate-pulse rounded`} />
+            <div className={`h-4 w-5/6 ${theme.skeleton} animate-pulse rounded`} />
+            <div className={`h-4 w-full ${theme.skeleton} animate-pulse rounded`} />
+            <div className={`h-4 w-4/5 ${theme.skeleton} animate-pulse rounded`} />
+          </div>
+        </main>
       </div>
     )
   }
 
+  // Error state with retry mechanism
   if (error || !data || !currentChapter || !novel || !author) {
     return (
-      <div className={`flex min-h-screen items-center justify-center px-4 transition-colors ${theme.bg}`}>
+      <div className={`flex min-h-screen items-center justify-center px-4 transition-colors duration-300 ${theme.bg}`}>
         <div className="max-w-md rounded-2xl border border-border/60 bg-card px-6 py-8 text-center shadow-sm">
           <p className="font-serif text-2xl text-foreground">Chapter unavailable</p>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
             {error || "We could not load this chapter right now."}
           </p>
           <div className="mt-6 flex justify-center gap-3">
-            <Button asChild>
-              <Link href={`/novel/${id}`}>Back to Novel</Link>
+            <Button onClick={() => window.location.reload()}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Try Again
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/library">Browse Library</Link>
+              <Link href={`/novel/${novelSlug}`}>Back to Novel</Link>
             </Button>
           </div>
         </div>
@@ -394,21 +485,26 @@ export function ReadPageClient({
   const isPaidChapter = Boolean(currentChapter.isPaid && chapterPrice > 0)
 
   return (
-    <div className={`min-h-screen transition-colors ${theme.bg}`}>
+    <div className={`min-h-screen transition-colors duration-300 ${theme.bg}`}>
       <header className={`sticky top-0 z-50 border-b ${theme.header} backdrop-blur-sm`}>
+        {/* Progress bar with accessibility attributes */}
         <div className="h-0.5 w-full bg-transparent">
           <div
-            className="h-full bg-primary transition-all duration-150"
+            role="progressbar"
+            aria-label="Reading progress"
+            aria-valuenow={Math.round(readingProgress)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            className={`h-full transition-all duration-150 ${theme.progressBar}`}
             style={{ width: `${readingProgress}%` }}
           />
         </div>
 
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" asChild>
-              <Link href={`/novel/${id}`}>
+            <Button variant="ghost" size="icon" asChild aria-label="Back to novel">
+              <Link href={`/novel/${novelSlug}`}>
                 <ChevronLeft className="h-5 w-5" />
-                <span className="sr-only">Back to novel</span>
               </Link>
             </Button>
             <div className="hidden sm:block">
@@ -420,20 +516,26 @@ export function ReadPageClient({
           <div className="flex items-center gap-1">
             <Sheet open={isChapterListOpen} onOpenChange={setIsChapterListOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" aria-label="Open chapter list">
                   <List className="h-5 w-5" />
-                  <span className="sr-only">Chapter list</span>
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className={theme.sheet}>
                 <SheetHeader>
                   <SheetTitle className={theme.sheetText}>Chapters</SheetTitle>
+                  <SheetDescription className={theme.mutedText}>
+                    Browse all chapters in this novel
+                  </SheetDescription>
                 </SheetHeader>
                 <div className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto px-1 pb-6">
                   {chapterGroups.map((group) => {
                     const isCurrentGroup = chapterList?.currentPage === group.page
                     const isOpen = openGroupPage === group.page
+                    const isLoading = loadingGroupPage === group.page
                     const groupData = chapterGroupCache[group.page] ?? null
+                    const sortedGroupChapters = groupData
+                      ? [...groupData.chapters].sort((a, b) => a.number - b.number)
+                      : []
 
                     return (
                       <div
@@ -479,68 +581,79 @@ export function ReadPageClient({
                                 )
                               })
                           }}
-                          className={`flex w-full items-center justify-between gap-3 px-3 py-3 text-left text-sm ${
-                            isCurrentGroup || isOpen
-                              ? readerTheme === "light"
-                                ? "bg-muted text-foreground"
-                                : "bg-[#333] text-white"
+                          disabled={isLoading}
+                          aria-expanded={isOpen}
+                          aria-label={`Chapters ${group.start.toLocaleString()} to ${group.end.toLocaleString()}`}
+                          className={`flex w-full items-center justify-between gap-3 px-3 py-3 text-left text-sm transition-colors ${
+                            isCurrentGroup
+                              ? theme.highlightBg
                               : `${theme.mutedText} hover:opacity-80`
-                          }`}
+                          } disabled:opacity-50`}
                         >
-                          <div>
+                          <div className="flex items-center gap-2">
                             <p className="font-medium">
-                              Chapters {group.start.toLocaleString()}-{group.end.toLocaleString()}
+                              {group.start.toLocaleString()}-{group.end.toLocaleString()}
                             </p>
-                            <p className="text-xs opacity-80">
-                              Group {group.page} of {chapterList?.totalPages ?? 0}
-                              {isCurrentGroup ? " · current" : ""}
-                              {isOpen && !isCurrentGroup ? " · open" : ""}
-                            </p>
+                            {isCurrentGroup && (
+                              <span className={`rounded-full px-2 py-0.5 text-xs ${theme.highlightBg} ${theme.highlightText}`}>
+                                Current
+                              </span>
+                            )}
+                            {isLoading && (
+                              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                            )}
                           </div>
                           <ChevronRight className="h-4 w-4" />
                         </button>
 
                         {isOpen ? (
                           <div className="border-t border-border/30">
-                            {groupData ? (
-                              <>
-                                <div className={`px-3 py-2 text-xs ${theme.mutedText}`}>
-                                  Loaded chapters {groupData.chapterList.visibleFrom.toLocaleString()}-
-                                  {groupData.chapterList.visibleTo.toLocaleString()} of{" "}
-                                  {groupData.chapterList.maxChapterNumber.toLocaleString()}
-                                </div>
-                                <div className="space-y-1 px-2 pb-2">
-                                  {groupData.chapters.map((ch) => (
+                            {sortedGroupChapters.length === 0 && !isLoading ? (
+                              <div className={`px-3 py-4 text-sm ${theme.mutedText}`}>
+                                Unable to load chapters right now.
+                              </div>
+                            ) : isLoading ? (
+                              <div className={`px-3 py-4 text-sm ${theme.mutedText}`}>
+                                Loading chapters...
+                              </div>
+                            ) : (
+                              <div className="space-y-1 px-2 pb-2">
+                                {sortedGroupChapters.map((ch) => {
+                                  const isCurrentChapter = ch.number === currentChapter.number
+                                  return (
                                     <Link
                                       key={ch.id}
-                                      href={`/novel/${id}/read/${ch.number}?chapterPage=${group.page}`}
+                                      href={`/novel/${novelSlug}/read/${ch.number}?chapterPage=${group.page}`}
                                       onClick={() => setIsChapterListOpen(false)}
+                                      aria-label={`Chapter ${ch.number}: ${ch.title}`}
                                       className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
-                                        ch.number === currentChapter.number
-                                          ? readerTheme === "light"
-                                            ? "bg-muted text-foreground"
-                                            : "bg-[#333] text-white"
+                                        isCurrentChapter
+                                          ? theme.highlightBg
                                           : `${theme.mutedText} hover:opacity-80`
                                       }`}
                                     >
-                                      <span className="flex h-6 w-6 items-center justify-center rounded text-xs font-medium">
+                                      <span
+                                        className={`text-xs font-medium ${
+                                          isCurrentChapter ? theme.highlightText : ""
+                                        }`}
+                                      >
                                         {ch.number}
                                       </span>
-                                      <span className="line-clamp-1">{ch.title}</span>
+                                      <span
+                                        className={`line-clamp-1 ${
+                                          isCurrentChapter ? theme.highlightText : ""
+                                        }`}
+                                      >
+                                        {ch.title}
+                                      </span>
                                       {ch.isPaid && ch.priceSats ? (
                                         <span className="ml-auto text-xs opacity-80">
                                           {ch.priceSats} sats
                                         </span>
                                       ) : null}
                                     </Link>
-                                  ))}
-                                </div>
-                              </>
-                            ) : (
-                              <div className={`px-3 py-4 text-sm ${theme.mutedText}`}>
-                                {loadingGroupPage === group.page
-                                  ? "Loading chapters..."
-                                  : "Unable to load this chapter group right now."}
+                                  )
+                                })}
                               </div>
                             )}
                           </div>
@@ -559,7 +672,9 @@ export function ReadPageClient({
               onClick={() => void toggleBookmark()}
               aria-label={isBookmarked ? "Remove bookmark" : "Add bookmark"}
             >
-              {isBookmarked ? (
+              {isBookmarkSubmitting ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : isBookmarked ? (
                 <BookmarkCheck className="h-5 w-5 text-primary" />
               ) : (
                 <Bookmark className="h-5 w-5" />
@@ -568,20 +683,22 @@ export function ReadPageClient({
 
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" aria-label="Open reading settings">
                   <Settings className="h-5 w-5" />
-                  <span className="sr-only">Reading settings</span>
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className={theme.sheet}>
                 <SheetHeader>
                   <SheetTitle className={theme.sheetText}>Reading Settings</SheetTitle>
+                  <SheetDescription className={theme.mutedText}>
+                    Customize your reading experience
+                  </SheetDescription>
                 </SheetHeader>
                 <div className="mt-6 space-y-6 px-2">
                   <div>
                     <label
+                      id="font-size-label"
                       className="text-sm font-medium"
-                      style={{ color: readerTheme === "dark" ? "#e0e0e0" : "" }}
                     >
                       Font Size
                     </label>
@@ -591,20 +708,14 @@ export function ReadPageClient({
                         size="icon"
                         onClick={() => adjustFontSize(-2)}
                         disabled={fontSize <= 14}
-                        style={
-                          readerTheme === "dark"
-                            ? { borderColor: "#444", color: "#e0e0e0", backgroundColor: "#1a1a1a" }
-                            : {}
-                        }
+                        aria-label="Decrease font size"
+                        aria-labelledby="font-size-label"
                       >
-                        <Minus
-                          className="h-4 w-4"
-                          style={{ color: readerTheme === "dark" ? "#e0e0e0" : "" }}
-                        />
+                        <Minus className="h-4 w-4" />
                       </Button>
                       <span
                         className="w-12 text-center text-sm"
-                        style={{ color: readerTheme === "dark" ? "#e0e0e0" : "" }}
+                        aria-live="polite"
                       >
                         {fontSize}px
                       </span>
@@ -613,25 +724,16 @@ export function ReadPageClient({
                         size="icon"
                         onClick={() => adjustFontSize(2)}
                         disabled={fontSize >= 24}
-                        style={
-                          readerTheme === "dark"
-                            ? { borderColor: "#444", color: "#e0e0e0", backgroundColor: "#1a1a1a" }
-                            : {}
-                        }
+                        aria-label="Increase font size"
+                        aria-labelledby="font-size-label"
                       >
-                        <Plus
-                          className="h-4 w-4"
-                          style={{ color: readerTheme === "dark" ? "#e0e0e0" : "" }}
-                        />
+                        <Plus className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
 
                   <div>
-                    <label
-                      className="text-sm font-medium"
-                      style={{ color: readerTheme === "dark" ? "#e0e0e0" : "" }}
-                    >
+                    <label id="theme-label" className="text-sm font-medium">
                       Theme
                     </label>
                     <div className="mt-3 flex flex-wrap gap-2">
@@ -639,17 +741,11 @@ export function ReadPageClient({
                         variant={readerTheme === "light" ? "default" : "outline"}
                         size="sm"
                         onClick={() => setReaderTheme("light")}
-                        style={
-                          readerTheme === "dark"
-                            ? { borderColor: "#444", color: "#e0e0e0", backgroundColor: "#1a1a1a" }
-                            : {}
-                        }
+                        aria-label="Light theme"
+                        aria-pressed={readerTheme === "light"}
                         className={readerTheme === "light" ? "ring-2 ring-primary ring-offset-2" : ""}
                       >
-                        <Sun
-                          className="mr-2 h-4 w-4"
-                          style={{ color: readerTheme === "dark" ? "#e0e0e0" : "" }}
-                        />
+                        <Sun className="mr-2 h-4 w-4" />
                         Light
                         {readerTheme === "light" && <Check className="ml-2 h-4 w-4" />}
                       </Button>
@@ -657,21 +753,15 @@ export function ReadPageClient({
                         variant={readerTheme === "dark" ? "default" : "outline"}
                         size="sm"
                         onClick={() => setReaderTheme("dark")}
-                        style={
-                          readerTheme !== "dark"
-                            ? { borderColor: "#444", color: "#e0e0e0", backgroundColor: "#1a1a1a" }
-                            : { borderColor: "#666", backgroundColor: "#2a2a2a" }
-                        }
+                        aria-label="Dark theme"
+                        aria-pressed={readerTheme === "dark"}
                         className={
                           readerTheme === "dark"
                             ? "ring-2 ring-primary ring-offset-2 ring-offset-[#1a1a1a]"
                             : ""
                         }
                       >
-                        <Moon
-                          className="mr-2 h-4 w-4"
-                          style={{ color: readerTheme !== "dark" ? "#e0e0e0" : "" }}
-                        />
+                        <Moon className="mr-2 h-4 w-4" />
                         Dark
                         {readerTheme === "dark" && <Check className="ml-2 h-4 w-4" />}
                       </Button>
@@ -679,17 +769,11 @@ export function ReadPageClient({
                         variant={readerTheme === "sepia" ? "default" : "outline"}
                         size="sm"
                         onClick={() => setReaderTheme("sepia")}
-                        style={
-                          readerTheme === "dark"
-                            ? { borderColor: "#444", color: "#e0e0e0", backgroundColor: "#1a1a1a" }
-                            : {}
-                        }
+                        aria-label="Sepia theme"
+                        aria-pressed={readerTheme === "sepia"}
                         className={readerTheme === "sepia" ? "ring-2 ring-primary ring-offset-2" : ""}
                       >
-                        <Coffee
-                          className="mr-2 h-4 w-4"
-                          style={{ color: readerTheme === "dark" ? "#e0e0e0" : "" }}
-                        />
+                        <Coffee className="mr-2 h-4 w-4" />
                         Sepia
                         {readerTheme === "sepia" && <Check className="ml-2 h-4 w-4" />}
                       </Button>
@@ -699,17 +783,16 @@ export function ReadPageClient({
               </SheetContent>
             </Sheet>
 
-            <Button variant="ghost" size="icon" asChild>
+            <Button variant="ghost" size="icon" asChild aria-label="Go to home page">
               <Link href="/">
                 <Home className="h-5 w-5" />
-                <span className="sr-only">Home</span>
               </Link>
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl px-4 py-12 sm:px-6 sm:py-16">
+      <main className="mx-auto max-w-2xl px-4 py-12 pb-24 sm:px-6 sm:py-16">
         <header className="mb-12 text-center">
           <p className={`text-sm ${theme.mutedText}`}>Chapter {currentChapter.number}</p>
           <h1 className="mt-2 font-serif text-3xl font-light tracking-tight sm:text-4xl">
@@ -771,18 +854,23 @@ export function ReadPageClient({
         </div>
       </main>
 
-      <footer className={`sticky bottom-0 border-t ${theme.header} backdrop-blur-sm`}>
+      <footer className={`fixed inset-x-0 bottom-0 border-t ${theme.header} bg-opacity-95 backdrop-blur-sm`}>
         <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4">
           {currentChapter.previousChapterNumber ? (
-            <Button variant="ghost" asChild>
+            <Button
+              variant="ghost"
+              asChild
+              aria-label={`Go to previous chapter`}
+              title="Previous chapter (←)"
+            >
               <Link
-                href={`/novel/${id}/read/${currentChapter.previousChapterNumber}?chapterPage=${getGroupPageForChapter(
+                href={`/novel/${novelSlug}/read/${currentChapter.previousChapterNumber}?chapterPage=${getGroupPageForChapter(
                   currentChapter.previousChapterNumber,
                   chapterList?.pageSize ?? 100
                 )}`}
               >
                 <ChevronLeft className="mr-2 h-4 w-4" />
-                Previous
+                <span className="hidden sm:inline">Previous</span>
               </Link>
             </Button>
           ) : (
@@ -790,9 +878,9 @@ export function ReadPageClient({
           )}
 
           <div className="flex flex-col items-center gap-1">
-              <span className={`text-sm ${theme.mutedText}`}>
+            <span className={`text-sm ${theme.mutedText}`}>
               {currentChapter.number} / {novel.chaptersCount}
-              </span>
+            </span>
             {readingProgress > 0 ? (
               <span className={`text-xs ${theme.mutedText}`}>
                 {Math.round(readingProgress)}% read
@@ -801,21 +889,26 @@ export function ReadPageClient({
           </div>
 
           {currentChapter.nextChapterNumber ? (
-            <Button variant="ghost" asChild>
+            <Button
+              variant="ghost"
+              asChild
+              aria-label={`Go to next chapter`}
+              title="Next chapter (→)"
+            >
               <Link
-                href={`/novel/${id}/read/${currentChapter.nextChapterNumber}?chapterPage=${getGroupPageForChapter(
+                href={`/novel/${novelSlug}/read/${currentChapter.nextChapterNumber}?chapterPage=${getGroupPageForChapter(
                   currentChapter.nextChapterNumber,
                   chapterList?.pageSize ?? 100
                 )}`}
               >
-                Next
+                <span className="hidden sm:inline">Next</span>
                 <ChevronRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           ) : (
-            <Button variant="ghost" asChild>
-              <Link href={`/novel/${id}`}>
-                Finish
+            <Button variant="ghost" asChild aria-label="Finish chapter">
+              <Link href={`/novel/${novelSlug}`}>
+                <span className="hidden sm:inline">Finish</span>
                 <ChevronRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
