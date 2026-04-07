@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ChevronDown, ChevronRight, Lock } from "lucide-react"
+import { ChevronDown, ChevronRight, Loader2, Lock } from "lucide-react"
 import {
   type PublicNovelChapterListDto,
   type PublicNovelChapterDto,
@@ -11,6 +11,7 @@ import {
 } from "@mist/shared"
 import { isChapterUnlocked } from "@/lib/zap-utils"
 import { formatPublishedDate } from "./novel-utils"
+import { fetchPublicNovelDetail } from "@/lib/api"
 
 interface ChapterListProps {
   novel: PublicNovelDetailDto
@@ -28,26 +29,51 @@ function getGroupRange(
   return { start, end }
 }
 
+interface GroupData {
+  chapters: PublicNovelChapterDto[]
+  chapterList: PublicNovelChapterListDto
+}
+
 export function ChapterList({ novel, chapters, chapterList }: ChapterListProps) {
   const router = useRouter()
   const [unlockedSet, setUnlockedSet] = useState<Set<string>>(new Set())
-  const [openGroup, setOpenGroup] = useState(`group-${chapterList.currentPage}`)
+  const [openGroup, setOpenGroup] = useState<number | null>(chapterList.currentPage)
+  const [loadingGroup, setLoadingGroup] = useState<number | null>(null)
+  const [groupCache, setGroupCache] = useState<Record<number, GroupData>>({
+    [chapterList.currentPage]: { chapters, chapterList },
+  })
+  const groupRefs = useRef<Map<number, HTMLDivElement | null>>(new Map())
 
+  // Track current chapter from URL (if user navigated from reader)
+  const currentChapterNumber = useMemo(() => {
+    if (typeof window === "undefined") return null
+    const url = new URL(window.location.href)
+    const match = url.pathname.match(/\/read\/(\d+)/)
+    return match ? Number.parseInt(match[1], 10) : null
+  }, [])
+
+  // Build unlocked chapters set
   useEffect(() => {
     const unlocked = new Set<string>()
+    const allCachedChapters = Object.values(groupCache).flatMap((g) => g.chapters)
+    const chaptersToCheck = allCachedChapters.length > 0 ? allCachedChapters : chapters
 
-    for (const chapter of chapters) {
+    for (const chapter of chaptersToCheck) {
       if (isChapterUnlocked(novel.id, String(chapter.number))) {
         unlocked.add(String(chapter.number))
       }
     }
 
     setUnlockedSet(unlocked)
-  }, [chapters, novel.id])
+  }, [chapters, novel.id, groupCache])
 
+  // Auto-open current group and scroll to it
+  const currentGroupRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
-    setOpenGroup(`group-${chapterList.currentPage}`)
-  }, [chapterList.currentPage])
+    if (currentGroupRef.current) {
+      currentGroupRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" })
+    }
+  }, [])
 
   const groups = useMemo(
     () =>
@@ -55,11 +81,62 @@ export function ChapterList({ novel, chapters, chapterList }: ChapterListProps) 
         const page = index + 1
         return {
           page,
-          key: `group-${page}`,
           ...getGroupRange(page, chapterList.pageSize, chapterList.maxChapterNumber),
         }
       }),
     [chapterList.maxChapterNumber, chapterList.pageSize, chapterList.totalPages]
+  )
+
+  const loadGroup = useCallback(
+    async (groupPage: number) => {
+      if (groupCache[groupPage]) {
+        return
+      }
+
+      setLoadingGroup(groupPage)
+      try {
+        const payload = await fetchPublicNovelDetail(novel.id, { chapterPage: groupPage })
+        setGroupCache((previous) => ({
+          ...previous,
+          [groupPage]: {
+            chapters: payload.chapters,
+            chapterList: payload.chapterList,
+          },
+        }))
+      } catch (error) {
+        console.error(`Failed to load group ${groupPage}:`, error)
+      } finally {
+        setLoadingGroup(null)
+      }
+    },
+    [novel.id, groupCache]
+  )
+
+  const handleGroupToggle = useCallback(
+    (groupPage: number) => {
+      if (openGroup === groupPage) {
+        setOpenGroup(null)
+        return
+      }
+
+      setOpenGroup(groupPage)
+
+      // Load group data if not cached
+      void loadGroup(groupPage)
+
+      // Update URL without reload
+      if (groupPage !== chapterList.currentPage) {
+        router.replace(`/novel/${novel.slug}?chapterPage=${groupPage}`, {
+          scroll: false,
+        })
+      }
+
+      // Scroll to group after loading
+      setTimeout(() => {
+        groupRefs.current.get(groupPage)?.scrollIntoView({ block: "nearest", behavior: "smooth" })
+      }, 100)
+    },
+    [openGroup, chapterList.currentPage, novel.slug, router, loadGroup]
   )
 
   return (
@@ -73,7 +150,7 @@ export function ChapterList({ novel, chapters, chapterList }: ChapterListProps) 
 
       {novel.chaptersCount > 0 ? (
         <p className="mt-2 text-xs text-muted-foreground">
-          Browse by groups. Only the open group is loaded to keep large stories fast.
+          Browse by groups. Tap a group to load its chapters.
         </p>
       ) : null}
 
@@ -85,97 +162,111 @@ export function ChapterList({ novel, chapters, chapterList }: ChapterListProps) 
         <div className="mt-6 space-y-3">
           {groups.map((group) => {
             const isCurrentGroup = group.page === chapterList.currentPage
-            const isOpen = openGroup === group.key
+            const isOpen = openGroup === group.page
+            const isLoading = loadingGroup === group.page
+            const cachedData = groupCache[group.page] ?? null
+            const groupChapters = cachedData?.chapters ?? (isCurrentGroup ? chapters : [])
+
+            // Sort chapters by number to ensure consistent ordering
+            const sortedChapters = [...groupChapters].sort((a, b) => a.number - b.number)
 
             return (
               <div
-                key={group.key}
+                key={group.page}
+                ref={isCurrentGroup ? currentGroupRef : undefined}
                 className="overflow-hidden rounded-2xl border border-border/50 bg-background"
               >
                 <button
                   type="button"
-                  onClick={() => {
-                    if (isCurrentGroup) {
-                      setOpenGroup((previous) => (previous === group.key ? "" : group.key))
-                      return
-                    }
-
-                    setOpenGroup(group.key)
-                    router.replace(`/novel/${novel.slug}?chapterPage=${group.page}`, {
-                      scroll: false,
-                    })
-                  }}
-                  className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                  onClick={() => handleGroupToggle(group.page)}
+                  disabled={isLoading}
+                  aria-expanded={isOpen}
+                  aria-label={`Chapters ${group.start.toLocaleString()} to ${group.end.toLocaleString()}, ${isOpen ? "open" : "collapsed"}`}
+                  className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/40 disabled:opacity-50"
                 >
-                  <div>
+                  <div className="flex items-center gap-3">
                     <p className="text-sm font-medium text-foreground">
                       Chapters {group.start.toLocaleString()}-{group.end.toLocaleString()}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      Group {group.page} of {chapterList.totalPages}
-                      {isCurrentGroup ? " · current" : ""}
-                    </p>
+                    {isCurrentGroup && (
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                        Current
+                      </span>
+                    )}
+                    {isLoading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
                   </div>
-                  {isCurrentGroup && isOpen ? (
+                  {isLoading ? null : isOpen ? (
                     <ChevronDown className="h-4 w-4 text-muted-foreground" />
                   ) : (
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   )}
                 </button>
 
-                {isCurrentGroup && isOpen ? (
+                {isOpen ? (
                   <div className="border-t border-border/40">
-                    <div className="px-4 py-3 text-xs text-muted-foreground">
-                      Showing loaded chapters {chapterList.visibleFrom.toLocaleString()}-
-                      {chapterList.visibleTo.toLocaleString()} of{" "}
-                      {chapterList.maxChapterNumber.toLocaleString()}
-                    </div>
-                    <div className="divide-y divide-border/40">
-                      {chapters.map((chapter) => {
-                        const isPaid = chapter.isPaid && Boolean(chapter.priceSats)
-                        const isUnlocked = !isPaid || unlockedSet.has(String(chapter.number))
+                    {sortedChapters.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                        No chapters in this group.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-border/40">
+                        {sortedChapters.map((chapter) => {
+                          const isPaid = chapter.isPaid && Boolean(chapter.priceSats)
+                          const isUnlocked = !isPaid || unlockedSet.has(String(chapter.number))
+                          const isCurrentChapter = currentChapterNumber === chapter.number
 
-                        return (
-                          <Link
-                            key={chapter.id}
-                            href={`/novel/${novel.slug}/read/${chapter.number}?chapterPage=${group.page}`}
-                            className="group flex items-center justify-between py-4 pl-4 pr-4 transition-colors hover:bg-muted/30"
-                          >
-                            <div className="flex items-center gap-4">
-                              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
-                                {chapter.number}
-                              </span>
-                              <div>
-                                <p className="font-medium text-foreground group-hover:text-foreground/80">
-                                  {chapter.title}
-                                </p>
-                                {chapter.previewText ? (
-                                  <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                                    {chapter.previewText}
+                          return (
+                            <Link
+                              key={chapter.id}
+                              href={`/novel/${novel.slug}/read/${chapter.number}?chapterPage=${group.page}`}
+                              aria-label={`Chapter ${chapter.number}: ${chapter.title}`}
+                              className={`group flex items-center justify-between py-3 pl-4 pr-4 transition-colors hover:bg-muted/30 ${
+                                isCurrentChapter ? "bg-primary/5" : ""
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <span
+                                  className={`text-sm font-medium ${
+                                    isCurrentChapter
+                                      ? "text-primary"
+                                      : "text-muted-foreground"
+                                  }`}
+                                >
+                                  {chapter.number}
+                                </span>
+                                <div>
+                                  <p
+                                    className={`font-medium group-hover:text-foreground/80 ${
+                                      isCurrentChapter
+                                        ? "text-primary"
+                                        : "text-foreground"
+                                    }`}
+                                  >
+                                    {chapter.title}
                                   </p>
-                                ) : null}
-                                <p className="text-xs text-muted-foreground">
-                                  {formatPublishedDate(chapter.publishedAt)} ·{" "}
-                                  {chapter.wordCount.toLocaleString()} words
-                                  {isPaid && !isUnlocked ? (
-                                    <span className="ml-2 inline-flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
-                                      <Lock className="h-3 w-3" />
-                                      {chapter.priceSats} sats
-                                    </span>
-                                  ) : null}
-                                </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {formatPublishedDate(chapter.publishedAt)} ·{" "}
+                                    {chapter.wordCount.toLocaleString()} words
+                                    {isPaid && !isUnlocked ? (
+                                      <span className="ml-2 inline-flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
+                                        <Lock className="h-3 w-3" />
+                                        {chapter.priceSats} sats
+                                      </span>
+                                    ) : null}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {isPaid && !isUnlocked ? (
-                                <Lock className="h-4 w-4 text-muted-foreground/60" />
-                              ) : null}
-                              <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                            </div>
-                          </Link>
-                        )
-                      })}
-                    </div>
+                              <div className="flex items-center gap-2">
+                                {isPaid && !isUnlocked ? (
+                                  <Lock className="h-4 w-4 text-muted-foreground/60" />
+                                ) : null}
+                                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                              </div>
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 ) : null}
               </div>
