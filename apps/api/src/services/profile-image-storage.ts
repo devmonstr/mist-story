@@ -15,12 +15,14 @@ const MAX_PROFILE_IMAGE_FILE_SIZE_BYTES = 5 * 1024 * 1024
 const ALLOWED_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
 
 function getProfileImageMediaConfig(): R2MediaConfig {
+  const publicBaseUrl = env.R2_ENDPOINT ?? env.R2_PUBLIC_BASE_URL
+
   if (
     !env.R2_ACCOUNT_ID ||
     !env.R2_ACCESS_KEY_ID ||
     !env.R2_SECRET_ACCESS_KEY ||
     !env.R2_BUCKET_NAME ||
-    !env.R2_PUBLIC_BASE_URL
+    !publicBaseUrl
   ) {
     throw new HttpError(500, "Cloudflare R2 is not configured for profile image uploads")
   }
@@ -30,7 +32,7 @@ function getProfileImageMediaConfig(): R2MediaConfig {
     accessKeyId: env.R2_ACCESS_KEY_ID,
     secretAccessKey: env.R2_SECRET_ACCESS_KEY,
     bucketName: env.R2_BUCKET_NAME,
-    publicBaseUrl: env.R2_PUBLIC_BASE_URL,
+    publicBaseUrl,
   })
 }
 

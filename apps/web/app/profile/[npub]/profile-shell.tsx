@@ -6,6 +6,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react"
@@ -37,19 +38,32 @@ export function ProfileShell({ params, children }: ProfileShellProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isFollowPending, setIsFollowPending] = useState(false)
+  const loadRequestIdRef = useRef(0)
 
   const loadProfile = useCallback(async () => {
+    const requestId = ++loadRequestIdRef.current
     setIsLoading(true)
     setError(null)
+    setData(null)
 
     try {
       const payload = await fetchProfilePage(npub)
+      if (loadRequestIdRef.current !== requestId) {
+        return
+      }
+
       setData(payload)
     } catch (loadError) {
+      if (loadRequestIdRef.current !== requestId) {
+        return
+      }
+
       const message = loadError instanceof Error ? loadError.message : "Failed to load profile"
       setError(message)
     } finally {
-      setIsLoading(false)
+      if (loadRequestIdRef.current === requestId) {
+        setIsLoading(false)
+      }
     }
   }, [npub])
 

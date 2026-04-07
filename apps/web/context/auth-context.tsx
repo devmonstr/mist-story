@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react"
@@ -46,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isExtensionAvailable, setIsExtensionAvailable] = useState(false)
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
+  const sessionSyncRequestIdRef = useRef(0)
 
   useEffect(() => {
     const checkExtension = () => {
@@ -60,13 +62,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const restoreSession = async () => {
+      const requestId = ++sessionSyncRequestIdRef.current
+
       try {
         const session = await getCurrentUser()
+        if (sessionSyncRequestIdRef.current !== requestId) {
+          return
+        }
+
         setUser(session ? toNostrUser(session.user) : null)
       } catch (error) {
-        console.error("Failed to restore session:", error)
+        if (sessionSyncRequestIdRef.current === requestId) {
+          console.error("Failed to restore session:", error)
+        }
       } finally {
-        setIsLoading(false)
+        if (sessionSyncRequestIdRef.current === requestId) {
+          setIsLoading(false)
+        }
       }
     }
 
@@ -119,11 +131,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false
     }
 
+    const requestId = ++sessionSyncRequestIdRef.current
     setIsLoading(true)
     try {
       const pubkey = await getPublicKey()
       if (!pubkey) {
-        setIsLoading(false)
+        if (sessionSyncRequestIdRef.current === requestId) {
+          setIsLoading(false)
+        }
         return false
       }
 
@@ -139,18 +154,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signedEvent,
       })
 
+      if (sessionSyncRequestIdRef.current !== requestId) {
+        return false
+      }
+
       setUser(toNostrUser(result.user))
       setUnreadNotificationCount(0)
       return true
     } catch (error) {
-      console.error("Sign in failed:", error)
+      if (sessionSyncRequestIdRef.current === requestId) {
+        console.error("Sign in failed:", error)
+      }
       return false
     } finally {
-      setIsLoading(false)
+      if (sessionSyncRequestIdRef.current === requestId) {
+        setIsLoading(false)
+      }
     }
   }, [])
 
   const signOut = useCallback(() => {
+    sessionSyncRequestIdRef.current += 1
     void signOutSession().catch((error) => {
       console.error("Sign out failed:", error)
     })
@@ -164,6 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: "Invalid nsec format. Must start with nsec1" }
       }
 
+      const requestId = ++sessionSyncRequestIdRef.current
       setIsLoading(true)
       try {
         const pubkey = getPublicKeyFromNsec(nsec)
@@ -183,14 +208,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           signedEvent: signedChallengeEvent,
         })
 
+        if (sessionSyncRequestIdRef.current !== requestId) {
+          return { success: false, error: "Session changed during sign-in" }
+        }
+
         setUser(toNostrUser(result.user))
         setUnreadNotificationCount(0)
         return { success: true }
       } catch (error) {
-        console.error("Nsec sign in failed:", error)
+        if (sessionSyncRequestIdRef.current === requestId) {
+          console.error("Nsec sign in failed:", error)
+        }
         return { success: false, error: "Failed to sign in with nsec" }
       } finally {
-        setIsLoading(false)
+        if (sessionSyncRequestIdRef.current === requestId) {
+          setIsLoading(false)
+        }
       }
     },
     []
@@ -199,11 +232,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = useCallback(async () => {
     if (!user) return
 
+    const requestId = ++sessionSyncRequestIdRef.current
     try {
       const session = await getCurrentUser()
+      if (sessionSyncRequestIdRef.current !== requestId) {
+        return
+      }
+
       setUser(session ? toNostrUser(session.user) : null)
     } catch (error) {
-      console.error("Failed to refresh profile:", error)
+      if (sessionSyncRequestIdRef.current === requestId) {
+        console.error("Failed to refresh profile:", error)
+      }
     }
   }, [user])
 

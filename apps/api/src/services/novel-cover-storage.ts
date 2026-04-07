@@ -46,12 +46,14 @@ function getR2Client() {
     return r2Client
   }
 
+  const publicBaseUrl = env.R2_ENDPOINT ?? env.R2_PUBLIC_BASE_URL
+
   if (
     !env.R2_ACCOUNT_ID ||
     !env.R2_ACCESS_KEY_ID ||
     !env.R2_SECRET_ACCESS_KEY ||
     !env.R2_BUCKET_NAME ||
-    !env.R2_PUBLIC_BASE_URL
+    !publicBaseUrl
   ) {
     throw new HttpError(500, "Cloudflare R2 is not configured for cover uploads")
   }
@@ -69,13 +71,15 @@ function getR2Client() {
 }
 
 function getBucketName() {
-  if (!env.R2_BUCKET_NAME || !env.R2_PUBLIC_BASE_URL) {
+  const publicBaseUrl = env.R2_ENDPOINT ?? env.R2_PUBLIC_BASE_URL
+
+  if (!env.R2_BUCKET_NAME || !publicBaseUrl) {
     throw new HttpError(500, "Cloudflare R2 is not configured for cover uploads")
   }
 
   return {
     bucketName: env.R2_BUCKET_NAME,
-    publicBaseUrl: env.R2_PUBLIC_BASE_URL.replace(/\/$/, ""),
+    publicBaseUrl: publicBaseUrl.replace(/\/$/, ""),
   }
 }
 

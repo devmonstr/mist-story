@@ -15,4 +15,5 @@ export const r2EnvShape = {
   R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   R2_BUCKET_NAME: z.string().min(1).optional(),
   R2_PUBLIC_BASE_URL: z.string().url().optional(),
+  R2_ENDPOINT: z.string().url().optional(),
 } satisfies Record<string, z.ZodTypeAny>

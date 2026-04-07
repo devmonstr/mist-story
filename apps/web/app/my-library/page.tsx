@@ -28,29 +28,43 @@ function formatSavedDate(value: string) {
 }
 
 export default function MyLibraryPage() {
-  const { isLoading, isAuthenticated } = useRequireAuth()
+  const { user, isLoading, isAuthenticated } = useRequireAuth()
   const [library, setLibrary] = useState<MyLibraryResponse | null>(null)
   const [isFetching, setIsFetching] = useState(true)
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user?.npub) {
+      setLibrary(null)
+      setIsFetching(false)
       return
     }
+
+    let cancelled = false
 
     const loadLibrary = async () => {
       try {
         setIsFetching(true)
         const payload = await fetchMyLibrary()
-        setLibrary(payload)
+        if (!cancelled) {
+          setLibrary(payload)
+        }
       } catch (error) {
-        console.error("Failed to fetch my library:", error)
+        if (!cancelled) {
+          console.error("Failed to fetch my library:", error)
+        }
       } finally {
-        setIsFetching(false)
+        if (!cancelled) {
+          setIsFetching(false)
+        }
       }
     }
 
     void loadLibrary()
-  }, [isAuthenticated])
+
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthenticated, user?.npub])
 
   const stats = useMemo(() => {
     return {

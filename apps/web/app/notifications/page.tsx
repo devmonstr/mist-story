@@ -69,7 +69,7 @@ function getNotificationIcon(notification: NotificationDto) {
 }
 
 export default function NotificationsPage() {
-  const { isLoading, isAuthenticated } = useRequireAuth()
+  const { user, isLoading, isAuthenticated } = useRequireAuth()
   const { syncUnreadNotificationCount } = useAuth()
   const [notifications, setNotifications] = useState<NotificationDto[]>([])
   const [pagination, setPagination] = useState<NotificationPagination>(EMPTY_PAGINATION)
@@ -79,7 +79,7 @@ export default function NotificationsPage() {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
   const loadNotifications = useCallback(async () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user?.npub) {
       return
     }
 
@@ -100,15 +100,53 @@ export default function NotificationsPage() {
     } finally {
       setIsFetching(false)
     }
-  }, [isAuthenticated, page, pageSize, syncUnreadNotificationCount])
+  }, [isAuthenticated, page, pageSize, syncUnreadNotificationCount, user?.npub])
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user?.npub) {
+      setNotifications([])
+      setPagination(EMPTY_PAGINATION)
+      setIsFetching(false)
+      syncUnreadNotificationCount(0)
       return
     }
 
-    void loadNotifications()
-  }, [isAuthenticated, loadNotifications])
+    let cancelled = false
+
+    const load = async () => {
+      try {
+        setIsFetching(true)
+        const payload = await fetchNotifications({ page, pageSize })
+        if (cancelled) {
+          return
+        }
+
+        setNotifications(payload.notifications)
+        setPagination(payload.pagination)
+        syncUnreadNotificationCount(payload.unreadCount)
+        if (payload.pagination.page !== page) {
+          setPage(payload.pagination.page)
+        }
+        if (payload.pagination.pageSize !== pageSize) {
+          setPageSize(payload.pagination.pageSize)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to fetch notifications:", error)
+        }
+      } finally {
+        if (!cancelled) {
+          setIsFetching(false)
+        }
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthenticated, loadNotifications, page, pageSize, syncUnreadNotificationCount, user?.npub])
 
   const unreadCount = useMemo(
     () => notifications.filter((notification) => !notification.readAt).length,

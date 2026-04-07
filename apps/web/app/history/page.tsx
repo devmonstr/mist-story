@@ -23,28 +23,44 @@ function formatRelativeDate(value: string) {
 }
 
 export default function HistoryPage() {
-  const { isLoading, isAuthenticated } = useRequireAuth()
+  const { user, isLoading, isAuthenticated } = useRequireAuth()
   const [history, setHistory] = useState<MyLibraryContinueReadingDto[]>([])
   const [isFetching, setIsFetching] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated || !user?.npub) {
+      setHistory([])
+      setIsFetching(false)
+      return
+    }
+
+    let cancelled = false
 
     const loadHistory = async () => {
       try {
         setIsFetching(true)
         const payload = await fetchMyLibrary()
-        setHistory(payload.continueReading)
+        if (!cancelled) {
+          setHistory(payload.continueReading)
+        }
       } catch (error) {
-        console.error("Failed to fetch reading history:", error)
+        if (!cancelled) {
+          console.error("Failed to fetch reading history:", error)
+        }
       } finally {
-        setIsFetching(false)
+        if (!cancelled) {
+          setIsFetching(false)
+        }
       }
     }
 
     void loadHistory()
-  }, [isAuthenticated])
+
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthenticated, user?.npub])
 
   if (isLoading || isFetching) {
     return (

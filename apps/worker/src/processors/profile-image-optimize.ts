@@ -3,12 +3,14 @@ import type { ProfileImageOptimizeJobPayload } from "@mist/shared"
 import { env } from "../config/env"
 
 function getProfileImageMediaConfig() {
+  const publicBaseUrl = env.R2_ENDPOINT ?? env.R2_PUBLIC_BASE_URL
+
   if (
     !env.R2_ACCOUNT_ID ||
     !env.R2_ACCESS_KEY_ID ||
     !env.R2_SECRET_ACCESS_KEY ||
     !env.R2_BUCKET_NAME ||
-    !env.R2_PUBLIC_BASE_URL
+    !publicBaseUrl
   ) {
     throw new Error("Cloudflare R2 is not configured for profile image optimization")
   }
@@ -18,7 +20,7 @@ function getProfileImageMediaConfig() {
     accessKeyId: env.R2_ACCESS_KEY_ID,
     secretAccessKey: env.R2_SECRET_ACCESS_KEY,
     bucketName: env.R2_BUCKET_NAME,
-    publicBaseUrl: env.R2_PUBLIC_BASE_URL,
+    publicBaseUrl,
   })
 }
 

@@ -781,6 +781,16 @@ export default function SettingsPage() {
   const bannerInputRef = useRef<HTMLInputElement | null>(null)
   const profileImageEditorDragRef = useRef<ProfileImageEditorDragState | null>(null)
   const dirtyProfileFieldsRef = useRef<DirtyProfileFields>(EMPTY_DIRTY_PROFILE_FIELDS)
+  const activeUserNpub = user?.npub ?? null
+  const activeUserPubkey = user?.pubkey ?? null
+  const activeUserNpubRef = useRef<string | null>(activeUserNpub)
+  const notificationRequestIdRef = useRef(0)
+  const appearanceRequestIdRef = useRef(0)
+  const integrationsRequestIdRef = useRef(0)
+
+  useEffect(() => {
+    activeUserNpubRef.current = activeUserNpub
+  }, [activeUserNpub])
 
   const handleCopy = async (value: string) => {
     try {
@@ -800,12 +810,21 @@ export default function SettingsPage() {
   }
 
   const ensureIntegrationsSettings = useCallback(async () => {
+    const accountNpub = activeUserNpubRef.current
+    if (!accountNpub) {
+      return null
+    }
+
     if (integrationsSettings) {
       return integrationsSettings
     }
 
     try {
       const payload = await fetchIntegrationsSettings()
+      if (activeUserNpubRef.current !== accountNpub) {
+        return null
+      }
+
       setIntegrationsSettings(payload)
       setIntegrationsLoaded(true)
       return payload
@@ -827,7 +846,8 @@ export default function SettingsPage() {
   }, [ensureIntegrationsSettings])
 
   const loadSecuritySettings = useCallback(async (options?: { force?: boolean }) => {
-    if (!isAuthenticated) {
+    const accountNpub = activeUserNpubRef.current
+    if (!isAuthenticated || !accountNpub) {
       return null
     }
 
@@ -844,11 +864,19 @@ export default function SettingsPage() {
 
     try {
       const payload = await fetchSecuritySettings()
+      if (activeUserNpubRef.current !== accountNpub) {
+        return null
+      }
+
       setSecuritySettings(payload)
       setSecurityRequiresReauth(false)
       setSecurityLoaded(true)
       return payload
     } catch (error) {
+      if (activeUserNpubRef.current !== accountNpub) {
+        return null
+      }
+
       const status =
         typeof error === 'object' && error !== null && 'status' in error
           ? Number((error as { status?: number }).status)
@@ -874,9 +902,55 @@ export default function SettingsPage() {
   }, [dirtyProfileFields])
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !activeUserNpub) {
+      setProfileData(null)
+      setProfileError(null)
+      setIsProfileLoading(false)
+      setProfileForm(EMPTY_PROFILE_FORM)
+      setDirtyProfileFields(EMPTY_DIRTY_PROFILE_FIELDS)
+      setAdditionalMetadata('{}')
+      setHasLoadedLiveProfileMetadata(false)
+      setIsProfileMetadataLoading(false)
+      setProfileMetadataError(null)
+      setProfileSaveError(null)
+      setProfileSaveSuccess(null)
+      setProfileRelayResults([])
+      setAvatarImageSelection(null)
+      setBannerImageSelection(null)
+      setPendingProfileImageEdit(null)
+      setProfileImageError(null)
+      setNotificationSettings(null)
+      setNotificationLoading(false)
+      setNotificationSaving(false)
+      setNotificationError(null)
+      setNotificationLoaded(false)
+      setNotificationSavedAt(null)
+      setAppearanceSettings(null)
+      setAppearanceLoading(false)
+      setAppearanceSaving(false)
+      setAppearanceError(null)
+      setAppearanceLoaded(false)
+      setAppearanceSavedAt(null)
+      setSecuritySettings(null)
+      setSecurityLoading(false)
+      setSecurityError(null)
+      setSecurityLoaded(false)
+      setSecurityRequiresReauth(false)
+      setSecurityActionError(null)
+      setSecurityActionInFlight(null)
+      setIntegrationsSettings(null)
+      setIntegrationsLoading(false)
+      setIntegrationsError(null)
+      setIntegrationsLoaded(false)
+      setRelayForm(EMPTY_RELAY_FORM)
+      setEditingRelayId(null)
+      setIsSavingRelayForm(false)
+      setIsResettingRelays(false)
+      setRelayActionId(null)
       return
     }
+
+    let cancelled = false
 
     const loadProfile = async () => {
       setIsProfileLoading(true)
@@ -884,17 +958,27 @@ export default function SettingsPage() {
 
       try {
         const payload = await fetchMyProfile()
-        setProfileData(payload)
+        if (!cancelled) {
+          setProfileData(payload)
+        }
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to load profile'
-        setProfileError(message)
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : 'Failed to load profile'
+          setProfileError(message)
+        }
       } finally {
-        setIsProfileLoading(false)
+        if (!cancelled) {
+          setIsProfileLoading(false)
+        }
       }
     }
 
     void loadProfile()
-  }, [isAuthenticated])
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeUserNpub, isAuthenticated])
 
   useEffect(() => {
     if (!profileData) {
@@ -997,29 +1081,60 @@ export default function SettingsPage() {
       return
     }
 
+    const accountNpub = activeUserNpubRef.current
+    if (!accountNpub) {
+      return
+    }
+
+    const requestId = notificationRequestIdRef.current + 1
+    notificationRequestIdRef.current = requestId
+
     const loadNotifications = async () => {
       setNotificationLoading(true)
       setNotificationError(null)
 
       try {
         const payload = await fetchNotificationSettings()
-        setNotificationSettings(payload)
+        if (
+          notificationRequestIdRef.current === requestId &&
+          activeUserNpubRef.current === accountNpub
+        ) {
+          setNotificationSettings(payload)
+        }
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to load notifications'
-        setNotificationError(message)
+        if (
+          notificationRequestIdRef.current === requestId &&
+          activeUserNpubRef.current === accountNpub
+        ) {
+          const message = error instanceof Error ? error.message : 'Failed to load notifications'
+          setNotificationError(message)
+        }
       } finally {
-        setNotificationLoading(false)
-        setNotificationLoaded(true)
+        if (
+          notificationRequestIdRef.current === requestId &&
+          activeUserNpubRef.current === accountNpub
+        ) {
+          setNotificationLoading(false)
+          setNotificationLoaded(true)
+        }
       }
     }
 
     void loadNotifications()
-  }, [activeTab, isAuthenticated, notificationLoaded, notificationLoading])
+  }, [activeTab, activeUserNpub, isAuthenticated, notificationLoaded, notificationLoading])
 
   useEffect(() => {
     if (!isAuthenticated || activeTab !== 'appearance' || appearanceLoaded || appearanceLoading) {
       return
     }
+
+    const accountNpub = activeUserNpubRef.current
+    if (!accountNpub) {
+      return
+    }
+
+    const requestId = appearanceRequestIdRef.current + 1
+    appearanceRequestIdRef.current = requestId
 
     const loadAppearance = async () => {
       setAppearanceLoading(true)
@@ -1027,19 +1142,34 @@ export default function SettingsPage() {
 
       try {
         const payload = await fetchAppearanceSettings()
-        setAppearanceSettings(payload)
-        setTheme(payload.theme)
+        if (
+          appearanceRequestIdRef.current === requestId &&
+          activeUserNpubRef.current === accountNpub
+        ) {
+          setAppearanceSettings(payload)
+          setTheme(payload.theme)
+        }
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to load appearance'
-        setAppearanceError(message)
+        if (
+          appearanceRequestIdRef.current === requestId &&
+          activeUserNpubRef.current === accountNpub
+        ) {
+          const message = error instanceof Error ? error.message : 'Failed to load appearance'
+          setAppearanceError(message)
+        }
       } finally {
-        setAppearanceLoading(false)
-        setAppearanceLoaded(true)
+        if (
+          appearanceRequestIdRef.current === requestId &&
+          activeUserNpubRef.current === accountNpub
+        ) {
+          setAppearanceLoading(false)
+          setAppearanceLoaded(true)
+        }
       }
     }
 
     void loadAppearance()
-  }, [activeTab, appearanceLoaded, appearanceLoading, isAuthenticated, setTheme])
+  }, [activeTab, activeUserNpub, appearanceLoaded, appearanceLoading, isAuthenticated, setTheme])
 
   useEffect(() => {
     if (!isAuthenticated || activeTab !== 'security' || securityLoaded || securityLoading) {
@@ -1047,12 +1177,20 @@ export default function SettingsPage() {
     }
 
     void loadSecuritySettings()
-  }, [activeTab, isAuthenticated, loadSecuritySettings, securityLoaded, securityLoading])
+  }, [activeTab, activeUserNpub, isAuthenticated, loadSecuritySettings, securityLoaded, securityLoading])
 
   useEffect(() => {
     if (!isAuthenticated || activeTab !== 'api' || integrationsLoaded || integrationsLoading) {
       return
     }
+
+    const accountNpub = activeUserNpubRef.current
+    if (!accountNpub) {
+      return
+    }
+
+    const requestId = integrationsRequestIdRef.current + 1
+    integrationsRequestIdRef.current = requestId
 
     const loadIntegrations = async () => {
       setIntegrationsLoading(true)
@@ -1060,18 +1198,33 @@ export default function SettingsPage() {
 
       try {
         const payload = await fetchIntegrationsSettings()
-        setIntegrationsSettings(payload)
+        if (
+          integrationsRequestIdRef.current === requestId &&
+          activeUserNpubRef.current === accountNpub
+        ) {
+          setIntegrationsSettings(payload)
+        }
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to load integrations'
-        setIntegrationsError(message)
+        if (
+          integrationsRequestIdRef.current === requestId &&
+          activeUserNpubRef.current === accountNpub
+        ) {
+          const message = error instanceof Error ? error.message : 'Failed to load integrations'
+          setIntegrationsError(message)
+        }
       } finally {
-        setIntegrationsLoading(false)
-        setIntegrationsLoaded(true)
+        if (
+          integrationsRequestIdRef.current === requestId &&
+          activeUserNpubRef.current === accountNpub
+        ) {
+          setIntegrationsLoading(false)
+          setIntegrationsLoaded(true)
+        }
       }
     }
 
     void loadIntegrations()
-  }, [activeTab, integrationsLoaded, integrationsLoading, isAuthenticated])
+  }, [activeTab, activeUserNpub, integrationsLoaded, integrationsLoading, isAuthenticated])
 
   const handleRefreshProfile = async () => {
     setIsRefreshingProfile(true)
@@ -1279,6 +1432,13 @@ export default function SettingsPage() {
 
   const handleSaveProfile = async () => {
     if (!profileData) {
+      return
+    }
+
+    if (!activeUserPubkey || activeUserPubkey !== profileData.profile.pubkey) {
+      setProfileSaveError(
+        'The active account changed while this page still had older profile data. Reload your profile settings and try again.'
+      )
       return
     }
 

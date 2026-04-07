@@ -135,6 +135,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     response = await fetch(`${getApiBaseUrl()}${path}`, {
       ...init,
+      cache: init?.cache ?? "no-store",
       credentials: "include",
       headers,
     })
@@ -387,6 +388,7 @@ export function signOutAllSecuritySessions() {
 export async function downloadSecurityAuditLog() {
   const response = await fetch(`${getApiBaseUrl()}/api/v1/me/settings/security/audit-log`, {
     method: "GET",
+    cache: "no-store",
     credentials: "include",
   })
 

@@ -39,28 +39,44 @@ function formatRelativeUpdate(value: string | null) {
 }
 
 export default function BookmarksPage() {
-  const { isLoading, isAuthenticated } = useRequireAuth()
+  const { user, isLoading, isAuthenticated } = useRequireAuth()
   const [bookmarks, setBookmarks] = useState<MyLibrarySavedNovelDto[]>([])
   const [isFetching, setIsFetching] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated || !user?.npub) {
+      setBookmarks([])
+      setIsFetching(false)
+      return
+    }
+
+    let cancelled = false
 
     const loadBookmarks = async () => {
       try {
         setIsFetching(true)
         const payload = await fetchMyLibrary()
-        setBookmarks(payload.savedNovels)
+        if (!cancelled) {
+          setBookmarks(payload.savedNovels)
+        }
       } catch (error) {
-        console.error("Failed to fetch bookmarks:", error)
+        if (!cancelled) {
+          console.error("Failed to fetch bookmarks:", error)
+        }
       } finally {
-        setIsFetching(false)
+        if (!cancelled) {
+          setIsFetching(false)
+        }
       }
     }
 
     void loadBookmarks()
-  }, [isAuthenticated])
+
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthenticated, user?.npub])
 
   if (isLoading || isFetching) {
     return (
