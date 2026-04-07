@@ -67,6 +67,7 @@ import {
   getPublicKey,
   publishEventToRelays,
   signAuthChallengeWithExtension,
+  signAuthChallengeWithNsec,
   signKind0MetadataEvent,
   signKind0MetadataEventWithNsec,
   type RelayPublishResult,
@@ -798,6 +799,15 @@ export default function SettingsPage() {
   const [nsecDialogValue, setNsecDialogValue] = useState('')
   const [nsecDialogError, setNsecDialogError] = useState<string | null>(null)
   const [nsecDialogSigning, setNsecDialogSigning] = useState(false)
+
+  const [securityNsecDialogOpen, setSecurityNsecDialogOpen] = useState(false)
+  const [securityNsecDialogValue, setSecurityNsecDialogValue] = useState('')
+  const [securityNsecDialogError, setSecurityNsecDialogError] = useState<string | null>(null)
+  const [securityNsecDialogSigning, setSecurityNsecDialogSigning] = useState(false)
+  const securityNsecDialogResolveRef = useRef<{
+    resolve: (value: void | PromiseLike<void>) => void
+    reject: (reason?: unknown) => void
+  } | null>(null)
 
   useEffect(() => {
     activeUserNpubRef.current = activeUserNpub
@@ -1784,38 +1794,98 @@ export default function SettingsPage() {
     }, appearanceSettings?.theme)
   }
 
-  const runSecurityReauth = useCallback(async () => {
-    if (!isExtensionAvailable) {
-      throw new Error('Sensitive actions require a Nostr signing extension with NIP-07 support.')
-    }
-
+  const runSecurityReauthWithNsec = async (nsec: string) => {
     const accountPubkey = securitySettings?.pubkey ?? user?.pubkey ?? profileData?.profile.pubkey ?? null
     if (!accountPubkey) {
       throw new Error('Could not determine the current account pubkey for re-authentication.')
     }
 
-    const pubkey = await getPublicKey()
-    if (!pubkey) {
-      throw new Error('Could not read your Nostr public key from the extension.')
-    }
-
-    if (pubkey !== accountPubkey) {
-      throw new Error('The connected Nostr extension does not match the current Mist Story account.')
-    }
-
-    setSecurityActionInFlight('reauth')
     const { challenge } = await requestReauthChallenge()
-    const signedEvent = await signAuthChallengeWithExtension(pubkey, challenge)
+    const signedEvent = await signAuthChallengeWithNsec(nsec, challenge)
 
     if (!signedEvent) {
-      throw new Error('Re-authentication was cancelled or the extension could not sign the challenge.')
+      throw new Error('Failed to sign the re-auth challenge with nsec.')
+    }
+
+    if (signedEvent.pubkey !== accountPubkey) {
+      throw new Error(
+        `Wrong nsec: this nsec belongs to ${signedEvent.pubkey.slice(0, 8)}..., not your current account (${accountPubkey.slice(0, 8)}...).`
+      )
     }
 
     await verifyReauthChallenge({
       challenge,
       signedEvent,
     })
+  }
+
+  const runSecurityReauth = useCallback(async () => {
+    const accountPubkey = securitySettings?.pubkey ?? user?.pubkey ?? profileData?.profile.pubkey ?? null
+    if (!accountPubkey) {
+      throw new Error('Could not determine the current account pubkey for re-authentication.')
+    }
+
+    // Try extension first if available and matching
+    if (isExtensionAvailable) {
+      try {
+        const pubkey = await getPublicKey()
+        if (pubkey && pubkey === accountPubkey) {
+          setSecurityActionInFlight('reauth')
+          const { challenge } = await requestReauthChallenge()
+          const signedEvent = await signAuthChallengeWithExtension(pubkey, challenge)
+
+          if (!signedEvent) {
+            throw new Error('Extension could not sign the challenge.')
+          }
+
+          await verifyReauthChallenge({
+            challenge,
+            signedEvent,
+          })
+          return
+        }
+      } catch (error) {
+        // Extension error — fall through to nsec dialog
+        // Only re-throw if it's not a pubkey mismatch from our own check
+        if (error instanceof Error && error.message.includes('Could not read')) {
+          throw error
+        }
+        // For other extension failures, fall through
+      }
+    }
+
+    // Extension unavailable or mismatched → use nsec dialog
+    setSecurityNsecDialogOpen(true)
+    setSecurityNsecDialogValue('')
+    setSecurityNsecDialogError(null)
+
+    // Return a promise that resolves when the dialog completes
+    return new Promise<void>((resolve, reject) => {
+      securityNsecDialogResolveRef.current = { resolve, reject }
+    })
   }, [isExtensionAvailable, profileData?.profile.pubkey, securitySettings?.pubkey, user?.pubkey])
+
+  const handleSecurityNsecDialogSubmit = async (nsec: string) => {
+    setSecurityNsecDialogSigning(true)
+    setSecurityNsecDialogError(null)
+
+    try {
+      await runSecurityReauthWithNsec(nsec)
+      setSecurityNsecDialogOpen(false)
+      securityNsecDialogResolveRef.current?.resolve()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to sign with nsec'
+      setSecurityNsecDialogError(message)
+      // Don't reject — let the user try again
+    } finally {
+      setSecurityNsecDialogSigning(false)
+    }
+  }
+
+  const handleSecurityNsecDialogCancel = () => {
+    setSecurityNsecDialogOpen(false)
+    securityNsecDialogResolveRef.current?.reject(new Error('Re-authentication was cancelled'))
+  }
 
   const handleUnlockSecurityDetails = async () => {
     setSecurityActionError(null)
@@ -3728,7 +3798,13 @@ export default function SettingsPage() {
       <Footer />
 
       {/* NSEC Re-auth Dialog for Profile Save */}
-      <Dialog open={nsecDialogOpen} onOpenChange={setNsecDialogOpen}>
+      <Dialog open={nsecDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setNsecDialogOpen(false)
+          setProfileSaveError('Profile save was cancelled.')
+          setProfileSaving(false)
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Sign with your nsec</DialogTitle>
@@ -3774,6 +3850,62 @@ export default function SettingsPage() {
               disabled={!nsecDialogValue.trim() || nsecDialogSigning}
             >
               {nsecDialogSigning ? 'Signing...' : 'Sign & Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* NSEC Re-auth Dialog for Security Actions */}
+      <Dialog open={securityNsecDialogOpen} onOpenChange={(open) => {
+        if (!open && securityNsecDialogResolveRef.current) {
+          handleSecurityNsecDialogCancel()
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sign with your nsec</DialogTitle>
+            <DialogDescription>
+              Re-authenticate with your nsec (private key) to access security settings.
+              Your nsec is used only for this single operation and is never stored.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Input
+                type="password"
+                placeholder="nsec1..."
+                value={securityNsecDialogValue}
+                onChange={(e) => setSecurityNsecDialogValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && securityNsecDialogValue.trim() && !securityNsecDialogSigning) {
+                    void handleSecurityNsecDialogSubmit(securityNsecDialogValue.trim())
+                  }
+                }}
+                disabled={securityNsecDialogSigning}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+
+            {securityNsecDialogError && (
+              <p className="text-sm text-destructive">{securityNsecDialogError}</p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleSecurityNsecDialogCancel}
+              disabled={securityNsecDialogSigning}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleSecurityNsecDialogSubmit(securityNsecDialogValue.trim())}
+              disabled={!securityNsecDialogValue.trim() || securityNsecDialogSigning}
+            >
+              {securityNsecDialogSigning ? 'Signing...' : 'Sign & Unlock'}
             </Button>
           </DialogFooter>
         </DialogContent>
