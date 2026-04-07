@@ -44,8 +44,8 @@ export default function WritePage() {
       <Navbar />
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="border-b border-border/40 bg-background px-4 py-20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl text-center">
+        <section className="border-b border-border/40 bg-background py-20">
+          <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
             <h1 className="font-serif text-4xl font-light tracking-tight text-foreground sm:text-5xl lg:text-6xl">
               Share Your Stories
             </h1>
@@ -64,8 +64,8 @@ export default function WritePage() {
         </section>
 
         {/* Features Grid */}
-        <section className="px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl">
+        <section className="py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-16 text-center">
               <h2 className="font-serif text-3xl font-light tracking-tight text-foreground">
                 Everything You Need to Write
@@ -98,8 +98,8 @@ export default function WritePage() {
         </section>
 
         {/* CTA Section */}
-        <section className="border-t border-border/40 bg-card/50 px-4 py-16 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl text-center">
+        <section className="border-t border-border/40 bg-card/50 py-16">
+          <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
             <h2 className="font-serif text-3xl font-light tracking-tight text-foreground">
               Ready to Tell Your Story?
             </h2>

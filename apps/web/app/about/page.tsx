@@ -9,8 +9,8 @@ export default function AboutPage() {
       <Navbar />
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="border-b border-border/40 bg-background px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl">
+        <section className="border-b border-border/40 bg-background py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <h1 className="font-serif text-4xl font-light tracking-tight text-foreground sm:text-5xl">
               About Mist Story
             </h1>
@@ -21,8 +21,8 @@ export default function AboutPage() {
         </section>
 
         {/* Mission Section */}
-        <section className="border-b border-border/40 px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl">
+        <section className="border-b border-border/40 py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <h2 className="font-serif text-3xl font-light tracking-tight text-foreground">
               Our Mission
             </h2>
@@ -33,8 +33,8 @@ export default function AboutPage() {
         </section>
 
         {/* Values Section */}
-        <section className="border-b border-border/40 px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl">
+        <section className="border-b border-border/40 py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <h2 className="mb-12 font-serif text-3xl font-light tracking-tight text-foreground">
               Our Values
             </h2>
@@ -74,8 +74,8 @@ export default function AboutPage() {
         </section>
 
         {/* Stats Section */}
-        <section className="border-b border-border/40 bg-card/50 px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl">
+        <section className="border-b border-border/40 bg-card/50 py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="grid gap-8 md:grid-cols-3">
               <div className="text-center">
                 <div className="font-serif text-3xl font-light text-foreground">15K+</div>
@@ -94,8 +94,8 @@ export default function AboutPage() {
         </section>
 
         {/* Team Section */}
-        <section className="border-b border-border/40 px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl">
+        <section className="border-b border-border/40 py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <h2 className="mb-8 font-serif text-3xl font-light tracking-tight text-foreground">
               Behind the Pages
             </h2>
@@ -109,8 +109,8 @@ export default function AboutPage() {
         </section>
 
         {/* CTA Section */}
-        <section className="px-4 py-16 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl text-center">
+        <section className="py-16">
+          <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
             <h2 className="font-serif text-3xl font-light tracking-tight text-foreground">
               Join Our Community
             </h2>
