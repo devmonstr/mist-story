@@ -1462,12 +1462,20 @@ export default function SettingsPage() {
       return
     }
 
-    if (isExtensionAvailable) {
-      await executeProfileSaveWithExtension()
-      return
+    // Check if extension is available AND matches the session user
+    if (isExtensionAvailable && activeUserPubkey) {
+      try {
+        const extensionPubkey = await getPublicKey()
+        if (extensionPubkey && extensionPubkey === activeUserPubkey) {
+          await executeProfileSaveWithExtension()
+          return
+        }
+      } catch {
+        // Extension error — fall through to nsec dialog
+      }
     }
 
-    // No extension → ask user to provide nsec for signing
+    // Extension unavailable, mismatched, or errored → ask for nsec
     setNsecDialogValue('')
     setNsecDialogError(null)
     setNsecDialogOpen(true)
