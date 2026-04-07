@@ -103,7 +103,7 @@ export default function WritePage() {
             <h2 className="font-serif text-3xl font-light tracking-tight text-foreground">
               Ready to Tell Your Story?
             </h2>
-            <p className="mt-4 text-muted-foreground">
+            <p className="mt-4 max-w-3xl mx-auto text-muted-foreground">
               Join thousands of writers who are already sharing their work on Mist Story. It takes less than a minute to get started.
             </p>
             <Button size="lg" className="mt-8" asChild>
