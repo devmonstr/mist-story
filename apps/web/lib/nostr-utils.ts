@@ -364,6 +364,28 @@ export async function signKind0MetadataEvent(
   return signed as PublishedNostrEvent
 }
 
+export async function signKind0MetadataEventWithNsec(
+  nsec: string,
+  metadata: Record<string, unknown>
+): Promise<PublishedNostrEvent | null> {
+  const privateKeyHex = nsecToHex(nsec)
+  if (!privateKeyHex) return null
+
+  const pubkey = getPublicKeyFromPrivateKey(privateKeyHex)
+  if (!pubkey) return null
+
+  const event: NostrEvent & { pubkey: string } = {
+    pubkey,
+    created_at: Math.floor(Date.now() / 1000),
+    kind: 0,
+    tags: [],
+    content: JSON.stringify(metadata),
+  }
+
+  const signed = await buildSignedEvent(event, privateKeyHex)
+  return signed as PublishedNostrEvent
+}
+
 // Fetch profile from relay (uses multiple relays for reliability)
 export async function fetchProfile(pubkey: string): Promise<NostrProfile | null> {
   const relays = DEFAULT_NOSTR_PROFILE_RELAYS

@@ -68,6 +68,7 @@ import {
   publishEventToRelays,
   signAuthChallengeWithExtension,
   signKind0MetadataEvent,
+  signKind0MetadataEventWithNsec,
   type RelayPublishResult,
 } from '@/lib/nostr-utils'
 import type { NostrProfile } from '@/lib/nostr-types'
@@ -793,6 +794,11 @@ export default function SettingsPage() {
   const appearanceRequestIdRef = useRef(0)
   const integrationsRequestIdRef = useRef(0)
 
+  const [nsecDialogOpen, setNsecDialogOpen] = useState(false)
+  const [nsecDialogValue, setNsecDialogValue] = useState('')
+  const [nsecDialogError, setNsecDialogError] = useState<string | null>(null)
+  const [nsecDialogSigning, setNsecDialogSigning] = useState(false)
+
   useEffect(() => {
     activeUserNpubRef.current = activeUserNpub
   }, [activeUserNpub])
@@ -1447,13 +1453,6 @@ export default function SettingsPage() {
       return
     }
 
-    if (!isExtensionAvailable) {
-      setProfileSaveError(
-        'Publishing profile metadata currently requires a Nostr signing extension with NIP-07 support.'
-      )
-      return
-    }
-
     if (isProfileMetadataLoading || !hasLoadedLiveProfileMetadata) {
       setProfileSaveError(
         profileMetadataError
@@ -1463,6 +1462,71 @@ export default function SettingsPage() {
       return
     }
 
+    if (isExtensionAvailable) {
+      await executeProfileSaveWithExtension()
+      return
+    }
+
+    // No extension → ask user to provide nsec for signing
+    setNsecDialogValue('')
+    setNsecDialogError(null)
+    setNsecDialogOpen(true)
+  }
+
+  const prepareProfileSaveData = async () => {
+    const nextProfileForm = { ...profileForm }
+    const imageUploadTasks: Array<
+      Promise<{
+        assetType: ProfileImageAssetType
+        response: UploadProfileImageResponse
+      }>
+    > = []
+
+    if (avatarImageSelection) {
+      imageUploadTasks.push(
+        uploadMyProfileImage('avatar', {
+          image: avatarImageSelection,
+        }).then((response) => ({
+          assetType: 'avatar',
+          response,
+        }))
+      )
+    }
+
+    if (bannerImageSelection) {
+      imageUploadTasks.push(
+        uploadMyProfileImage('banner', {
+          image: bannerImageSelection,
+        }).then((response) => ({
+          assetType: 'banner',
+          response,
+        }))
+      )
+    }
+
+    const imageUploadResponses = await Promise.all(imageUploadTasks)
+
+    for (const upload of imageUploadResponses) {
+      if (upload.assetType === 'avatar') {
+        nextProfileForm.picture = upload.response.url
+        continue
+      }
+
+      nextProfileForm.banner = upload.response.url
+    }
+
+    const profile = buildEditableProfileMetadata(nextProfileForm)
+    const extraMetadata = parseExtraMetadata(additionalMetadata)
+    const mergedMetadata = buildProfileMetadataContent(profile, extraMetadata)
+
+    return { profile, mergedMetadata, imageUploadResponses, nextProfileForm }
+  }
+
+  const executeProfileSaveWithExtension = async () => {
+    if (!activeUserPubkey) {
+      throw new Error('Could not determine the current user pubkey.')
+    }
+
     setProfileSaving(true)
     setProfileSaveError(null)
     setProfileSaveSuccess(null)
@@ -1470,50 +1534,9 @@ export default function SettingsPage() {
     setProfileImageError(null)
 
     try {
-      const nextProfileForm = { ...profileForm }
-      const imageUploadTasks: Array<
-        Promise<{
-          assetType: ProfileImageAssetType
-          response: UploadProfileImageResponse
-        }>
-      > = []
+      const { profile, mergedMetadata, imageUploadResponses, nextProfileForm } =
+        await prepareProfileSaveData()
 
-      if (avatarImageSelection) {
-        imageUploadTasks.push(
-          uploadMyProfileImage('avatar', {
-            image: avatarImageSelection,
-          }).then((response) => ({
-            assetType: 'avatar',
-            response,
-          }))
-        )
-      }
-
-      if (bannerImageSelection) {
-        imageUploadTasks.push(
-          uploadMyProfileImage('banner', {
-            image: bannerImageSelection,
-          }).then((response) => ({
-            assetType: 'banner',
-            response,
-          }))
-        )
-      }
-
-      const imageUploadResponses = await Promise.all(imageUploadTasks)
-
-      for (const upload of imageUploadResponses) {
-        if (upload.assetType === 'avatar') {
-          nextProfileForm.picture = upload.response.url
-          continue
-        }
-
-        nextProfileForm.banner = upload.response.url
-      }
-
-      const profile = buildEditableProfileMetadata(nextProfileForm)
-      const extraMetadata = parseExtraMetadata(additionalMetadata)
-      const mergedMetadata = buildProfileMetadataContent(profile, extraMetadata)
       const signedEvent = await signKind0MetadataEvent(mergedMetadata)
 
       if (!signedEvent) {
@@ -1522,48 +1545,111 @@ export default function SettingsPage() {
         )
       }
 
-      const writeRelays = await resolveProfileRelayUrls('write')
-      const relayResults = await publishEventToRelays(signedEvent, writeRelays)
-      const successfulRelayCount = relayResults.filter((relay) => relay.success).length
-
-      setProfileRelayResults(relayResults)
-
-      if (successfulRelayCount === 0) {
+      if (signedEvent.pubkey !== activeUserPubkey) {
         throw new Error(
-          'All relay publishes failed. Your new profile metadata was not accepted by any relay.'
+          `Signing key mismatch: the signed event uses pubkey ${signedEvent.pubkey.slice(0, 8)}... but your session uses ${activeUserPubkey.slice(0, 8)}.... Make sure your Nostr extension is set to the correct account.`
         )
       }
 
-      const optimizationToast = buildProfileImageOptimizationToastPayload(
-        imageUploadResponses.map((upload) => upload.response)
-      )
-      if (optimizationToast) {
-        toast(optimizationToast)
-      }
-
-      try {
-        const payload = await publishMyProfile({
-          profile,
-          signedEvent,
-        })
-
-        setProfileData(payload)
-        setProfileForm(nextProfileForm)
-        setDirtyProfileFields(EMPTY_DIRTY_PROFILE_FIELDS)
-        setProfileSaveSuccess(
-          `Published kind 0 metadata to ${successfulRelayCount}/${relayResults.length} relays and refreshed Mist Story's cache.`
-        )
-        await refreshProfile()
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Mist Story failed to refresh its cached profile'
-        setProfileSaveError(
-          `${message}. Your metadata was still published to Nostr. You can use "Refresh from Nostr" to pull the latest copy back into Mist Story.`
-        )
-      }
+      await finalizeProfileSave(profile, signedEvent, imageUploadResponses, nextProfileForm)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to publish profile metadata'
       setProfileSaveError(message)
+    } finally {
+      setProfileSaving(false)
+    }
+  }
+
+  const executeProfileSaveWithNsec = async (nsec: string) => {
+    if (!activeUserPubkey) {
+      setNsecDialogError('Could not determine the current user pubkey.')
+      return
+    }
+
+    setNsecDialogSigning(true)
+    setNsecDialogError(null)
+
+    try {
+      const { profile, mergedMetadata, imageUploadResponses, nextProfileForm } =
+        await prepareProfileSaveData()
+
+      const signedEvent = await signKind0MetadataEventWithNsec(nsec, mergedMetadata)
+
+      if (!signedEvent) {
+        throw new Error(
+          'Failed to sign the kind 0 metadata event. Check that your nsec is valid.'
+        )
+      }
+
+      if (signedEvent.pubkey !== activeUserPubkey) {
+        throw new Error(
+          `Wrong nsec: this nsec belongs to ${signedEvent.pubkey.slice(0, 8)}..., not your current account (${activeUserPubkey.slice(0, 8)}...).`
+        )
+      }
+
+      setNsecDialogOpen(false)
+      setProfileSaving(true)
+      setProfileSaveError(null)
+      setProfileSaveSuccess(null)
+      setProfileRelayResults([])
+      setProfileImageError(null)
+
+      await finalizeProfileSave(profile, signedEvent, imageUploadResponses, nextProfileForm)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to sign with nsec'
+      setNsecDialogError(message)
+    } finally {
+      setNsecDialogSigning(false)
+    }
+  }
+
+  const finalizeProfileSave = async (
+    profile: Partial<NostrProfile>,
+    signedEvent: Awaited<ReturnType<typeof signKind0MetadataEvent>> & {},
+    imageUploadResponses: Array<{
+      assetType: ProfileImageAssetType
+      response: UploadProfileImageResponse
+    }>,
+    nextProfileForm: ProfileFormState
+  ) => {
+    const writeRelays = await resolveProfileRelayUrls('write')
+    const relayResults = await publishEventToRelays(signedEvent, writeRelays)
+    const successfulRelayCount = relayResults.filter((relay) => relay.success).length
+
+    setProfileRelayResults(relayResults)
+
+    if (successfulRelayCount === 0) {
+      throw new Error(
+        'All relay publishes failed. Your new profile metadata was not accepted by any relay.'
+      )
+    }
+
+    const optimizationToast = buildProfileImageOptimizationToastPayload(
+      imageUploadResponses.map((upload) => upload.response)
+    )
+    if (optimizationToast) {
+      toast(optimizationToast)
+    }
+
+    try {
+      const payload = await publishMyProfile({
+        profile,
+        signedEvent,
+      })
+
+      setProfileData(payload)
+      setProfileForm(nextProfileForm)
+      setDirtyProfileFields(EMPTY_DIRTY_PROFILE_FIELDS)
+      setProfileSaveSuccess(
+        `Published kind 0 metadata to ${successfulRelayCount}/${relayResults.length} relays and refreshed Mist Story's cache.`
+      )
+      await refreshProfile()
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Mist Story failed to refresh its cached profile'
+      setProfileSaveError(
+        `${message}. Your metadata was still published to Nostr. You can use "Refresh from Nostr" to pull the latest copy back into Mist Story.`
+      )
     } finally {
       setProfileSaving(false)
     }
@@ -3632,6 +3718,58 @@ export default function SettingsPage() {
       </div>
       </main>
       <Footer />
+
+      {/* NSEC Re-auth Dialog for Profile Save */}
+      <Dialog open={nsecDialogOpen} onOpenChange={setNsecDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sign with your nsec</DialogTitle>
+            <DialogDescription>
+              No Nostr signing extension detected. Enter your nsec (private key) to sign this profile update.
+              Your nsec is used only for this single operation and is never stored.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Input
+                type="password"
+                placeholder="nsec1..."
+                value={nsecDialogValue}
+                onChange={(e) => setNsecDialogValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && nsecDialogValue.trim() && !nsecDialogSigning) {
+                    void executeProfileSaveWithNsec(nsecDialogValue.trim())
+                  }
+                }}
+                disabled={nsecDialogSigning}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+
+            {nsecDialogError && (
+              <p className="text-sm text-destructive">{nsecDialogError}</p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setNsecDialogOpen(false)}
+              disabled={nsecDialogSigning}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void executeProfileSaveWithNsec(nsecDialogValue.trim())}
+              disabled={!nsecDialogValue.trim() || nsecDialogSigning}
+            >
+              {nsecDialogSigning ? 'Signing...' : 'Sign & Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
