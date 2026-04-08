@@ -243,6 +243,7 @@ export async function getProfilePage(
       summary: novel.summary,
       genre: novel.genre,
       coverUrl: novel.coverUrl,
+      coverStorageKey: novel.coverStorageKey ?? null,
       chaptersCount: novel.chaptersCount,
       rating: decimalToNumber(novel.rating),
       ratingsCount: novel.ratingsCount,

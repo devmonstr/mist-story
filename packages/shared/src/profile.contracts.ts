@@ -32,6 +32,7 @@ export const profileNovelSchema = z.object({
   summary: z.string(),
   genre: z.string(),
   coverUrl: z.string(),
+  coverStorageKey: z.string().nullable(),
   chaptersCount: z.number().int().nonnegative(),
   rating: z.number(),
   ratingsCount: z.number().int().nonnegative(),

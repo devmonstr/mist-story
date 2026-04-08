@@ -222,7 +222,7 @@ export function ProfileHeader() {
           </div>
         </div>
 
-        <div className="grid gap-8 bg-background px-5 py-6 sm:px-8 sm:py-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:px-10">
+        <div className="grid gap-8 bg-background px-5 py-6 sm:px-8 sm:py-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)] lg:px-10">
           <div className="max-w-2xl space-y-3">
             <p className="text-[11px] uppercase tracking-[0.32em] text-muted-foreground">
               Profile
@@ -292,39 +292,67 @@ export function ProfileHeader() {
             ) : null}
           </div>
 
-          <div className="grid grid-cols-2 gap-x-6 gap-y-5 border-t border-border pt-5 sm:gap-x-10 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0">
-            <div className="space-y-1">
-              <div className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
-                Novels
+          <div className="border-t border-border pt-5 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0">
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <p className="text-[11px] uppercase tracking-[0.32em] text-muted-foreground">
+                  At A Glance
+                </p>
+                <p className="max-w-sm text-sm leading-6 text-muted-foreground">
+                  A quick view of this writer&apos;s published catalog and audience on Mist Story.
+                </p>
               </div>
-              <div className="text-3xl font-semibold text-foreground">{data.stats.novels}</div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
-                Followers
-              </div>
-              <div className="text-3xl font-semibold text-foreground">
-                <Link href={`/profile/${npub}/followers`} className="transition hover:text-primary">
-                  {data.stats.followers.toLocaleString()}
-                </Link>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
-                Following
-              </div>
-              <div className="text-3xl font-semibold text-foreground">
-                <Link href={`/profile/${npub}/following`} className="transition hover:text-primary">
-                  {data.stats.following.toLocaleString()}
-                </Link>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
-                Total Reads
-              </div>
-              <div className="text-3xl font-semibold text-foreground">
-                {data.stats.totalReads.toLocaleString()}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2 border border-border/70 bg-muted/20 px-4 py-4">
+                  <div className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
+                    Novels
+                  </div>
+                  <div className="text-3xl font-semibold text-foreground">{data.stats.novels}</div>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    Published stories available to read now.
+                  </p>
+                </div>
+
+                <div className="space-y-2 border border-border/70 bg-muted/20 px-4 py-4">
+                  <div className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
+                    Followers
+                  </div>
+                  <div className="text-3xl font-semibold text-foreground">
+                    <Link href={`/profile/${npub}/followers`} className="transition hover:text-primary">
+                      {data.stats.followers.toLocaleString()}
+                    </Link>
+                  </div>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    Readers following future updates from this profile.
+                  </p>
+                </div>
+
+                <div className="space-y-2 border border-border/70 bg-muted/20 px-4 py-4">
+                  <div className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
+                    Following
+                  </div>
+                  <div className="text-3xl font-semibold text-foreground">
+                    <Link href={`/profile/${npub}/following`} className="transition hover:text-primary">
+                      {data.stats.following.toLocaleString()}
+                    </Link>
+                  </div>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    Writers and readers this account keeps up with.
+                  </p>
+                </div>
+
+                <div className="space-y-2 border border-border/70 bg-muted/20 px-4 py-4">
+                  <div className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
+                    Total Reads
+                  </div>
+                  <div className="text-3xl font-semibold text-foreground">
+                    {data.stats.totalReads.toLocaleString()}
+                  </div>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    Reading sessions across this writer&apos;s published work.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
