@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
@@ -718,9 +719,11 @@ export default function NovelEditorPage() {
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-4">
                 {novel.coverImage ? (
-                  <img
+                  <Image
                     src={novel.coverImage}
                     alt={`${novel.title} cover`}
+                    width={56}
+                    height={80}
                     className="h-20 w-14 rounded-lg border border-border/60 object-cover"
                   />
                 ) : (

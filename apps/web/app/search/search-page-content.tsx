@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -166,10 +167,12 @@ function SearchResultCard({ result }: { result: SearchResult }) {
     <article className="relative flex h-full flex-col overflow-hidden border border-border/40 bg-card p-4 transition-all hover:border-border/80 hover:shadow-sm">
       {result.avatarUrl ? (
         <div className="pointer-events-none absolute inset-0 opacity-[0.60]">
-          <img
+          <Image
             src={result.avatarUrl}
             alt=""
-            className="h-full w-full scale-110 object-cover blur-sm"
+            fill
+            sizes="(min-width: 1536px) 18rem, (min-width: 1280px) 20rem, (min-width: 1024px) 24vw, 48vw"
+            className="scale-110 object-cover blur-sm"
             aria-hidden="true"
           />
         </div>

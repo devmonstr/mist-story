@@ -1,3 +1,4 @@
+import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,9 +24,11 @@ export function AuthorSidebar({ novel, author }: AuthorSidebarProps) {
         <div className="mt-4">
           <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-muted text-lg font-medium text-muted-foreground">
             {author.avatarUrl ? (
-              <img
+              <Image
                 src={author.avatarUrl}
                 alt={author.displayName}
+                width={48}
+                height={48}
                 className="h-full w-full object-cover"
               />
             ) : (

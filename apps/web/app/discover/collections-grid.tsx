@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { BookOpen, ChevronRight } from "lucide-react"
@@ -55,9 +56,12 @@ export function CollectionsGrid({ collections }: CollectionsGridProps) {
                         title={`${novel.title} by ${novel.authorName}`}
                       >
                         {coverSrc ? (
-                          <img
+                          <Image
                             src={coverSrc}
                             alt={`${novel.title} cover`}
+                            width={300}
+                            height={400}
+                            sizes="(min-width: 1024px) 12rem, (min-width: 768px) 18vw, 30vw"
                             className="aspect-[3/4] w-full object-cover transition-transform duration-300 group-hover:scale-105"
                           />
                         ) : (

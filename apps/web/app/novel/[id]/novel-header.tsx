@@ -1,4 +1,5 @@
 import { BookOpen, Clock, Eye, Heart, BookmarkPlus } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { type PublicNovelAuthorDto, type PublicNovelDetailDto, type PublicNovelViewerStateDto } from "@mist/shared"
@@ -31,9 +32,12 @@ export function NovelHeader({ novel, author, viewer }: NovelHeaderProps) {
           <div className="flex justify-center lg:justify-start">
             <div className="flex aspect-[2/3] w-full max-w-[280px] items-center justify-center border border-border bg-card">
               {coverSrc ? (
-                <img
+                <Image
                   src={coverSrc}
                   alt={`${novel.title} cover`}
+                  width={560}
+                  height={840}
+                  sizes="(min-width: 1024px) 280px, 70vw"
                   className="h-full w-full object-cover"
                 />
               ) : (

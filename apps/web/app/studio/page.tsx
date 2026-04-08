@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
@@ -188,9 +189,11 @@ export default function StudioPage() {
                     <div className="flex items-start gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-muted">
                         {novel.coverUrl ? (
-                          <img
+                          <Image
                             src={novel.coverUrl}
                             alt={`${novel.title} cover`}
+                            width={40}
+                            height={40}
                             className="h-full w-full object-cover"
                           />
                         ) : (

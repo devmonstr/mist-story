@@ -1,5 +1,6 @@
 'use client'
 
+import Image from "next/image"
 import {
   useCallback,
   useEffect,
@@ -2385,9 +2386,12 @@ export default function SettingsPage() {
                                 onPointerUp={finishProfileImageEditorDrag}
                                 onPointerCancel={finishProfileImageEditorDrag}
                               >
-                                <img
+                                <Image
                                   src={pendingProfileImageEdit.sourceDataUrl}
                                   alt={`Selected ${activeProfileImageEditorConfig.label}`}
+                                  unoptimized
+                                  width={Math.round(activeProfileImageEditorMetrics.scaledWidth)}
+                                  height={Math.round(activeProfileImageEditorMetrics.scaledHeight)}
                                   className="pointer-events-none absolute left-0 top-0 max-w-none"
                                   style={{
                                     width: `${activeProfileImageEditorMetrics.scaledWidth}px`,
@@ -2452,10 +2456,12 @@ export default function SettingsPage() {
 
                       <div className="relative h-40 w-full bg-muted">
                         {profileForm.banner ? (
-                          <img
+                          <Image
                             src={profileForm.banner}
                             alt="Profile banner preview"
-                            className="h-full w-full object-cover"
+                            fill
+                            sizes="(min-width: 1024px) 48rem, 100vw"
+                            className="object-cover"
                           />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center bg-gradient-to-r from-muted via-muted/80 to-muted">
@@ -2510,9 +2516,11 @@ export default function SettingsPage() {
                                 aria-label="Choose profile picture"
                               >
                                 {profileForm.picture ? (
-                                  <img
+                                  <Image
                                     src={profileForm.picture}
                                     alt={profileData.profile.displayName ?? 'Profile avatar'}
+                                    width={80}
+                                    height={80}
                                     className="h-20 w-20 rounded-full border border-border/60 object-cover"
                                   />
                                 ) : (

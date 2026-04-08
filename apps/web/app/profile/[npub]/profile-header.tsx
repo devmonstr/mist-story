@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { useMemo } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -65,11 +66,13 @@ export function ProfileHeader() {
     <>
       {/* Banner */}
       {profile.bannerUrl && (
-        <div className="h-48 w-full bg-muted overflow-hidden">
-          <img
+        <div className="relative h-48 w-full overflow-hidden bg-muted">
+          <Image
             src={profile.bannerUrl}
             alt=""
-            className="h-full w-full object-cover"
+            fill
+            sizes="100vw"
+            className="object-cover"
           />
         </div>
       )}
@@ -81,9 +84,11 @@ export function ProfileHeader() {
             <div className="flex items-start gap-4">
               {/* Avatar */}
               {profile.avatarUrl ? (
-                <img
+                <Image
                   src={profile.avatarUrl}
                   alt={displayName}
+                  width={80}
+                  height={80}
                   className="h-20 w-20 rounded-full object-cover border-2 border-background shadow-sm -mt-12 sm:-mt-16"
                 />
               ) : (

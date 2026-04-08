@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
+import Image from "next/image"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -80,9 +81,11 @@ export function AuthButton({ variant = "default", onAction }: AuthButtonProps) {
           className="flex items-center gap-3 px-2 py-3 rounded hover:bg-muted transition-colors"
         >
           {user.profile?.picture ? (
-            <img
+            <Image
               src={user.profile.picture}
               alt=""
+              width={40}
+              height={40}
               className="h-10 w-10 rounded-full object-cover"
             />
           ) : (
@@ -162,9 +165,11 @@ export function AuthButton({ variant = "default", onAction }: AuthButtonProps) {
           className="flex items-center gap-2 px-2"
         >
           {user.profile?.picture ? (
-            <img
+            <Image
               src={user.profile.picture}
               alt=""
+              width={24}
+              height={24}
               className="h-6 w-6 rounded-full object-cover"
             />
           ) : (

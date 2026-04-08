@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import {
   useEffect,
   useRef,
@@ -450,9 +451,12 @@ export function NovelCoverImageField({
                   onPointerUp={finishDrag}
                   onPointerCancel={finishDrag}
                 >
-                  <img
+                  <Image
                     src={pendingCoverImageEdit.sourceDataUrl}
                     alt="Selected cover image"
+                    unoptimized
+                    width={Math.round(activeMetrics.scaledWidth)}
+                    height={Math.round(activeMetrics.scaledHeight)}
                     className="pointer-events-none absolute left-0 top-0 max-w-none"
                     style={{
                       width: `${activeMetrics.scaledWidth}px`,
@@ -508,9 +512,11 @@ export function NovelCoverImageField({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             {coverImage ? (
               <div className="relative">
-                <img
+                <Image
                   src={coverImage}
                   alt="Cover preview"
+                  width={144}
+                  height={208}
                   className="h-52 w-36 border border-border object-cover shadow-none"
                 />
                 <button
