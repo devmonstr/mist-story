@@ -12,6 +12,7 @@ type NovelCardProps = {
   authorHref?: string
   summary?: string | null
   summaryFallback?: string
+  hideSummary?: boolean
   titleAside?: ReactNode
   meta?: ReactNode
   afterSummary?: ReactNode
@@ -30,6 +31,7 @@ export function NovelCard({
   authorHref,
   summary,
   summaryFallback = "A new story is waiting to be explored.",
+  hideSummary = false,
   titleAside,
   meta,
   afterSummary,
@@ -92,9 +94,11 @@ export function NovelCard({
 
           {meta ? <div className="mb-3 text-xs text-muted-foreground">{meta}</div> : null}
 
-          <p className="mb-4 line-clamp-3 text-sm leading-relaxed text-foreground/80">
-            {resolvedSummary}
-          </p>
+          {!hideSummary ? (
+            <p className="mb-4 line-clamp-3 text-sm leading-relaxed text-foreground/80">
+              {resolvedSummary}
+            </p>
+          ) : null}
 
           {afterSummary}
         </div>
