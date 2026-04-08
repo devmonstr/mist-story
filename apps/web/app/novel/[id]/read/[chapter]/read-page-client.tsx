@@ -58,43 +58,75 @@ function getDefaultThemeStyles(readerTheme: "light" | "dark" | "sepia") {
       bg: "bg-background text-foreground",
       header: "border-border/40 bg-background/95",
       sheet: "",
+      sheetClose: "",
       sheetText: "",
       mutedText: "text-muted-foreground",
       border: "bg-border",
       icon: "text-muted-foreground/50",
+      toolbarIcon: "text-foreground",
+      toolbarAccentIcon: "text-primary",
       contentText: "text-foreground/90",
       progressBar: "bg-primary",
       highlightBg: "bg-primary/5",
       highlightText: "text-primary",
       skeleton: "bg-muted",
+      toolbarButton:
+        "text-foreground hover:bg-accent hover:text-accent-foreground",
+      controlButton:
+        "border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground disabled:border-border/60 disabled:bg-muted/60 disabled:text-muted-foreground",
+      controlButtonActive:
+        "border-primary bg-primary text-primary-foreground hover:bg-primary/90",
+      ringOffset: "ring-offset-background",
     },
     dark: {
       bg: "bg-[#1a1a1a] text-[#e0e0e0]",
       header: "border-[#333] bg-[#1a1a1a]/95",
       sheet: "bg-[#1a1a1a] text-[#e0e0e0] border-[#333]",
+      sheetClose:
+        "[&>button]:text-[#cfcfcf] [&>button]:hover:bg-[#2a2a2a] [&>button]:hover:text-white [&>button]:ring-offset-[#1a1a1a]",
       sheetText: "text-[#e0e0e0]",
       mutedText: "text-[#888]",
       border: "bg-[#333]",
       icon: "text-[#555]",
+      toolbarIcon: "text-[#d6d6d6]",
+      toolbarAccentIcon: "text-[#4a9eff]",
       contentText: "text-[#d0d0d0]",
       progressBar: "bg-[#4a9eff]",
       highlightBg: "bg-[#333]",
       highlightText: "text-[#4a9eff]",
       skeleton: "bg-[#333]",
+      toolbarButton:
+        "text-[#d6d6d6] hover:bg-[#2a2a2a] hover:text-white",
+      controlButton:
+        "border-[#3a3a3a] bg-[#242424] text-[#e0e0e0] hover:bg-[#2d2d2d] hover:text-white disabled:border-[#2e2e2e] disabled:bg-[#202020] disabled:text-[#707070]",
+      controlButtonActive:
+        "border-[#4a9eff] bg-[#12161c] text-white hover:bg-[#18202a]",
+      ringOffset: "ring-offset-[#1a1a1a]",
     },
     sepia: {
       bg: "bg-[#f4ecd8] text-[#5b4636]",
       header: "border-[#d4c4a8] bg-[#f4ecd8]/95",
       sheet: "bg-[#f4ecd8] text-[#5b4636] border-[#d4c4a8]",
+      sheetClose:
+        "[&>button]:text-[#5b4636] [&>button]:hover:bg-[#e7dbc1] [&>button]:hover:text-[#433422] [&>button]:ring-offset-[#f4ecd8]",
       sheetText: "text-[#5b4636]",
       mutedText: "text-[#8b7355]",
       border: "bg-[#d4c4a8]",
       icon: "text-[#a89880]",
+      toolbarIcon: "text-[#5b4636]",
+      toolbarAccentIcon: "text-[#8b6914]",
       contentText: "text-[#433422]",
       progressBar: "bg-[#8b6914]",
       highlightBg: "bg-[#d4c4a8]",
       highlightText: "text-[#8b6914]",
       skeleton: "bg-[#d4c4a8]",
+      toolbarButton:
+        "text-[#5b4636] hover:bg-[#e7dbc1] hover:text-[#433422]",
+      controlButton:
+        "border-[#d4c4a8] bg-[#fbf5e8] text-[#5b4636] hover:bg-[#efe4cb] hover:text-[#433422] disabled:border-[#ddd2bb] disabled:bg-[#f2ead7] disabled:text-[#b09d83]",
+      controlButtonActive:
+        "border-[#8b6914] bg-[#8b6914] text-[#fdf8ef] hover:bg-[#775811]",
+      ringOffset: "ring-offset-[#f4ecd8]",
     },
   }[readerTheme]
 }
@@ -539,10 +571,16 @@ export function ReadPageClient({
 
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" asChild aria-label="Back to novel">
-              <Link href={`/novel/${novelSlug}`}>
-                <ChevronLeft className="h-5 w-5" />
-              </Link>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  asChild
+                  aria-label="Back to novel"
+                  className={theme.toolbarButton}
+                >
+                  <Link href={`/novel/${novelSlug}`}>
+                    <ChevronLeft className="h-5 w-5" />
+                  </Link>
             </Button>
             <div className="hidden sm:block">
               <p className="text-sm font-medium line-clamp-1">{novel.title}</p>
@@ -551,13 +589,18 @@ export function ReadPageClient({
           </div>
 
           <div className="flex items-center gap-1">
-            <Sheet open={isChapterListOpen} onOpenChange={setIsChapterListOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Open chapter list">
-                  <List className="h-5 w-5" />
+              <Sheet open={isChapterListOpen} onOpenChange={setIsChapterListOpen}>
+                <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Open chapter list"
+                  className={theme.toolbarButton}
+                >
+                  <List className={`h-5 w-5 ${theme.toolbarIcon}`} />
                 </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className={theme.sheet}>
+                </SheetTrigger>
+                <SheetContent side="right" className={`${theme.sheet} ${theme.sheetClose}`}>
                 <SheetHeader>
                   <SheetTitle className={theme.sheetText}>Chapters</SheetTitle>
                   <SheetDescription className={theme.mutedText}>
@@ -708,23 +751,29 @@ export function ReadPageClient({
               disabled={isBookmarkSubmitting}
               onClick={() => void toggleBookmark()}
               aria-label={isBookmarked ? "Remove bookmark" : "Add bookmark"}
+              className={theme.toolbarButton}
             >
               {isBookmarkSubmitting ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
+                <Loader2 className={`h-5 w-5 animate-spin ${theme.toolbarIcon}`} />
               ) : isBookmarked ? (
-                <BookmarkCheck className="h-5 w-5 text-primary" />
+                <BookmarkCheck className={`h-5 w-5 ${theme.toolbarAccentIcon}`} />
               ) : (
-                <Bookmark className="h-5 w-5" />
+                <Bookmark className={`h-5 w-5 ${theme.toolbarIcon}`} />
               )}
             </Button>
 
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Open reading settings">
-                  <Settings className="h-5 w-5" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Open reading settings"
+                  className={theme.toolbarButton}
+                >
+                  <Settings className={`h-5 w-5 ${theme.toolbarIcon}`} />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className={theme.sheet}>
+              <SheetContent side="right" className={`${theme.sheet} ${theme.sheetClose}`}>
                 <SheetHeader>
                   <SheetTitle className={theme.sheetText}>Reading Settings</SheetTitle>
                   <SheetDescription className={theme.mutedText}>
@@ -747,6 +796,7 @@ export function ReadPageClient({
                         disabled={fontSize <= 14}
                         aria-label="Decrease font size"
                         aria-labelledby="font-size-label"
+                        className={theme.controlButton}
                       >
                         <Minus className="h-4 w-4" />
                       </Button>
@@ -763,6 +813,7 @@ export function ReadPageClient({
                         disabled={fontSize >= 24}
                         aria-label="Increase font size"
                         aria-labelledby="font-size-label"
+                        className={theme.controlButton}
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
@@ -775,40 +826,48 @@ export function ReadPageClient({
                     </label>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button
-                        variant={readerTheme === "light" ? "default" : "outline"}
+                        variant="outline"
                         size="sm"
                         onClick={() => setReaderTheme("light")}
                         aria-label="Light theme"
                         aria-pressed={readerTheme === "light"}
-                        className={readerTheme === "light" ? "ring-2 ring-primary ring-offset-2" : ""}
+                        className={`${
+                          readerTheme === "light"
+                            ? `${theme.controlButtonActive} ring-2 ring-primary ring-offset-2 ${theme.ringOffset}`
+                            : theme.controlButton
+                        }`}
                       >
                         <Sun className="mr-2 h-4 w-4" />
                         Light
                         {readerTheme === "light" && <Check className="ml-2 h-4 w-4" />}
                       </Button>
                       <Button
-                        variant={readerTheme === "dark" ? "default" : "outline"}
+                        variant="outline"
                         size="sm"
                         onClick={() => setReaderTheme("dark")}
                         aria-label="Dark theme"
                         aria-pressed={readerTheme === "dark"}
-                        className={
+                        className={`${
                           readerTheme === "dark"
-                            ? "ring-2 ring-primary ring-offset-2 ring-offset-[#1a1a1a]"
-                            : ""
-                        }
+                            ? `${theme.controlButtonActive} ring-2 ring-primary ring-offset-2 ${theme.ringOffset}`
+                            : theme.controlButton
+                        }`}
                       >
                         <Moon className="mr-2 h-4 w-4" />
                         Dark
                         {readerTheme === "dark" && <Check className="ml-2 h-4 w-4" />}
                       </Button>
                       <Button
-                        variant={readerTheme === "sepia" ? "default" : "outline"}
+                        variant="outline"
                         size="sm"
                         onClick={() => setReaderTheme("sepia")}
                         aria-label="Sepia theme"
                         aria-pressed={readerTheme === "sepia"}
-                        className={readerTheme === "sepia" ? "ring-2 ring-primary ring-offset-2" : ""}
+                        className={`${
+                          readerTheme === "sepia"
+                            ? `${theme.controlButtonActive} ring-2 ring-primary ring-offset-2 ${theme.ringOffset}`
+                            : theme.controlButton
+                        }`}
                       >
                         <Coffee className="mr-2 h-4 w-4" />
                         Sepia
@@ -820,9 +879,15 @@ export function ReadPageClient({
               </SheetContent>
             </Sheet>
 
-            <Button variant="ghost" size="icon" asChild aria-label="Go to home page">
+            <Button
+              variant="ghost"
+              size="icon"
+              asChild
+              aria-label="Go to home page"
+              className={theme.toolbarButton}
+            >
               <Link href="/">
-                <Home className="h-5 w-5" />
+                <Home className={`h-5 w-5 ${theme.toolbarIcon}`} />
               </Link>
             </Button>
           </div>
@@ -899,6 +964,7 @@ export function ReadPageClient({
               asChild
               aria-label={`Go to previous chapter`}
               title="Previous chapter (←)"
+              className={theme.toolbarButton}
             >
               <Link
                 href={`/novel/${novelSlug}/read/${currentChapter.previousChapterNumber}?chapterPage=${getGroupPageForChapter(
@@ -931,6 +997,7 @@ export function ReadPageClient({
               asChild
               aria-label={`Go to next chapter`}
               title="Next chapter (→)"
+              className={theme.toolbarButton}
             >
               <Link
                 href={`/novel/${novelSlug}/read/${currentChapter.nextChapterNumber}?chapterPage=${getGroupPageForChapter(
