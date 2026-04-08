@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { ChevronDown, ChevronRight, Loader2, Lock } from "lucide-react"
 import {
   type PublicNovelChapterListDto,
@@ -36,6 +36,7 @@ interface GroupData {
 
 export function ChapterList({ novel, chapters, chapterList }: ChapterListProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const [unlockedSet, setUnlockedSet] = useState<Set<string>>(new Set())
   const [openGroup, setOpenGroup] = useState<number | null>(chapterList.currentPage)
   const [loadingGroup, setLoadingGroup] = useState<number | null>(null)
@@ -46,11 +47,9 @@ export function ChapterList({ novel, chapters, chapterList }: ChapterListProps) 
 
   // Track current chapter from URL (if user navigated from reader)
   const currentChapterNumber = useMemo(() => {
-    if (typeof window === "undefined") return null
-    const url = new URL(window.location.href)
-    const match = url.pathname.match(/\/read\/(\d+)/)
+    const match = pathname.match(/\/read\/(\d+)/)
     return match ? Number.parseInt(match[1], 10) : null
-  }, [])
+  }, [pathname])
 
   // Build unlocked chapters set
   useEffect(() => {
@@ -73,7 +72,15 @@ export function ChapterList({ novel, chapters, chapterList }: ChapterListProps) 
     if (currentGroupRef.current) {
       currentGroupRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" })
     }
-  }, [])
+  }, [chapterList.currentPage])
+
+  useEffect(() => {
+    setOpenGroup(chapterList.currentPage)
+    setGroupCache((previous) => ({
+      ...previous,
+      [chapterList.currentPage]: { chapters, chapterList },
+    }))
+  }, [chapterList, chapters])
 
   const groups = useMemo(
     () =>
@@ -173,7 +180,12 @@ export function ChapterList({ novel, chapters, chapterList }: ChapterListProps) 
             return (
               <div
                 key={group.page}
-                ref={isCurrentGroup ? currentGroupRef : undefined}
+                ref={(node) => {
+                  groupRefs.current.set(group.page, node)
+                  if (isCurrentGroup) {
+                    currentGroupRef.current = node
+                  }
+                }}
                 className="overflow-hidden rounded-2xl border border-border/50 bg-background"
               >
                 <button

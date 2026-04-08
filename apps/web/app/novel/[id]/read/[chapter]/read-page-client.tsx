@@ -149,6 +149,13 @@ export function ReadPageClient({
   const theme = getDefaultThemeStyles(readerTheme)
   const chapterPage = Number.parseInt(searchParams.get("chapterPage") ?? "", 10)
   const scrollRestored = useRef(false)
+  const initialDataMatchesRoute = useMemo(() => {
+    if (!initialData) {
+      return false
+    }
+
+    return initialData.novel.id === id && initialData.chapter.number === chapterNumber
+  }, [chapterNumber, id, initialData])
 
   // Clear cache when novel changes
   useEffect(() => {
@@ -199,11 +206,26 @@ export function ReadPageClient({
   }, [chapterNumber, id])
 
   useEffect(() => {
+    if (!initialDataMatchesRoute || !initialData) {
+      return
+    }
+
+    setData(initialData)
+    setError(initialError ?? null)
+    setIsFetching(false)
+    setIsBookmarked(initialData.viewer.isBookmarked)
+    setIsUnlocked(
+      initialData.chapter.isPaid ? isChapterUnlocked(id, String(initialData.chapter.number)) : true
+    )
+  }, [chapterNumber, id, initialData, initialDataMatchesRoute, initialError])
+
+  useEffect(() => {
     let cancelled = false
 
     const loadChapter = async () => {
       setIsFetching(true)
       setError(null)
+      setData(null)
 
       try {
         const payload = await fetchPublicNovelChapter(id, String(chapterNumber), {
@@ -234,15 +256,16 @@ export function ReadPageClient({
       }
     }
 
-    // Only fetch if no initial data was provided (prevents duplicate fetch)
-    if (!initialData) {
+    if (!initialDataMatchesRoute) {
       void loadChapter()
+    } else {
+      setIsFetching(false)
     }
 
     return () => {
       cancelled = true
     }
-  }, [chapterNumber, chapterPage, id, initialData])
+  }, [chapterNumber, chapterPage, id, initialDataMatchesRoute])
 
   useEffect(() => {
     if (!data) {
@@ -319,6 +342,20 @@ export function ReadPageClient({
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target
+      if (
+        e.defaultPrevented ||
+        e.altKey ||
+        e.ctrlKey ||
+        e.metaKey ||
+        !(target instanceof HTMLElement) ||
+        target.isContentEditable ||
+        ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target.tagName) ||
+        target.closest("[role='dialog'], a, button, input, select, textarea, [contenteditable='true']")
+      ) {
+        return
+      }
+
       if (e.key === "ArrowLeft" && data.chapter?.previousChapterNumber) {
         e.preventDefault()
         const prevGroupPage = getGroupPageForChapter(

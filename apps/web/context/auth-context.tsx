@@ -48,6 +48,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isExtensionAvailable, setIsExtensionAvailable] = useState(false)
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
   const sessionSyncRequestIdRef = useRef(0)
+  const unreadNotificationRequestIdRef = useRef(0)
+  const activeUserPubkeyRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    activeUserPubkeyRef.current = user?.pubkey ?? null
+  }, [user?.pubkey])
 
   useEffect(() => {
     const checkExtension = () => {
@@ -70,7 +76,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return
         }
 
-        setUser(session ? toNostrUser(session.user) : null)
+        const nextUser = session ? toNostrUser(session.user) : null
+        activeUserPubkeyRef.current = nextUser?.pubkey ?? null
+        setUser(nextUser)
       } catch (error) {
         if (sessionSyncRequestIdRef.current === requestId) {
           console.error("Failed to restore session:", error)
@@ -86,18 +94,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const refreshUnreadNotifications = useCallback(async () => {
-    if (!user) {
+    const accountPubkey = activeUserPubkeyRef.current
+    const requestId = ++unreadNotificationRequestIdRef.current
+
+    if (!accountPubkey) {
       setUnreadNotificationCount(0)
       return
     }
 
     try {
       const payload = await fetchNotificationSummary()
-      setUnreadNotificationCount(payload.unreadCount)
+      if (
+        unreadNotificationRequestIdRef.current === requestId &&
+        activeUserPubkeyRef.current === accountPubkey
+      ) {
+        setUnreadNotificationCount(payload.unreadCount)
+      }
     } catch (error) {
-      console.error("Failed to refresh notification summary:", error)
+      if (
+        unreadNotificationRequestIdRef.current === requestId &&
+        activeUserPubkeyRef.current === accountPubkey
+      ) {
+        console.error("Failed to refresh notification summary:", error)
+      }
     }
-  }, [user])
+  }, [])
 
   useEffect(() => {
     if (!user) {
@@ -158,7 +179,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false
       }
 
-      setUser(toNostrUser(result.user))
+      const nextUser = toNostrUser(result.user)
+      activeUserPubkeyRef.current = nextUser.pubkey
+      setUser(nextUser)
       setUnreadNotificationCount(0)
       return true
     } catch (error) {
@@ -175,6 +198,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(() => {
     sessionSyncRequestIdRef.current += 1
+    unreadNotificationRequestIdRef.current += 1
+    activeUserPubkeyRef.current = null
     void signOutSession().catch((error) => {
       console.error("Sign out failed:", error)
     })
@@ -212,7 +237,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return { success: false, error: "Session changed during sign-in" }
         }
 
-        setUser(toNostrUser(result.user))
+        const nextUser = toNostrUser(result.user)
+        activeUserPubkeyRef.current = nextUser.pubkey
+        setUser(nextUser)
         setUnreadNotificationCount(0)
         return { success: true }
       } catch (error) {
@@ -239,7 +266,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      setUser(session ? toNostrUser(session.user) : null)
+      const nextUser = session ? toNostrUser(session.user) : null
+      activeUserPubkeyRef.current = nextUser?.pubkey ?? null
+      setUser(nextUser)
     } catch (error) {
       if (sessionSyncRequestIdRef.current === requestId) {
         console.error("Failed to refresh profile:", error)

@@ -125,7 +125,7 @@ export default function BookmarksPage() {
           </div>
         </div>
 
-        <div className={`${pageContentContainerClassName} pt-6 sm:pt-8`}>
+        <div className={`${pageContentContainerClassName} pt-8 sm:pt-10 lg:pt-12`}>
           {bookmarks.length === 0 ? (
             <div className="py-12 text-center">
               <Bookmark className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />

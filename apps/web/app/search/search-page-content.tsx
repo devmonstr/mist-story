@@ -500,7 +500,7 @@ export function SearchPageContent() {
         </div>
       </section>
 
-      <div className={`${pageContentContainerClassName} pt-6 sm:pt-8`}>
+      <div className={`${pageContentContainerClassName} pt-8 sm:pt-10 lg:pt-12`}>
         {hasQuery && !isLoading && !error && results.length > 0 ? (
           <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <ResultsCount

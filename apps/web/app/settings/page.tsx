@@ -65,6 +65,7 @@ import {
   buildProfileMetadataContent,
   fetchLatestProfileMetadata,
   getPublicKey,
+  getPublicKeyFromNsec,
   publishEventToRelays,
   signAuthChallengeWithExtension,
   signAuthChallengeWithNsec,
@@ -1588,6 +1589,17 @@ export default function SettingsPage() {
     setNsecDialogError(null)
 
     try {
+      const nsecPubkey = getPublicKeyFromNsec(nsec)
+      if (!nsecPubkey) {
+        throw new Error('Failed to read a pubkey from this nsec. Check that your nsec is valid.')
+      }
+
+      if (nsecPubkey !== activeUserPubkey) {
+        throw new Error(
+          `Wrong nsec: this nsec belongs to ${nsecPubkey.slice(0, 8)}..., not your current account (${activeUserPubkey.slice(0, 8)}...).`
+        )
+      }
+
       const { profile, mergedMetadata, imageUploadResponses, nextProfileForm } =
         await prepareProfileSaveData()
 
@@ -1855,6 +1867,7 @@ export default function SettingsPage() {
     }
 
     // Extension unavailable or mismatched → use nsec dialog
+    setSecurityActionInFlight('reauth')
     setSecurityNsecDialogOpen(true)
     setSecurityNsecDialogValue('')
     setSecurityNsecDialogError(null)
@@ -1871,8 +1884,10 @@ export default function SettingsPage() {
 
     try {
       await runSecurityReauthWithNsec(nsec)
+      const pendingDialog = securityNsecDialogResolveRef.current
+      securityNsecDialogResolveRef.current = null
       setSecurityNsecDialogOpen(false)
-      securityNsecDialogResolveRef.current?.resolve()
+      pendingDialog?.resolve()
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to sign with nsec'
       setSecurityNsecDialogError(message)
@@ -1883,8 +1898,10 @@ export default function SettingsPage() {
   }
 
   const handleSecurityNsecDialogCancel = () => {
+    const pendingDialog = securityNsecDialogResolveRef.current
+    securityNsecDialogResolveRef.current = null
     setSecurityNsecDialogOpen(false)
-    securityNsecDialogResolveRef.current?.reject(new Error('Re-authentication was cancelled'))
+    pendingDialog?.reject(new Error('Re-authentication was cancelled'))
   }
 
   const handleUnlockSecurityDetails = async () => {
@@ -2259,10 +2276,10 @@ export default function SettingsPage() {
     <div className="flex min-h-screen flex-col">
       <Navbar />
       <main className="flex-1 bg-background">
-      <div className={`${pageContentContainerClassName} ${pageSectionPaddingClassName}`}>
-        <h1 className={pageHeadingTitleClassName}>Settings</h1>
+        <div className={`${pageContentContainerClassName} ${pageSectionPaddingClassName}`}>
+          <h1 className={pageHeadingTitleClassName}>Settings</h1>
 
-        <div className="grid gap-8 lg:grid-cols-4">
+        <div className="mt-8 grid gap-8 lg:grid-cols-4">
           {/* Sidebar Navigation */}
           <nav className="lg:col-span-1">
             <div className="space-y-1 border border-border/40 rounded bg-card p-2">
