@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Menu, Search, Bell, Bookmark, PenSquare, BookOpen, Book, Pen, Compass, Info } from "lucide-react"
+import { Menu, Search, Bookmark, PenSquare, BookOpen, Book, Pen, Compass, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import { AuthButton } from "@/components/auth-button"
 import { useState } from "react"
 import { useAuth } from "@/context/auth-context"
+import { NavbarNotificationDropdown } from "@/components/navbar-notification-dropdown"
 
 const navLinks = [
   { href: "/library", label: "Library", icon: Book },
@@ -23,7 +24,7 @@ const navLinks = [
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
-  const { user, unreadNotificationCount } = useAuth()
+  const { user } = useAuth()
   const isLoggedIn = !!user
 
   return (
@@ -66,18 +67,7 @@ export function Navbar() {
                   <Bookmark className="h-5 w-5" />
                 </Link>
               </Button>
-              <Button variant="ghost" size="icon" asChild>
-                <Link href="/notifications" aria-label="Notifications">
-                  <span className="relative block">
-                    <Bell className="h-5 w-5" />
-                    {unreadNotificationCount > 0 ? (
-                      <span className="absolute -right-2 -top-2 min-w-[1rem] border border-background bg-foreground px-1 text-center text-[10px] leading-4 text-background">
-                        {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
-                      </span>
-                    ) : null}
-                  </span>
-                </Link>
-              </Button>
+              <NavbarNotificationDropdown />
             </>
           )}
 
@@ -102,18 +92,7 @@ export function Navbar() {
                   <Bookmark className="h-5 w-5" />
                 </Link>
               </Button>
-              <Button variant="ghost" size="icon" asChild>
-                <Link href="/notifications" aria-label="Notifications">
-                  <span className="relative block">
-                    <Bell className="h-5 w-5" />
-                    {unreadNotificationCount > 0 ? (
-                      <span className="absolute -right-2 -top-2 min-w-[1rem] border border-background bg-foreground px-1 text-center text-[10px] leading-4 text-background">
-                        {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
-                      </span>
-                    ) : null}
-                  </span>
-                </Link>
-              </Button>
+              <NavbarNotificationDropdown />
             </>
           )}
 
