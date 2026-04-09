@@ -1,0 +1,186 @@
+{
+  "generatedAt": "2026-04-09T08:55:58.479Z",
+  "baseUrl": "http://127.0.0.1:3000",
+  "routeMix": [
+    {
+      "route": "/",
+      "weight": 35
+    },
+    {
+      "route": "/discover",
+      "weight": 25
+    },
+    {
+      "route": "/api/v1/library",
+      "weight": 25
+    },
+    {
+      "route": "/api/v1/discover/search",
+      "weight": 15
+    }
+  ],
+  "runs": [
+    {
+      "concurrency": 10,
+      "durationSeconds": 20,
+      "totalRequests": 1173,
+      "totalErrors": 0,
+      "errorRate": 0,
+      "requestsPerSecond": 58.65,
+      "avgLatencyMs": 38.3105513213981,
+      "p50LatencyMs": 14.11620000000039,
+      "p95LatencyMs": 96.61000000000013,
+      "p99LatencyMs": 723.5336,
+      "routeSummaries": [
+        {
+          "route": "/",
+          "requests": 406,
+          "errors": 0,
+          "errorRate": 0,
+          "avgLatencyMs": 14.773126600985169,
+          "p50LatencyMs": 7.104899999998452,
+          "p95LatencyMs": 32.91529999999966,
+          "p99LatencyMs": 260.7851
+        },
+        {
+          "route": "/api/v1/discover/search",
+          "requests": 169,
+          "errors": 0,
+          "errorRate": 0,
+          "avgLatencyMs": 58.090601775147874,
+          "p50LatencyMs": 13.255699999999706,
+          "p95LatencyMs": 109.04629999999997,
+          "p99LatencyMs": 1446.9586000000004
+        },
+        {
+          "route": "/api/v1/library",
+          "requests": 286,
+          "errors": 0,
+          "errorRate": 0,
+          "avgLatencyMs": 27.17379615384623,
+          "p50LatencyMs": 13.710399999999936,
+          "p95LatencyMs": 64.65539999999964,
+          "p99LatencyMs": 570.2264
+        },
+        {
+          "route": "/discover",
+          "requests": 312,
+          "errors": 0,
+          "errorRate": 0,
+          "avgLatencyMs": 68.43387788461538,
+          "p50LatencyMs": 25.4803000000029,
+          "p95LatencyMs": 235.64469999999983,
+          "p99LatencyMs": 1046.9539
+        }
+      ]
+    },
+    {
+      "concurrency": 25,
+      "durationSeconds": 20,
+      "totalRequests": 2844,
+      "totalErrors": 0,
+      "errorRate": 0,
+      "requestsPerSecond": 142.2,
+      "avgLatencyMs": 46.85163540787611,
+      "p50LatencyMs": 24.780900000001566,
+      "p95LatencyMs": 174.60809999999765,
+      "p99LatencyMs": 299.7674999999981,
+      "routeSummaries": [
+        {
+          "route": "/",
+          "requests": 971,
+          "errors": 0,
+          "errorRate": 0,
+          "avgLatencyMs": 17.91213079299679,
+          "p50LatencyMs": 13.057200000002922,
+          "p95LatencyMs": 49.45579999999609,
+          "p99LatencyMs": 85.29910000000382
+        },
+        {
+          "route": "/api/v1/discover/search",
+          "requests": 432,
+          "errors": 0,
+          "errorRate": 0,
+          "avgLatencyMs": 52.06368935185165,
+          "p50LatencyMs": 26.367200000000594,
+          "p95LatencyMs": 122.46030000000246,
+          "p99LatencyMs": 725.0293999999994
+        },
+        {
+          "route": "/api/v1/library",
+          "requests": 728,
+          "errors": 0,
+          "errorRate": 0,
+          "avgLatencyMs": 33.527126510989014,
+          "p50LatencyMs": 26.436600000000908,
+          "p95LatencyMs": 80.67510000000038,
+          "p99LatencyMs": 123.31789999999819
+        },
+        {
+          "route": "/discover",
+          "requests": 713,
+          "errors": 0,
+          "errorRate": 0,
+          "avgLatencyMs": 96.70983197755943,
+          "p50LatencyMs": 74.89500000000044,
+          "p95LatencyMs": 231.71530000000348,
+          "p99LatencyMs": 357.2314000000006
+        }
+      ]
+    },
+    {
+      "concurrency": 40,
+      "durationSeconds": 20,
+      "totalRequests": 3640,
+      "totalErrors": 0,
+      "errorRate": 0,
+      "requestsPerSecond": 182,
+      "avgLatencyMs": 92.10755082417609,
+      "p50LatencyMs": 54.80159999999887,
+      "p95LatencyMs": 292.7044999999998,
+      "p99LatencyMs": 416.9953000000023,
+      "routeSummaries": [
+        {
+          "route": "/",
+          "requests": 1333,
+          "errors": 0,
+          "errorRate": 0,
+          "avgLatencyMs": 37.870105101275406,
+          "p50LatencyMs": 30.71719999999914,
+          "p95LatencyMs": 88.16090000000258,
+          "p99LatencyMs": 115.93939999999566
+        },
+        {
+          "route": "/api/v1/discover/search",
+          "requests": 533,
+          "errors": 0,
+          "errorRate": 0,
+          "avgLatencyMs": 59.10323808630423,
+          "p50LatencyMs": 52.54960000000574,
+          "p95LatencyMs": 115.3015000000014,
+          "p99LatencyMs": 157.08660000000236
+        },
+        {
+          "route": "/api/v1/library",
+          "requests": 891,
+          "errors": 0,
+          "errorRate": 0,
+          "avgLatencyMs": 59.557763973063935,
+          "p50LatencyMs": 53.88520000000426,
+          "p95LatencyMs": 117.02409999999509,
+          "p99LatencyMs": 188.1637000000046
+        },
+        {
+          "route": "/discover",
+          "requests": 883,
+          "errors": 0,
+          "errorRate": 0,
+          "avgLatencyMs": 226.75270815402064,
+          "p50LatencyMs": 220.10160000000178,
+          "p95LatencyMs": 402.6461999999956,
+          "p99LatencyMs": 546.9705999999933
+        }
+      ]
+    }
+  ]
+}

@@ -6,6 +6,8 @@ import {
   npubToHex,
   prisma,
 } from "@mist/db"
+import { enqueuePublicCatalogMetricsRefresh } from "@mist/queue"
+import { createRedisClient } from "@mist/redis"
 import type {
   AdminNovelListQuery,
   AdminNovelListResponse,
@@ -20,6 +22,10 @@ import type {
   UpdateAdminUserRolesInput,
 } from "@mist/shared"
 import { HttpError } from "../utils/http-error"
+import { invalidatePublicCacheScopes } from "./public-cache-service"
+import { env } from "../config/env"
+
+const redis = createRedisClient(env.REDIS_URL)
 
 type AdminUserRecord = Awaited<ReturnType<typeof listAdminUserRecords>>[number]
 
@@ -480,5 +486,11 @@ export async function updateAdminNovelVisibility(
     },
   })
 
+  await enqueuePublicCatalogMetricsRefresh(redis, {
+    scope: "author",
+    authorId: updated.authorId,
+    reason: "admin-visibility-updated",
+  })
+  await invalidatePublicCacheScopes("discover", "library", "search")
   return buildAdminNovelSummary(updated)
 }

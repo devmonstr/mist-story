@@ -2,6 +2,7 @@ import { Queue } from "bullmq"
 import type {
   ChapterPublishJobPayload,
   NotificationDispatchJobPayload,
+  PublicCatalogMetricsRefreshJobPayload,
   ProfileImageOptimizeJobPayload,
   ProfileSyncJobPayload,
 } from "@mist/shared"
@@ -11,6 +12,7 @@ export const queueNames = {
   notificationDispatch: "notification-dispatch",
   profileSync: "profile-sync",
   profileImageOptimize: "profile-image-optimize",
+  publicCatalogMetricsRefresh: "public-catalog-metrics-refresh",
 } as const
 
 export function createChapterPublishQueue(connection: unknown) {
@@ -51,6 +53,16 @@ export function createProfileImageOptimizeQueue(connection: unknown) {
   })
 }
 
+export function createPublicCatalogMetricsRefreshQueue(connection: unknown) {
+  return new Queue<
+    PublicCatalogMetricsRefreshJobPayload,
+    unknown,
+    typeof queueNames.publicCatalogMetricsRefresh
+  >(queueNames.publicCatalogMetricsRefresh, {
+    connection: connection as never,
+  })
+}
+
 export async function enqueueChapterPublish(
   connection: unknown,
   payload: ChapterPublishJobPayload
@@ -86,5 +98,24 @@ export async function enqueueProfileImageOptimize(
       type: "exponential",
       delay: 10_000,
     },
+  })
+}
+
+export async function enqueuePublicCatalogMetricsRefresh(
+  connection: unknown,
+  payload: PublicCatalogMetricsRefreshJobPayload
+) {
+  const queue = createPublicCatalogMetricsRefreshQueue(connection)
+  const jobId =
+    payload.scope === "novel" && payload.novelId
+      ? `novel:${payload.novelId}`
+      : payload.scope === "author" && payload.authorId
+        ? `author:${payload.authorId}`
+        : "all"
+
+  return queue.add(queueNames.publicCatalogMetricsRefresh, payload, {
+    jobId,
+    removeOnComplete: true,
+    removeOnFail: 50,
   })
 }

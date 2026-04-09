@@ -40,6 +40,7 @@ import {
   encodeLibraryCatalogCursor,
 } from "./catalog-cursor"
 import { HttpError } from "../utils/http-error"
+import { withPublicCache } from "./public-cache-service"
 
 function stripHtml(html: string) {
   return html
@@ -442,7 +443,7 @@ type LibraryCatalogNovelSource = {
   }
 }
 
-export async function listLibraryCatalog(input: {
+async function listLibraryCatalogUncached(input: {
   query?: string
   sortBy?: CatalogSortBy | PublicCatalogSortBy
   page?: number
@@ -668,6 +669,36 @@ export async function listLibraryCatalog(input: {
       updatedAt: novel.updatedAt.toISOString(),
     })),
   }
+}
+
+export async function listLibraryCatalog(input: {
+  query?: string
+  sortBy?: CatalogSortBy | PublicCatalogSortBy
+  page?: number
+  pageSize?: number
+  cursor?: string | null
+  direction?: "next" | "prev" | null
+  genre?: string | null
+  workType?: "ORIGINAL" | "TRANSLATION" | null
+  status?: "Ongoing" | "Completed" | "Hiatus" | null
+  collection?: "trending" | "hidden-gems" | "editors-picks" | "new-voices" | null
+}): Promise<LibraryCatalogResponse> {
+  return withPublicCache(
+    "library",
+    {
+      query: input.query?.trim() || null,
+      sortBy: input.sortBy ?? "recent",
+      page: input.page ?? 1,
+      pageSize: input.pageSize ?? 18,
+      cursor: input.cursor ?? null,
+      direction: input.direction ?? null,
+      genre: input.genre?.trim() || null,
+      workType: input.workType ?? null,
+      status: input.status ?? null,
+      collection: input.collection ?? null,
+    },
+    () => listLibraryCatalogUncached(input)
+  )
 }
 
 export async function getPublicNovelDetail(

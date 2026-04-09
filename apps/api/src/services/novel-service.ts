@@ -9,13 +9,19 @@ import {
 } from "@mist/db"
 import type { Response } from "express"
 import type { CreateNovelInput, UpdateNovelInput } from "@mist/shared"
+import { enqueuePublicCatalogMetricsRefresh } from "@mist/queue"
+import { createRedisClient } from "@mist/redis"
+import { env } from "../config/env"
 import { HttpError } from "../utils/http-error"
 import {
   deleteNovelCoverAsset,
   getNovelCoverAsset,
   uploadNovelCoverAsset,
 } from "./novel-cover-storage"
+import { invalidatePublicCacheScopes } from "./public-cache-service"
 import { notifyFollowersAboutPublishedNovel } from "./profile-service"
+
+const redis = createRedisClient(env.REDIS_URL)
 
 function resolveNovelStatus(
   status: CreateNovelInput["status"] | UpdateNovelInput["status"],
@@ -153,6 +159,13 @@ export async function createNovel(userId: string, input: CreateNovelInput) {
     })
   }
 
+  await enqueuePublicCatalogMetricsRefresh(redis, {
+    scope: "author",
+    authorId: created.authorId,
+    reason: "novel-created",
+  })
+  await invalidatePublicCacheScopes("discover", "library", "search")
+
   return serializeNovel(created)
 }
 
@@ -247,6 +260,13 @@ export async function updateNovel(
       novelTitle: updated.title,
     })
   }
+
+  await enqueuePublicCatalogMetricsRefresh(redis, {
+    scope: "author",
+    authorId: updated.authorId,
+    reason: "novel-updated",
+  })
+  await invalidatePublicCacheScopes("discover", "library", "search")
 
   return serializeNovel(updated)
 }

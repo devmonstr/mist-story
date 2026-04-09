@@ -23,9 +23,19 @@ export const profileImageOptimizeJobPayloadSchema = z.object({
   sourceMimeType: z.string().min(1),
 })
 
+export const publicCatalogMetricsRefreshJobPayloadSchema = z.object({
+  scope: z.enum(["all", "novel", "author"]).default("all"),
+  novelId: z.string().min(1).optional(),
+  authorId: z.string().min(1).optional(),
+  reason: z.string().min(1).optional(),
+})
+
 export type ChapterPublishJobPayload = z.infer<typeof chapterPublishJobPayloadSchema>
 export type NotificationDispatchJobPayload = z.infer<typeof notificationDispatchJobPayloadSchema>
 export type ProfileSyncJobPayload = z.infer<typeof profileSyncJobPayloadSchema>
 export type ProfileImageOptimizeJobPayload = z.infer<
   typeof profileImageOptimizeJobPayloadSchema
+>
+export type PublicCatalogMetricsRefreshJobPayload = z.infer<
+  typeof publicCatalogMetricsRefreshJobPayloadSchema
 >

@@ -21,7 +21,10 @@ import type {
   ReadingProgressState,
   UpsertReadingProgressInput,
 } from "@mist/shared"
-import { enqueueNotificationDispatch } from "@mist/queue"
+import {
+  enqueueNotificationDispatch,
+  enqueuePublicCatalogMetricsRefresh,
+} from "@mist/queue"
 import { createRedisClient } from "@mist/redis"
 import { env } from "../config/env"
 import { HttpError } from "../utils/http-error"
@@ -144,6 +147,11 @@ export async function addBookmark(
 
   const existingBookmark = await findNovelBookmarkForUser(userId, novel.id)
   const bookmark = await upsertNovelBookmarkForUser(userId, novel.id)
+  await enqueuePublicCatalogMetricsRefresh(redis, {
+    scope: "novel",
+    novelId: novel.id,
+    reason: "bookmark-added",
+  })
 
   if (!existingBookmark && novel.authorId !== userId) {
     const notification = await createNotification({
@@ -177,6 +185,11 @@ export async function removeBookmark(
   }
 
   await deleteNovelBookmarkForUser(userId, novel.id)
+  await enqueuePublicCatalogMetricsRefresh(redis, {
+    scope: "novel",
+    novelId: novel.id,
+    reason: "bookmark-removed",
+  })
   return serializeBookmarkState(novel.id, null)
 }
 
@@ -225,6 +238,11 @@ export async function saveReadingProgress(
     chapterId,
     chapterNumber,
   })
+  await enqueuePublicCatalogMetricsRefresh(redis, {
+    scope: "novel",
+    novelId: novel.id,
+    reason: "reading-progress-saved",
+  })
 
   return serializeReadingProgressState(novel.id, progress)
 }
@@ -239,8 +257,24 @@ export async function removeReadingProgress(
   }
 
   await deleteReadingProgressForUserAndNovel(userId, novel.id)
+  await enqueuePublicCatalogMetricsRefresh(redis, {
+    scope: "novel",
+    novelId: novel.id,
+    reason: "reading-progress-removed",
+  })
 }
 
 export async function clearReadingHistory(userId: string) {
+  const currentEntries = await listReadingProgressForUser(userId)
   await clearReadingProgressForUser(userId)
+
+  await Promise.all(
+    [...new Set(currentEntries.map((entry) => entry.novelId))].map((novelId) =>
+      enqueuePublicCatalogMetricsRefresh(redis, {
+        scope: "novel",
+        novelId,
+        reason: "reading-history-cleared",
+      })
+    )
+  )
 }

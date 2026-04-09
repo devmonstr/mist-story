@@ -21,6 +21,9 @@
     "db:prepare-catalog-search": "bun run --filter @mist/db db:prepare-catalog-search",
     "db:studio": "bun run --filter @mist/db db:studio",
     "db:seed:sample-catalog": "bun run --filter @mist/db db:seed:sample-catalog",
+    "db:refresh-public-metrics": "bun run --filter @mist/db db:refresh-public-metrics",
+    "perf:load:public": "bun --env-file=.env.local ./scripts/loadtest-public.ts",
+    "perf:profile:discover": "bun --env-file=.env.local ./scripts/profile-discover.ts",
     "infra:up": "docker compose up -d postgres redis",
     "infra:down": "docker compose down"
   },

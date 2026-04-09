@@ -30,6 +30,7 @@ import {
   encodeSearchAuthorCursor,
   encodeSearchNovelCursor,
 } from "./catalog-cursor"
+import { withPublicCache } from "./public-cache-service"
 
 const MAX_SEARCH_QUERY_LENGTH = 120
 
@@ -154,7 +155,7 @@ function mapFacetCounts(facets: {
   }
 }
 
-export async function getDiscoverData(input: {
+async function getDiscoverDataUncached(input: {
   query?: string
   genre?: string | null
   workType?: "ORIGINAL" | "TRANSLATION" | null
@@ -273,7 +274,29 @@ export async function getDiscoverData(input: {
   }
 }
 
-export async function searchCatalog(input: {
+export async function getDiscoverData(input: {
+  query?: string
+  genre?: string | null
+  workType?: "ORIGINAL" | "TRANSLATION" | null
+  status?: "Ongoing" | "Completed" | "Hiatus" | null
+  collection?: "trending" | "hidden-gems" | "editors-picks" | "new-voices" | null
+  sort?: "relevance" | "popular" | "recent"
+} = {}): Promise<DiscoverResponse> {
+  return withPublicCache(
+    "discover",
+    {
+      query: input.query?.trim() || null,
+      genre: input.genre?.trim() || null,
+      workType: input.workType ?? null,
+      status: input.status ?? null,
+      collection: input.collection ?? null,
+      sort: input.sort ?? "recent",
+    },
+    () => getDiscoverDataUncached(input)
+  )
+}
+
+async function searchCatalogUncached(input: {
   query: string
   filterType: SearchFilterType
   sortBy: SearchSortBy
@@ -558,4 +581,47 @@ export async function searchCatalog(input: {
     activeFilters: filters,
     facets: mapFacetCounts(facetCounts),
   }
+}
+
+export async function searchCatalog(input: {
+  query: string
+  filterType: SearchFilterType
+  sortBy: SearchSortBy
+  page?: number
+  pageSize?: number
+  cursor?: string | null
+  direction?: "next" | "prev" | null
+  genre?: string | null
+  workType?: "ORIGINAL" | "TRANSLATION" | null
+  status?: "Ongoing" | "Completed" | "Hiatus" | null
+}): Promise<SearchResponse> {
+  const normalizedQuery = normalizeSearchQuery(input.query)
+
+  if (!normalizedQuery) {
+    return searchCatalogUncached({
+      ...input,
+      query: normalizedQuery,
+    })
+  }
+
+  return withPublicCache(
+    "search",
+    {
+      query: normalizedQuery,
+      filterType: input.filterType,
+      sortBy: input.sortBy,
+      page: input.page ?? 1,
+      pageSize: input.pageSize ?? 20,
+      cursor: input.cursor ?? null,
+      direction: input.direction ?? null,
+      genre: input.genre?.trim() || null,
+      workType: input.workType ?? null,
+      status: input.status ?? null,
+    },
+    () =>
+      searchCatalogUncached({
+        ...input,
+        query: normalizedQuery,
+      })
+  )
 }

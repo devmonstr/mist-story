@@ -258,23 +258,7 @@ function buildLibraryCollectionBaseCte(filters: PublicCatalogNovelFilters = {}) 
   const whereSql = buildPublishedNovelWhereSql(filters)
 
   return Prisma.sql`
-    WITH reading_counts AS (
-      SELECT rp."novelId", COUNT(*)::int AS "readsCount"
-      FROM "ReadingProgress" rp
-      GROUP BY rp."novelId"
-    ),
-    bookmark_counts AS (
-      SELECT nb."novelId", COUNT(*)::int AS "bookmarksCount"
-      FROM "NovelBookmark" nb
-      GROUP BY nb."novelId"
-    ),
-    author_published_counts AS (
-      SELECT author_novel."authorId", COUNT(*)::int AS "publishedNovelsCount"
-      FROM "Novel" author_novel
-      WHERE author_novel."visibility" = 'PUBLISHED'
-      GROUP BY author_novel."authorId"
-    ),
-    catalog_base AS (
+    WITH catalog_base AS (
       SELECT
         n.id,
         n.slug,
@@ -297,14 +281,13 @@ function buildLibraryCollectionBaseCte(filters: PublicCatalogNovelFilters = {}) 
         a."displayName" AS "authorName",
         a.handle AS "authorHandle",
         a."avatarUrl" AS "authorAvatarUrl",
-        COALESCE(reading_counts."readsCount", 0)::int AS "readsCount",
-        COALESCE(bookmark_counts."bookmarksCount", 0)::int AS "bookmarksCount",
-        COALESCE(author_published_counts."publishedNovelsCount", 0)::int AS "authorPublishedNovelsCount"
+        COALESCE(metric."readsCount", 0)::int AS "readsCount",
+        COALESCE(metric."bookmarksCount", 0)::int AS "bookmarksCount",
+        COALESCE(metric."authorPublishedNovelsCount", 0)::int AS "authorPublishedNovelsCount",
+        COALESCE(metric."trendingScore", 0)::double precision AS "trendingScore"
       FROM "Novel" n
       JOIN "User" a ON a.id = n."authorId"
-      LEFT JOIN reading_counts ON reading_counts."novelId" = n.id
-      LEFT JOIN bookmark_counts ON bookmark_counts."novelId" = n.id
-      LEFT JOIN author_published_counts ON author_published_counts."authorId" = n."authorId"
+      LEFT JOIN "PublicNovelMetric" metric ON metric."novelId" = n.id
       ${whereSql}
     )
   `
@@ -326,6 +309,7 @@ function buildLibraryCollectionOrderBySql(collection: CatalogCollection) {
   if (collection === "trending") {
     return Prisma.sql`
       ORDER BY
+        base."trendingScore" DESC,
         base."readsCount" DESC,
         base."bookmarksCount" DESC,
         base."ratingsCount" DESC,

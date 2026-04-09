@@ -1,0 +1,6 @@
+$ bun --bun turbo start --filter=@mist/web --filter=@mist/api --filter=@mist/worker
+• turbo 2.8.19
+ ERROR  @mist/api#start: command (D:\my_developer\mist-story\apps\api) C:\Users\THANETH\AppData\Local\Temp\bun-node-af24e281e\bun.exe run start exited (255)
+ ERROR  @mist/worker#start: command (D:\my_developer\mist-story\apps\worker) C:\Users\THANETH\AppData\Local\Temp\bun-node-af24e281e\bun.exe run start exited (255)
+ ERROR  run failed: command  exited (255)
+error: script "start" exited with code 255

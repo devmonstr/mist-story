@@ -116,16 +116,6 @@ function buildNovelSearchCandidatesCte(filters: PublicCatalogNovelFilters, query
           LIMIT 120
         ) author_candidates
       ) candidate
-    ),
-    reading_counts AS (
-      SELECT rp."novelId", COUNT(*)::int AS "readsCount"
-      FROM "ReadingProgress" rp
-      GROUP BY rp."novelId"
-    ),
-    bookmark_counts AS (
-      SELECT nb."novelId", COUNT(*)::int AS "bookmarksCount"
-      FROM "NovelBookmark" nb
-      GROUP BY nb."novelId"
     )
   `
 }
@@ -727,15 +717,14 @@ export async function searchPublishedNovelsWithPagination(
       coalesce(a."displayName", a."handle", 'Unknown author') AS "authorName",
       a."pubkey" AS "authorPubkey",
       n."chaptersCount",
-      COALESCE(reading_counts."readsCount", 0)::int AS "readsCount",
-      COALESCE(bookmark_counts."bookmarksCount", 0)::int AS "bookmarksCount",
+      COALESCE(metric."readsCount", 0)::int AS "readsCount",
+      COALESCE(metric."bookmarksCount", 0)::int AS "bookmarksCount",
       n."coverUrl",
       n."coverStorageKey"
     FROM novel_search_candidates candidate
     JOIN "Novel" n ON n.id = candidate.id
     JOIN "User" a ON a.id = n."authorId"
-    LEFT JOIN reading_counts ON reading_counts."novelId" = n.id
-    LEFT JOIN bookmark_counts ON bookmark_counts."novelId" = n.id
+    LEFT JOIN "PublicNovelMetric" metric ON metric."novelId" = n.id
     ${orderBySql}
     LIMIT ${pagination.take + 1}
     OFFSET ${pagination.skip}
@@ -818,8 +807,8 @@ export async function searchPublishedNovelsWithCursor(
         coalesce(a."displayName", a."handle", 'Unknown author') AS "authorName",
         a."pubkey" AS "authorPubkey",
         n."chaptersCount",
-        COALESCE(reading_counts."readsCount", 0)::int AS "readsCount",
-        COALESCE(bookmark_counts."bookmarksCount", 0)::int AS "bookmarksCount",
+        COALESCE(metric."readsCount", 0)::int AS "readsCount",
+        COALESCE(metric."bookmarksCount", 0)::int AS "bookmarksCount",
         n."coverUrl",
         n."coverStorageKey",
         n."ratingsCount",
@@ -833,8 +822,7 @@ export async function searchPublishedNovelsWithCursor(
       FROM novel_search_candidates candidate
       JOIN "Novel" n ON n.id = candidate.id
       JOIN "User" a ON a.id = n."authorId"
-      LEFT JOIN reading_counts ON reading_counts."novelId" = n.id
-      LEFT JOIN bookmark_counts ON bookmark_counts."novelId" = n.id
+      LEFT JOIN "PublicNovelMetric" metric ON metric."novelId" = n.id
       WHERE 1 = 1
       ${cursorWhereSql}
       ${orderBySql}
@@ -883,28 +871,16 @@ export async function searchAuthorsWithPagination(
     followersCount: number
     novelsCount: number
   }>>(Prisma.sql`
-    WITH follower_counts AS (
-      SELECT uf."followingId" AS "userId", COUNT(*)::int AS "followersCount"
-      FROM "UserFollow" uf
-      GROUP BY uf."followingId"
-    ),
-    published_novel_counts AS (
-      SELECT n."authorId" AS "userId", COUNT(*)::int AS "novelsCount"
-      FROM "Novel" n
-      WHERE n."visibility" = 'PUBLISHED'
-      GROUP BY n."authorId"
-    )
     SELECT
       u.id,
       u."pubkey",
       coalesce(u."displayName", u."handle", 'Unknown author') AS name,
       coalesce(u."about", '') AS bio,
       u."avatarUrl",
-      COALESCE(follower_counts."followersCount", 0)::int AS "followersCount",
-      COALESCE(published_novel_counts."novelsCount", 0)::int AS "novelsCount"
+      COALESCE(metric."followersCount", 0)::int AS "followersCount",
+      COALESCE(metric."publishedNovelsCount", 0)::int AS "novelsCount"
     FROM "User" u
-    LEFT JOIN follower_counts ON follower_counts."userId" = u.id
-    LEFT JOIN published_novel_counts ON published_novel_counts."userId" = u.id
+    LEFT JOIN "PublicAuthorMetric" metric ON metric."authorId" = u.id
     ${whereSql}
     ${orderBySql}
     LIMIT ${pagination.take + 1}
@@ -971,17 +947,6 @@ export async function searchAuthorsWithCursor(
       rankScore: number
       similarityScore: number
     }>>(Prisma.sql`
-      WITH follower_counts AS (
-        SELECT uf."followingId" AS "userId", COUNT(*)::int AS "followersCount"
-        FROM "UserFollow" uf
-        GROUP BY uf."followingId"
-      ),
-      published_novel_counts AS (
-        SELECT n."authorId" AS "userId", COUNT(*)::int AS "novelsCount"
-        FROM "Novel" n
-        WHERE n."visibility" = 'PUBLISHED'
-        GROUP BY n."authorId"
-      )
       SELECT
         u.id,
         u."pubkey",
@@ -989,8 +954,8 @@ export async function searchAuthorsWithCursor(
         coalesce(u."about", '') AS bio,
         u."avatarUrl",
         u."updatedAt",
-        COALESCE(follower_counts."followersCount", 0)::int AS "followersCount",
-        COALESCE(published_novel_counts."novelsCount", 0)::int AS "novelsCount",
+        COALESCE(metric."followersCount", 0)::int AS "followersCount",
+        COALESCE(metric."publishedNovelsCount", 0)::int AS "novelsCount",
         ts_rank_cd(${buildAuthorSearchDocumentSql()}, websearch_to_tsquery('simple', ${query}))::double precision AS "rankScore",
         GREATEST(
           similarity(coalesce(u."displayName", ''), ${query}),
@@ -998,8 +963,7 @@ export async function searchAuthorsWithCursor(
           similarity(coalesce(u."nip05", ''), ${query})
         )::double precision AS "similarityScore"
       FROM "User" u
-      LEFT JOIN follower_counts ON follower_counts."userId" = u.id
-      LEFT JOIN published_novel_counts ON published_novel_counts."userId" = u.id
+      LEFT JOIN "PublicAuthorMetric" metric ON metric."authorId" = u.id
       ${whereSql}
       ${cursorWhereSql}
       ${orderBySql}

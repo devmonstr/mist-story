@@ -15,7 +15,8 @@
     "db:migrate": "bun --env-file=../../.env.local --bun prisma migrate dev --schema ./prisma/schema.prisma",
     "db:studio": "bun --env-file=../../.env.local --bun prisma studio --schema ./prisma/schema.prisma",
     "db:prepare-catalog-search": "bun --env-file=../../.env.local ./src/scripts/prepare-catalog-search.ts",
-    "db:seed:sample-catalog": "bun --env-file=../../.env.local ./src/scripts/seed-sample-catalog.ts"
+    "db:seed:sample-catalog": "bun --env-file=../../.env.local ./src/scripts/seed-sample-catalog.ts",
+    "db:refresh-public-metrics": "bun --env-file=../../.env.local ./src/scripts/refresh-public-catalog-metrics.ts"
   },
   "dependencies": {
     "@mist/shared": "workspace:*",

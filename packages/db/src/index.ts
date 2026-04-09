@@ -1,4 +1,5 @@
 export * from "./client"
 export * from "./catalog-search"
+export * from "./public-catalog-metrics"
 export * from "./repositories/index"
 export * from "./utils"

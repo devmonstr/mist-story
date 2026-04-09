@@ -1,9 +1,14 @@
 import { Worker } from "bullmq"
+import {
+  ensurePublicCatalogMetricsInfrastructure,
+  refreshPublicCatalogMetrics,
+} from "@mist/db"
 import { queueNames } from "@mist/queue"
 import { createBullMQConnection } from "@mist/redis"
 import type {
   ChapterPublishJobPayload,
   NotificationDispatchJobPayload,
+  PublicCatalogMetricsRefreshJobPayload,
   ProfileImageOptimizeJobPayload,
   ProfileSyncJobPayload,
 } from "@mist/shared"
@@ -12,11 +17,16 @@ import { processChapterPublishJob } from "./processors/chapter-publish"
 import { processProfileImageOptimizeJob } from "./processors/profile-image-optimize"
 import { processNotificationDispatchJob } from "./processors/notification-dispatch"
 import { processProfileSyncJob } from "./processors/profile-sync"
+import { processPublicCatalogMetricsRefreshJob } from "./processors/public-catalog-metrics-refresh"
+
+await ensurePublicCatalogMetricsInfrastructure()
+await refreshPublicCatalogMetrics({ scope: "all" })
 
 const chapterPublishConnection = createBullMQConnection(env.REDIS_URL)
 const notificationConnection = createBullMQConnection(env.REDIS_URL)
 const profileSyncConnection = createBullMQConnection(env.REDIS_URL)
 const profileImageOptimizeConnection = createBullMQConnection(env.REDIS_URL)
+const publicCatalogMetricsConnection = createBullMQConnection(env.REDIS_URL)
 
 const chapterPublishWorker = new Worker<ChapterPublishJobPayload>(
   queueNames.chapterPublish,
@@ -42,6 +52,12 @@ const profileImageOptimizeWorker = new Worker<ProfileImageOptimizeJobPayload>(
   { connection: profileImageOptimizeConnection as never }
 )
 
+const publicCatalogMetricsWorker = new Worker<PublicCatalogMetricsRefreshJobPayload>(
+  queueNames.publicCatalogMetricsRefresh,
+  async (job) => processPublicCatalogMetricsRefreshJob(job.data),
+  { connection: publicCatalogMetricsConnection as never }
+)
+
 chapterPublishWorker.on("completed", (job) => {
   console.log(`[worker] completed ${job.name}:${job.id}`)
 })
@@ -59,6 +75,10 @@ profileSyncWorker.on("failed", (job, error) => {
 })
 
 profileImageOptimizeWorker.on("failed", (job, error) => {
+  console.error(`[worker] failed ${job?.name}:${job?.id}`, error)
+})
+
+publicCatalogMetricsWorker.on("failed", (job, error) => {
   console.error(`[worker] failed ${job?.name}:${job?.id}`, error)
 })
 

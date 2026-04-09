@@ -25,6 +25,7 @@ import {
 } from "@mist/db"
 import {
   enqueueNotificationDispatch,
+  enqueuePublicCatalogMetricsRefresh,
   enqueueProfileImageOptimize,
 } from "@mist/queue"
 import { createRedisClient } from "@mist/redis"
@@ -209,6 +210,11 @@ async function buildMyProfileResponse(userId: string): Promise<MyProfileResponse
 
   const user = await ensureUserProfileHydrated(existingUser)
   const stats = await getProfileSiteStats(user.id)
+  await enqueuePublicCatalogMetricsRefresh(redis, {
+    scope: "author",
+    authorId: user.id,
+    reason: "follow-added",
+  })
 
   return {
     profile: serializeProfileSummary(user),
@@ -362,6 +368,11 @@ export async function unfollowProfile(
 
   await unfollowUser(viewerUserId, user.id)
   const stats = await getProfileSiteStats(user.id)
+  await enqueuePublicCatalogMetricsRefresh(redis, {
+    scope: "author",
+    authorId: user.id,
+    reason: "follow-removed",
+  })
 
   return {
     npub: hexToNpub(user.pubkey),
