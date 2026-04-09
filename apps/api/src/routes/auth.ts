@@ -5,7 +5,10 @@ import {
   authReverifyRequestSchema,
   authVerifyRequestSchema,
 } from "@mist/shared"
-import { SESSION_COOKIE_NAME } from "../config/constants"
+import {
+  SESSION_COOKIE_NAME,
+  SESSION_PRESENCE_COOKIE_NAME,
+} from "../config/constants"
 import { requireAuth } from "../middleware/require-auth"
 import { sessionMiddleware } from "../middleware/session"
 import { validateBody } from "../middleware/validate"
@@ -41,6 +44,13 @@ authRouter.post(
 
       response.cookie(SESSION_COOKIE_NAME, result.sessionId, {
         httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 1000 * 60 * 60 * 24 * 7,
+      })
+      response.cookie(SESSION_PRESENCE_COOKIE_NAME, "1", {
+        httpOnly: false,
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
         path: "/",
@@ -131,6 +141,12 @@ authRouter.post("/sign-out", sessionMiddleware, async (_request, response) => {
 
   response.clearCookie(SESSION_COOKIE_NAME, {
     httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  })
+  response.clearCookie(SESSION_PRESENCE_COOKIE_NAME, {
+    httpOnly: false,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",

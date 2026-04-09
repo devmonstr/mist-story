@@ -377,6 +377,14 @@ type LibraryCollectionNovelRow = {
   }
 }
 
+export type DiscoverCollectionSnapshot = Record<
+  CatalogCollection,
+  {
+    total: number
+    novels: LibraryCollectionNovelRow[]
+  }
+>
+
 function mapLibraryCollectionNovelRow(row: {
   id: string
   slug: string
@@ -431,6 +439,207 @@ function mapLibraryCollectionNovelRow(row: {
       bookmarks: row.bookmarksCount,
     },
   }
+}
+
+function createEmptyDiscoverCollectionSnapshot(): DiscoverCollectionSnapshot {
+  return {
+    trending: { total: 0, novels: [] },
+    "hidden-gems": { total: 0, novels: [] },
+    "editors-picks": { total: 0, novels: [] },
+    "new-voices": { total: 0, novels: [] },
+  }
+}
+
+export async function listDiscoverCollectionsSnapshot(
+  filters: PublicCatalogNovelFilters = {}
+): Promise<DiscoverCollectionSnapshot> {
+  const baseSql = buildLibraryCollectionBaseCte(filters)
+
+  const [countRows, previewRows] = await Promise.all([
+    prisma.$queryRaw<
+      Array<{
+        collectionId: CatalogCollection
+        totalCount: number
+      }>
+    >(Prisma.sql`
+      ${baseSql}
+      SELECT 'trending'::text AS "collectionId", COUNT(*)::int AS "totalCount"
+      FROM catalog_base base
+      UNION ALL
+      SELECT 'hidden-gems'::text AS "collectionId", COUNT(*)::int AS "totalCount"
+      FROM catalog_base base
+      WHERE base."readsCount" <= 25
+      UNION ALL
+      SELECT 'editors-picks'::text AS "collectionId", COUNT(*)::int AS "totalCount"
+      FROM catalog_base base
+      UNION ALL
+      SELECT 'new-voices'::text AS "collectionId", COUNT(*)::int AS "totalCount"
+      FROM catalog_base base
+      WHERE base."authorPublishedNovelsCount" <= 1
+    `),
+    prisma.$queryRaw<
+    Array<{
+      collectionId: CatalogCollection
+      rowNumber: number
+      id: string
+      slug: string
+      title: string
+      summary: string
+      genre: string
+      workType: "ORIGINAL" | "TRANSLATION"
+      status: "Ongoing" | "Completed" | "Hiatus"
+      visibility: "PUBLISHED" | "HIDDEN"
+      coverUrl: string
+      coverStorageKey: string | null
+      chaptersCount: number
+      rating: number
+      ratingsCount: number
+      publishedAt: Date | null
+      updatedAt: Date
+      authorDisplayName: string | null
+      authorId: string
+      authorPubkey: string
+      authorName: string | null
+      authorHandle: string | null
+      authorAvatarUrl: string | null
+      readsCount: number
+      bookmarksCount: number
+    }>
+  >(Prisma.sql`
+    ${baseSql}
+    SELECT *
+    FROM (
+      SELECT
+        'trending'::text AS "collectionId",
+        ranked.*
+      FROM (
+        SELECT
+          ROW_NUMBER() OVER ()::int AS "rowNumber",
+          ordered.*
+        FROM (
+          SELECT
+            base.*
+          FROM catalog_base base
+          ORDER BY
+            base."trendingScore" DESC,
+            base."readsCount" DESC,
+            base."bookmarksCount" DESC,
+            base."ratingsCount" DESC,
+            coalesce(base."publishedAt", base."updatedAt") DESC,
+            base.id DESC
+          LIMIT 3
+        ) ordered
+      ) ranked
+
+      UNION ALL
+
+      SELECT
+        'hidden-gems'::text AS "collectionId",
+        ranked.*
+      FROM (
+        SELECT
+          ROW_NUMBER() OVER ()::int AS "rowNumber",
+          ordered.*
+        FROM (
+          SELECT
+            base.*
+          FROM catalog_base base
+          WHERE base."readsCount" <= 25
+          ORDER BY
+            base.rating DESC,
+            base."bookmarksCount" DESC,
+            base."readsCount" DESC,
+            coalesce(base."publishedAt", base."updatedAt") DESC,
+            base.id DESC
+          LIMIT 3
+        ) ordered
+      ) ranked
+
+      UNION ALL
+
+      SELECT
+        'editors-picks'::text AS "collectionId",
+        ranked.*
+      FROM (
+        SELECT
+          ROW_NUMBER() OVER ()::int AS "rowNumber",
+          ordered.*
+        FROM (
+          SELECT
+            base.*
+          FROM catalog_base base
+          ORDER BY
+            base.rating DESC,
+            base."ratingsCount" DESC,
+            base."readsCount" DESC,
+            coalesce(base."publishedAt", base."updatedAt") DESC,
+            base.id DESC
+          LIMIT 3
+        ) ordered
+      ) ranked
+
+      UNION ALL
+
+      SELECT
+        'new-voices'::text AS "collectionId",
+        ranked.*
+      FROM (
+        SELECT
+          ROW_NUMBER() OVER ()::int AS "rowNumber",
+          ordered.*
+        FROM (
+          SELECT
+            base.*
+          FROM catalog_base base
+          WHERE base."authorPublishedNovelsCount" <= 1
+          ORDER BY
+            coalesce(base."publishedAt", base."updatedAt") DESC,
+            base.id DESC
+          LIMIT 3
+        ) ordered
+      ) ranked
+    ) collection_previews
+    ORDER BY "collectionId" ASC, "rowNumber" ASC
+  `),
+  ])
+
+  const snapshot = createEmptyDiscoverCollectionSnapshot()
+
+  for (const row of countRows) {
+    snapshot[row.collectionId].total = row.totalCount
+  }
+
+  for (const row of previewRows) {
+    snapshot[row.collectionId].novels.push(
+      mapLibraryCollectionNovelRow({
+        id: row.id,
+        slug: row.slug,
+        title: row.title,
+        summary: row.summary ?? "",
+        genre: row.genre,
+        workType: row.workType,
+        status: row.status,
+        visibility: row.visibility,
+        coverUrl: row.coverUrl ?? "",
+        coverStorageKey: row.coverStorageKey ?? null,
+        chaptersCount: row.chaptersCount,
+        rating: row.rating,
+        ratingsCount: row.ratingsCount,
+        publishedAt: row.publishedAt ?? null,
+        updatedAt: row.updatedAt,
+        authorDisplayName: row.authorDisplayName ?? null,
+        authorId: row.authorId,
+        authorPubkey: row.authorPubkey,
+        authorName: row.authorName ?? null,
+        authorHandle: row.authorHandle ?? null,
+        authorAvatarUrl: row.authorAvatarUrl ?? null,
+        readsCount: row.readsCount,
+        bookmarksCount: row.bookmarksCount,
+      })
+    )
+  }
+
+  return snapshot
 }
 
 export async function listLibraryCollectionNovels(

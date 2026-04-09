@@ -5,6 +5,8 @@ import { FeaturesSection } from "@/components/features-section"
 import { FeaturedStoriesSection } from "@/components/featured-stories-section"
 import { CtaSection } from "@/components/cta-section"
 
+export const revalidate = 3600
+
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">

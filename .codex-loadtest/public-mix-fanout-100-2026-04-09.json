@@ -1,0 +1,78 @@
+{
+  "generatedAt": "2026-04-09T10:13:14.227Z",
+  "baseUrl": "http://127.0.0.1:3000",
+  "routeMix": [
+    {
+      "route": "/",
+      "weight": 35
+    },
+    {
+      "route": "/discover",
+      "weight": 25
+    },
+    {
+      "route": "/api/v1/library",
+      "weight": 25
+    },
+    {
+      "route": "/api/v1/discover/search",
+      "weight": 15
+    }
+  ],
+  "runs": [
+    {
+      "concurrency": 100,
+      "durationSeconds": 15,
+      "totalRequests": 1436,
+      "totalErrors": 0,
+      "errorRate": 0,
+      "requestsPerSecond": 95.73333333333333,
+      "avgLatencyMs": 981.0326107242353,
+      "p50LatencyMs": 538.8827000000001,
+      "p95LatencyMs": 3067.6562000000004,
+      "p99LatencyMs": 3911.1646999999994,
+      "routeSummaries": [
+        {
+          "route": "/",
+          "requests": 526,
+          "errors": 0,
+          "errorRate": 0,
+          "avgLatencyMs": 465.4012233840307,
+          "p50LatencyMs": 362.34959999999955,
+          "p95LatencyMs": 1152.6975,
+          "p99LatencyMs": 1166.8683
+        },
+        {
+          "route": "/api/v1/discover/search",
+          "requests": 219,
+          "errors": 0,
+          "errorRate": 0,
+          "avgLatencyMs": 604.1886721461186,
+          "p50LatencyMs": 440.83969999999954,
+          "p95LatencyMs": 1221.4506000000001,
+          "p99LatencyMs": 2729.0276
+        },
+        {
+          "route": "/api/v1/library",
+          "requests": 333,
+          "errors": 0,
+          "errorRate": 0,
+          "avgLatencyMs": 561.4285867867861,
+          "p50LatencyMs": 416.1983,
+          "p95LatencyMs": 1218.4325000000001,
+          "p99LatencyMs": 2049.2516
+        },
+        {
+          "route": "/discover",
+          "requests": 358,
+          "errors": 0,
+          "errorRate": 0,
+          "avgLatencyMs": 2359.465773463687,
+          "p50LatencyMs": 2157.6903,
+          "p95LatencyMs": 3812.4303,
+          "p99LatencyMs": 4347.3558
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+$ bun --bun turbo start --filter=@mist/web --filter=@mist/api --filter=@mist/worker
+• turbo 2.8.19
+error: script "start" exited with code 255

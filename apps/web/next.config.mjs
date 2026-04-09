@@ -49,6 +49,19 @@ const apiOrigin = resolveApiOrigin()
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   allowedDevOrigins: collectAllowedDevOrigins(),
+  async headers() {
+    return [
+      {
+        source: "/",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
+          },
+        ],
+      },
+    ]
+  },
   async rewrites() {
     return [
       {

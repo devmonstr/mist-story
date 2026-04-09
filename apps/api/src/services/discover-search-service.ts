@@ -1,8 +1,6 @@
 import {
-  countLibraryCollectionNovels,
   hexToNpub,
-  listLibraryCollectionNovels,
-  listDiscoverGenres,
+  listDiscoverCollectionsSnapshot,
   listLibraryCatalogFacetCounts,
   normalizeCatalogPagination,
   searchAuthorsWithCursor,
@@ -87,7 +85,18 @@ function buildLibraryHref(input: {
 }
 
 function serializeCollectionPreviewNovels(
-  novels: Awaited<ReturnType<typeof listLibraryCollectionNovels>>
+  novels: Array<{
+    id: string
+    slug: string
+    title: string
+    coverUrl: string
+    coverStorageKey: string | null
+    genre: string
+    author: {
+      displayName: string | null
+      handle: string | null
+    }
+  }>
 ) {
   return novels.slice(0, 3).map((novel) => ({
     id: novel.id,
@@ -173,23 +182,12 @@ async function getDiscoverDataUncached(input: {
     scope: "all",
   })
 
-  const [genres, facetCounts, trending, hiddenGems, editorsPicks, newVoices] = await Promise.all([
-    listDiscoverGenres(filters),
+  const [facetCounts, collectionsSnapshot] = await Promise.all([
     listLibraryCatalogFacetCounts(filters),
-    listLibraryCollectionNovels("trending", filters, { page: 1, pageSize: 3 }),
-    listLibraryCollectionNovels("hidden-gems", filters, { page: 1, pageSize: 3 }),
-    listLibraryCollectionNovels("editors-picks", filters, { page: 1, pageSize: 3 }),
-    listLibraryCollectionNovels("new-voices", filters, { page: 1, pageSize: 3 }),
+    listDiscoverCollectionsSnapshot(filters),
   ])
 
-  const [trendingCount, hiddenGemsCount, editorsPicksCount, newVoicesCount] = await Promise.all([
-    countLibraryCollectionNovels("trending", filters),
-    countLibraryCollectionNovels("hidden-gems", filters),
-    countLibraryCollectionNovels("editors-picks", filters),
-    countLibraryCollectionNovels("new-voices", filters),
-  ])
-
-  const discoverGenres: DiscoverGenreDto[] = genres.map((genre) => ({
+  const discoverGenres: DiscoverGenreDto[] = facetCounts.genres.slice(0, 6).map((genre) => ({
     id: genre.genre.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
     title: genre.genre,
     description: buildGenreDescription(genre.genre),
@@ -208,7 +206,7 @@ async function getDiscoverDataUncached(input: {
       id: "trending",
       title: "Trending This Week",
       description: "The most-read stories gaining popularity right now.",
-      storyCount: trendingCount,
+      storyCount: collectionsSnapshot.trending.total,
       curator: "Mist Story Editors",
       href: buildLibraryHref({
         query: input.query,
@@ -217,13 +215,13 @@ async function getDiscoverDataUncached(input: {
         status: input.status,
         collection: "trending",
       }),
-      previewNovels: serializeCollectionPreviewNovels(trending),
+      previewNovels: serializeCollectionPreviewNovels(collectionsSnapshot.trending.novels),
     },
     {
       id: "hidden-gems",
       title: "Hidden Gems",
       description: "Underrated stories that deserve more attention.",
-      storyCount: hiddenGemsCount,
+      storyCount: collectionsSnapshot["hidden-gems"].total,
       curator: "Community",
       href: buildLibraryHref({
         query: input.query,
@@ -232,13 +230,13 @@ async function getDiscoverDataUncached(input: {
         status: input.status,
         collection: "hidden-gems",
       }),
-      previewNovels: serializeCollectionPreviewNovels(hiddenGems),
+      previewNovels: serializeCollectionPreviewNovels(collectionsSnapshot["hidden-gems"].novels),
     },
     {
       id: "editors-picks",
       title: "Editor's Picks",
       description: "Our favorite stories showcasing exceptional writing.",
-      storyCount: editorsPicksCount,
+      storyCount: collectionsSnapshot["editors-picks"].total,
       curator: "Mist Story Team",
       href: buildLibraryHref({
         query: input.query,
@@ -247,13 +245,13 @@ async function getDiscoverDataUncached(input: {
         status: input.status,
         collection: "editors-picks",
       }),
-      previewNovels: serializeCollectionPreviewNovels(editorsPicks),
+      previewNovels: serializeCollectionPreviewNovels(collectionsSnapshot["editors-picks"].novels),
     },
     {
       id: "new-voices",
       title: "New Voices",
       description: "First stories from fresh and exciting writers.",
-      storyCount: newVoicesCount,
+      storyCount: collectionsSnapshot["new-voices"].total,
       curator: "Community",
       href: buildLibraryHref({
         query: input.query,
@@ -262,7 +260,7 @@ async function getDiscoverDataUncached(input: {
         status: input.status,
         collection: "new-voices",
       }),
-      previewNovels: serializeCollectionPreviewNovels(newVoices),
+      previewNovels: serializeCollectionPreviewNovels(collectionsSnapshot["new-voices"].novels),
     },
   ]
 

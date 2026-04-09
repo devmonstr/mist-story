@@ -1,5 +1,6 @@
 "use client"
 
+import { usePathname } from "next/navigation"
 import {
   createContext,
   useCallback,
@@ -26,6 +27,7 @@ import {
   toNostrUser,
   verifyAuthChallenge,
 } from "@/lib/api"
+import { SESSION_PRESENCE_COOKIE_NAME } from "@/lib/auth-routes"
 
 interface AuthContextType {
   user: NostrUser | null
@@ -42,11 +44,22 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+function hasSessionPresenceCookie() {
+  if (typeof document === "undefined") {
+    return false
+  }
+
+  const cookieName = `${SESSION_PRESENCE_COOKIE_NAME}=`
+  return document.cookie.split(";").some((entry) => entry.trim().startsWith(cookieName))
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
   const [user, setUser] = useState<NostrUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isExtensionAvailable, setIsExtensionAvailable] = useState(false)
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
+  const hasRestoredSessionRef = useRef(false)
   const sessionSyncRequestIdRef = useRef(0)
   const unreadNotificationRequestIdRef = useRef(0)
   const activeUserPubkeyRef = useRef<string | null>(null)
@@ -67,7 +80,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    if (hasRestoredSessionRef.current) {
+      return
+    }
+
     const restoreSession = async () => {
+      if (pathname === "/" && !hasSessionPresenceCookie()) {
+        setIsLoading(false)
+        return
+      }
+
+      hasRestoredSessionRef.current = true
       const requestId = ++sessionSyncRequestIdRef.current
 
       try {
@@ -91,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     void restoreSession()
-  }, [])
+  }, [pathname])
 
   const refreshUnreadNotifications = useCallback(async () => {
     const accountPubkey = activeUserPubkeyRef.current

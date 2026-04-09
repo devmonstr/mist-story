@@ -1,0 +1,2 @@
+$ bun run --filter @mist/worker start
+error: script "start:worker" exited with code 255

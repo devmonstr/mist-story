@@ -7,7 +7,10 @@ import {
   notificationSettingsSchema,
   updateRelayInputSchema,
 } from "@mist/shared"
-import { SESSION_COOKIE_NAME } from "../config/constants"
+import {
+  SESSION_COOKIE_NAME,
+  SESSION_PRESENCE_COOKIE_NAME,
+} from "../config/constants"
 import { requireAuth } from "../middleware/require-auth"
 import { requireRecentAuth } from "../middleware/require-recent-auth"
 import { validateBody } from "../middleware/validate"
@@ -135,6 +138,12 @@ settingsRouter.delete(
         secure: process.env.NODE_ENV === "production",
         path: "/",
       })
+      response.clearCookie(SESSION_PRESENCE_COOKIE_NAME, {
+        httpOnly: false,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+      })
       return response.status(204).send()
     } catch (error) {
       return next(error)
@@ -150,6 +159,12 @@ settingsRouter.delete(
       await revokeAllSecuritySessions(response.locals.user.id as string)
       response.clearCookie(SESSION_COOKIE_NAME, {
         httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+      })
+      response.clearCookie(SESSION_PRESENCE_COOKIE_NAME, {
+        httpOnly: false,
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
         path: "/",
