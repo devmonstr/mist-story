@@ -35,7 +35,7 @@ Codex subagents are better when the lead only needs distilled results back from 
 
 ## Repo Fit
 
-Mist Story is a `pnpm` monorepo with these working areas:
+Mist Story is a Bun monorepo with these working areas:
 
 | Area | Purpose | Typical change pressure |
 | --- | --- | --- |

@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "dotenv -e ../../.env.local -- tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json --noEmit",
-    "start": "dotenv -e ../../.env.local -- tsx src/server.ts",
-    "lint": "eslint src --ext .ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "dev": "bun --env-file=../../.env.local --watch src/server.ts",
+    "build": "bun --bun tsc -p tsconfig.json --noEmit",
+    "start": "bun --env-file=../../.env.local src/server.ts",
+    "lint": "bun --bun eslint src --ext .ts",
+    "typecheck": "bun --bun tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.899.0",

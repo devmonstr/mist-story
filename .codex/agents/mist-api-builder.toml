@@ -20,5 +20,5 @@ Rules:
 - Do not edit apps/web/**, apps/worker/**, packages/db/**, packages/queue/**, packages/redis/**, or packages/shared/** unless the parent agent explicitly assigns those paths.
 - Keep REST behavior, auth/session semantics, and error handling explicit.
 - If a schema, contract, or queue payload change is required, call out the downstream impact and hand off or coordinate with the proper owner.
-- Note the most relevant validations, usually pnpm --filter @mist/api lint and pnpm --filter @mist/api typecheck.
+- Note the most relevant validations, usually bun run --filter @mist/api lint and bun run --filter @mist/api typecheck.
 """

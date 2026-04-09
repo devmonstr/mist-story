@@ -12,10 +12,10 @@ Recommended options:
 
 - Windows-first workflow:
   - keep the repo on `D:\...`
-  - use Git, Node.js, and `pnpm` from PowerShell or Windows Terminal
+  - use Git, Bun, and `bun` commands from PowerShell or Windows Terminal
 - WSL-first workflow:
   - keep the repo under your WSL home directory, for example `~/projects/mist-story`
-  - use Git, Node.js, and `pnpm` from WSL only
+  - use Git, Bun, and `bun` commands from WSL only
 
 Avoid mixing Windows Git and WSL Git against the same working copy when possible. That is the most common cause of noisy `git status` metadata changes.
 
@@ -33,7 +33,7 @@ If your editor has its own line-ending setting, prefer `LF`.
 Use:
 
 ```bash
-pnpm install
+bun install
 ```
 
 If you hit a Prisma error like:
@@ -44,24 +44,29 @@ EPERM: operation not permitted, unlink ... query_engine-windows.dll.node
 
 do this:
 
-1. Stop `pnpm dev`
+1. Stop `bun run dev`
 2. Stop Prisma Studio if it is running
-3. Stop any extra Node.js processes that still hold Prisma engine files
-4. Run `pnpm install` again
+3. Stop any extra Node.js or Bun processes that still hold Prisma engine files
+4. Run `bun install` again
+
+If Bun postinstall warns that Prisma could not replace `query_engine-windows.dll.node`, the install can still finish. In that case:
+
+1. Stop any running app, worker, or Prisma Studio processes
+2. Run `bun run db:generate`
 
 ## Dev Workflow
 
 Suggested order:
 
 ```bash
-pnpm infra:up
-pnpm install
-pnpm dev
+bun run infra:up
+bun install
+bun run dev
 ```
 
 Before switching environments or reinstalling packages:
 
-1. Stop `pnpm dev`
+1. Stop `bun run dev`
 2. Stop Prisma Studio
 3. Run your next commands from the same environment you plan to keep using
 

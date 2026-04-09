@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "dotenv -e ../../.env.local -- next dev",
-    "build": "dotenv -e ../../.env.local -- next build",
-    "start": "dotenv -e ../../.env.local -- next start",
-    "lint": "eslint .",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "dev": "bun --env-file=../../.env.local --bun next dev",
+    "build": "bun --env-file=../../.env.local --bun next build",
+    "start": "bun --env-file=../../.env.local --bun next start",
+    "lint": "bun --bun eslint .",
+    "typecheck": "bun --bun tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

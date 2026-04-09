@@ -2,7 +2,7 @@
 
 ## Overview
 
-Mist Story is a `pnpm` monorepo for a writing and reading platform with a separated frontend, API, worker, and shared packages.
+Mist Story is a Bun monorepo for a writing and reading platform with a separated frontend, API, worker, and shared packages.
 
 ## Tech Stack
 
@@ -14,7 +14,7 @@ Mist Story is a `pnpm` monorepo for a writing and reading platform with a separa
 | Database | PostgreSQL + Prisma |
 | Cache / Queue backend | Redis |
 | Validation | Zod |
-| Tooling | pnpm workspaces, Turborepo, ESLint |
+| Tooling | Bun workspaces, Turborepo, ESLint |
 
 ## Repository Structure
 
@@ -34,13 +34,13 @@ packages/
 ## Commands
 
 ```bash
-pnpm dev
-pnpm build
-pnpm lint
-pnpm typecheck
-pnpm db:generate
-pnpm db:migrate
-pnpm db:studio
+bun run dev
+bun run build
+bun run lint
+bun run typecheck
+bun run db:generate
+bun run db:migrate
+bun run db:studio
 docker compose up -d
 ```
 

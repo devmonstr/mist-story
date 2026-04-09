@@ -20,7 +20,7 @@ Mist Story is a full-stack novel reading/writing platform built with Nostr authe
 | **Storage** | Cloudflare R2 (via AWS SDK S3) |
 | **Auth** | Nostr (nsec/npub keys, schnorr signatures) |
 | **Payments** | Bitcoin Lightning (SATS) |
-| **Package Manager** | pnpm 10 with Turborepo |
+| **Package Manager** | Bun 1.3 with Turborepo |
 
 ---
 
@@ -279,25 +279,25 @@ services:
 
 ```bash
 # Development
-pnpm dev                      # Start all apps (web, api, worker)
-pnpm dev:web                  # Frontend only
-pnpm dev:api                  # Backend API only
-pnpm dev:worker               # Worker only
+bun run dev                   # Start all apps (web, api, worker)
+bun run dev:web               # Frontend only
+bun run dev:api               # Backend API only
+bun run dev:worker            # Worker only
 
 # Database
-pnpm db:generate              # Generate Prisma client
-pnpm db:migrate               # Run migrations
-pnpm db:studio                # Open Prisma Studio
-pnpm db:seed:sample-catalog   # Seed sample data
+bun run db:generate           # Generate Prisma client
+bun run db:migrate            # Run migrations
+bun run db:studio             # Open Prisma Studio
+bun run db:seed:sample-catalog # Seed sample data
 
 # Infrastructure
-pnpm infra:up                 # Start Postgres + Redis
-pnpm infra:down               # Stop containers
+bun run infra:up              # Start Postgres + Redis
+bun run infra:down            # Stop containers
 
 # Build
-pnpm build                    # Build all packages
-pnpm lint                     # Lint all packages
-pnpm typecheck                # Type check all packages
+bun run build                 # Build all packages
+bun run lint                  # Lint all packages
+bun run typecheck             # Type check all packages
 ```
 
 ---

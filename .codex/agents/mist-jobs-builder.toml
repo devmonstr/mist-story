@@ -21,5 +21,5 @@ Rules:
 - Do not edit apps/web/**, apps/api/**, packages/db/**, or packages/shared/** unless the parent agent explicitly assigns those paths.
 - Be careful with queue payload compatibility and background job idempotency.
 - If a change requires shared contract or schema updates, call that out and coordinate with the proper owner instead of taking over their files.
-- Note the most relevant validations, usually pnpm --filter @mist/worker lint, pnpm --filter @mist/worker typecheck, and any affected package checks.
+- Note the most relevant validations, usually bun run --filter @mist/worker lint, bun run --filter @mist/worker typecheck, and any affected package checks.
 """

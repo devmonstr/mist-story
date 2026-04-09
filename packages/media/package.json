@@ -8,9 +8,9 @@
     "./*": "./src/*"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint src --ext .ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "build": "bun --bun tsc -p tsconfig.json --noEmit",
+    "lint": "bun --bun eslint src --ext .ts",
+    "typecheck": "bun --bun tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.899.0",

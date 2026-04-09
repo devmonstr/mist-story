@@ -17,13 +17,13 @@ This file provides guidance to Claude Code and similar coding assistants when wo
 ## Commands
 
 ```bash
-pnpm dev
-pnpm build
-pnpm lint
-pnpm typecheck
-pnpm db:generate
-pnpm db:migrate
-pnpm db:studio
+bun run dev
+bun run build
+bun run lint
+bun run typecheck
+bun run db:generate
+bun run db:migrate
+bun run db:studio
 docker compose up -d
 ```
 
@@ -54,7 +54,7 @@ packages/
 
 ## Important Files
 
-- `pnpm-workspace.yaml` - workspace definition
+- `package.json` - workspace definition via the `workspaces` field
 - `turbo.json` - task orchestration
 - `tsconfig.base.json` - shared TypeScript settings
 - `docker-compose.yml` - local Postgres and Redis
@@ -62,7 +62,7 @@ packages/
 
 ## Conventions
 
-- Prefer `pnpm` over `npm`
+- Prefer `bun` over `npm`
 - Keep shared contracts in `packages/shared`
 - Keep reusable storage and image-processing logic in `packages/media`
 - Do not access Prisma directly from `apps/web`

@@ -1,6 +1,6 @@
 # Mist Story Monorepo
 
-This repository is a `pnpm` monorepo with:
+This repository is a Bun monorepo with:
 
 - `apps/web`: Next.js frontend
 - `apps/api`: Express API
@@ -19,20 +19,20 @@ This repository is a `pnpm` monorepo with:
 4. Run the workspace
 
 ```bash
-pnpm infra:up
-pnpm install
-pnpm dev
+bun run infra:up
+bun install
+bun run dev
 ```
 
 Useful commands:
 
 ```bash
-pnpm build
-pnpm lint
-pnpm typecheck
-pnpm db:generate
-pnpm db:migrate
-pnpm db:studio
+bun run build
+bun run lint
+bun run typecheck
+bun run db:generate
+bun run db:migrate
+bun run db:studio
 ```
 
 ### Cloudflare R2 Cover Uploads
@@ -54,7 +54,9 @@ R2_PUBLIC_BASE_URL=""
 - If you access the Next.js dev server from another device on your LAN, set `ALLOWED_DEV_ORIGINS` in `.env.local` to a comma-separated list of extra hostnames or IPs that should be allowed during development.
 - The repository expects `LF` line endings for source files. `.gitattributes` and `.editorconfig` are included to keep Git and editors aligned.
 - On Windows/WSL setups, prefer using one Git environment consistently for the same working copy to avoid noisy `git status` metadata changes.
-- If `pnpm install` fails with a Prisma `EPERM` error on `query_engine-windows.dll.node`, stop any running `pnpm dev`, Prisma Studio, or Node processes that may still be locking the engine file, then run `pnpm install` again.
+- `bun install` runs a postinstall Prisma generate step automatically so the client is ready before `bun run dev`.
+- On Windows, if postinstall warns that the Prisma query engine is locked, stop dev servers or Prisma Studio and run `bun run db:generate` once manually.
+- If `bun install` fails with a Prisma `EPERM` error on `query_engine-windows.dll.node`, stop any running `bun run dev`, Prisma Studio, or Node/Bun processes that may still be locking the engine file, then run `bun install` again.
 - See [`docs/windows-wsl-workflow.md`](docs/windows-wsl-workflow.md) for the recommended Windows/WSL workflow.
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.

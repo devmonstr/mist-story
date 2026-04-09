@@ -8,14 +8,14 @@
     "./*": "./src/*"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint src --ext .ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "db:generate": "prisma generate --schema ./prisma/schema.prisma",
-    "db:migrate": "prisma migrate dev --schema ./prisma/schema.prisma",
-    "db:studio": "prisma studio --schema ./prisma/schema.prisma",
-    "db:prepare-catalog-search": "tsx ./src/scripts/prepare-catalog-search.ts",
-    "db:seed:sample-catalog": "tsx ./src/scripts/seed-sample-catalog.ts"
+    "build": "bun --bun tsc -p tsconfig.json --noEmit",
+    "lint": "bun --bun eslint src --ext .ts",
+    "typecheck": "bun --bun tsc -p tsconfig.json --noEmit",
+    "db:generate": "bun --bun prisma generate --schema ./prisma/schema.prisma",
+    "db:migrate": "bun --env-file=../../.env.local --bun prisma migrate dev --schema ./prisma/schema.prisma",
+    "db:studio": "bun --env-file=../../.env.local --bun prisma studio --schema ./prisma/schema.prisma",
+    "db:prepare-catalog-search": "bun --env-file=../../.env.local ./src/scripts/prepare-catalog-search.ts",
+    "db:seed:sample-catalog": "bun --env-file=../../.env.local ./src/scripts/seed-sample-catalog.ts"
   },
   "dependencies": {
     "@mist/shared": "workspace:*",
