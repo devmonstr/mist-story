@@ -22,6 +22,7 @@ import { invalidatePublicCacheScopes } from "./public-cache-service"
 import { notifyFollowersAboutPublishedNovel } from "./profile-service"
 
 const redis = createRedisClient(env.REDIS_URL)
+const NOVEL_SIDE_EFFECT_TIMEOUT_MS = 5_000
 
 function resolveNovelStatus(
   status: CreateNovelInput["status"] | UpdateNovelInput["status"],
@@ -36,6 +37,34 @@ function resolveNovelStatus(
   }
 
   return status ?? "Ongoing"
+}
+
+function runNovelSideEffect(label: string, task: () => Promise<unknown>) {
+  try {
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    void Promise.race([
+      task(),
+      new Promise((_, reject) => {
+        timeout = setTimeout(
+          () =>
+            reject(
+              new Error(`${label} timed out after ${NOVEL_SIDE_EFFECT_TIMEOUT_MS}ms`)
+            ),
+          NOVEL_SIDE_EFFECT_TIMEOUT_MS
+        )
+      }),
+    ])
+      .catch((error) => {
+        console.error(`[novel-service] ${label} failed`, error)
+      })
+      .finally(() => {
+        if (timeout) {
+          clearTimeout(timeout)
+        }
+      })
+  } catch (error) {
+    console.error(`[novel-service] ${label} failed`, error)
+  }
 }
 
 export async function listNovels(currentUserId?: string) {
@@ -152,19 +181,25 @@ export async function createNovel(userId: string, input: CreateNovelInput) {
   })
 
   if (created.visibility === "PUBLISHED") {
-    await notifyFollowersAboutPublishedNovel({
-      authorId: created.authorId,
-      novelId: created.id,
-      novelTitle: created.title,
-    })
+    runNovelSideEffect("notify followers about published novel", () =>
+      notifyFollowersAboutPublishedNovel({
+        authorId: created.authorId,
+        novelId: created.id,
+        novelTitle: created.title,
+      })
+    )
   }
 
-  await enqueuePublicCatalogMetricsRefresh(redis, {
-    scope: "author",
-    authorId: created.authorId,
-    reason: "novel-created",
-  })
-  await invalidatePublicCacheScopes("discover", "library", "search")
+  runNovelSideEffect("enqueue author catalog metrics refresh", () =>
+    enqueuePublicCatalogMetricsRefresh(redis, {
+      scope: "author",
+      authorId: created.authorId,
+      reason: "novel-created",
+    })
+  )
+  runNovelSideEffect("invalidate public catalog cache", () =>
+    invalidatePublicCacheScopes("discover", "library", "search")
+  )
 
   return serializeNovel(created)
 }
@@ -254,19 +289,25 @@ export async function updateNovel(
   })
 
   if (shouldNotifyFollowers) {
-    await notifyFollowersAboutPublishedNovel({
-      authorId: updated.authorId,
-      novelId: updated.id,
-      novelTitle: updated.title,
-    })
+    runNovelSideEffect("notify followers about published novel", () =>
+      notifyFollowersAboutPublishedNovel({
+        authorId: updated.authorId,
+        novelId: updated.id,
+        novelTitle: updated.title,
+      })
+    )
   }
 
-  await enqueuePublicCatalogMetricsRefresh(redis, {
-    scope: "author",
-    authorId: updated.authorId,
-    reason: "novel-updated",
-  })
-  await invalidatePublicCacheScopes("discover", "library", "search")
+  runNovelSideEffect("enqueue author catalog metrics refresh", () =>
+    enqueuePublicCatalogMetricsRefresh(redis, {
+      scope: "author",
+      authorId: updated.authorId,
+      reason: "novel-updated",
+    })
+  )
+  runNovelSideEffect("invalidate public catalog cache", () =>
+    invalidatePublicCacheScopes("discover", "library", "search")
+  )
 
   return serializeNovel(updated)
 }

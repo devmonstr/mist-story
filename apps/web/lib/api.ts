@@ -124,6 +124,8 @@ export class ApiError extends Error {
   }
 }
 
+const API_REQUEST_TIMEOUT_MS = 30_000
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers)
   if (init?.body && !headers.has("Content-Type")) {
@@ -131,6 +133,8 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   let response: Response
+  const abortController = new AbortController()
+  const timeout = setTimeout(() => abortController.abort(), API_REQUEST_TIMEOUT_MS)
 
   try {
     response = await fetch(`${getApiBaseUrl()}${path}`, {
@@ -138,13 +142,20 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
       cache: init?.cache ?? "no-store",
       credentials: "include",
       headers,
+      signal: abortController.signal,
     })
   } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("The API request timed out. Please try again.")
+    }
+
     throw new Error(
       error instanceof Error && error.message
         ? `Unable to reach the API: ${error.message}`
         : "Unable to reach the API."
     )
+  } finally {
+    clearTimeout(timeout)
   }
 
   if (!response.ok) {

@@ -12,6 +12,7 @@ import { HttpError } from "../utils/http-error"
 
 const MAX_COVER_FILE_SIZE_BYTES = 5 * 1024 * 1024
 const ALLOWED_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
+const COVER_UPLOAD_TIMEOUT_MS = 15_000
 
 let r2Client: S3Client | null = null
 
@@ -136,6 +137,10 @@ function normalizeUpload(input: CreateNovelInput | UpdateNovelInput) {
   }
 }
 
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError"
+}
+
 export async function uploadNovelCoverAsset(input: {
   userId: string
   novelId?: string
@@ -152,16 +157,29 @@ export async function uploadNovelCoverAsset(input: {
     upload.fileName,
     upload.mimeType
   )}`
+  const abortController = new AbortController()
+  const timeout = setTimeout(() => abortController.abort(), COVER_UPLOAD_TIMEOUT_MS)
 
-  await client.send(
-    new PutObjectCommand({
-      Bucket: bucketName,
-      Key: key,
-      Body: upload.buffer,
-      ContentType: upload.mimeType,
-      CacheControl: "public, max-age=31536000, immutable",
-    })
-  )
+  try {
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+        Body: upload.buffer,
+        ContentType: upload.mimeType,
+        CacheControl: "public, max-age=31536000, immutable",
+      }),
+      { abortSignal: abortController.signal }
+    )
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new HttpError(504, "Cover upload timed out. Please try again.")
+    }
+
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
 
   return {
     coverUrl: `${publicBaseUrl}/${key}`,
