@@ -63,6 +63,10 @@ export function createPublicCatalogMetricsRefreshQueue(connection: unknown) {
   })
 }
 
+function toBullMqSafeJobId(value: string) {
+  return value.replaceAll(":", "-")
+}
+
 export async function enqueueChapterPublish(
   connection: unknown,
   payload: ChapterPublishJobPayload
@@ -108,9 +112,9 @@ export async function enqueuePublicCatalogMetricsRefresh(
   const queue = createPublicCatalogMetricsRefreshQueue(connection)
   const jobId =
     payload.scope === "novel" && payload.novelId
-      ? `novel:${payload.novelId}`
+      ? toBullMqSafeJobId(`novel-${payload.novelId}`)
       : payload.scope === "author" && payload.authorId
-        ? `author:${payload.authorId}`
+        ? toBullMqSafeJobId(`author-${payload.authorId}`)
         : "all"
 
   return queue.add(queueNames.publicCatalogMetricsRefresh, payload, {
