@@ -16,6 +16,7 @@ node_modules/
 .next/
 .turbo/
 .crush/
+.codex-loadtest/
 *.tsbuildinfo
 **/.next/
 .DS_Store

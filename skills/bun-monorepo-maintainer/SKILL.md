@@ -1,11 +1,11 @@
 ---
 name: bun-monorepo-maintainer
-description: Maintain Bun-first monorepos with workspace scripts, Bun runtime execution, Prisma client generation, and repo-wide command/docs consistency. Use when migrating Mist Story or a similar repo from pnpm/npm to Bun, fixing Bun startup issues such as missing Prisma client generation, standardizing `bun run --filter` workflows, or updating docs and agent instructions to match a Bun-based setup.
+description: Maintain Bun-first monorepos with workspace scripts, Bun runtime execution, Prisma client generation, and repo-wide command/docs consistency. Use when migrating Myth Story or a similar repo from pnpm/npm to Bun, fixing Bun startup issues such as missing Prisma client generation, standardizing `bun run --filter` workflows, or updating docs and agent instructions to match a Bun-based setup.
 ---
 
 # Bun Monorepo Maintainer
 
-Use this skill to keep Mist Story's tooling truly Bun-first instead of leaving half-migrated pnpm or tsx remnants behind.
+Use this skill to keep Myth Story's tooling truly Bun-first instead of leaving half-migrated pnpm or tsx remnants behind.
 
 ## Workflow
 
@@ -36,7 +36,7 @@ Targeted `bun run --filter <workspace> <script>` checks for the packages touched
 
 ## Repo Notes
 
-- Mist Story keeps workspaces in the root `package.json`; do not recreate `pnpm-workspace.yaml`.
+- Myth Story keeps workspaces in the root `package.json`; do not recreate `pnpm-workspace.yaml`.
 - Treat `bun.lock` as the source of truth after dependency changes.
 - If Windows Prisma install errors mention `query_engine-windows.dll.node`, stop running dev servers or Prisma tooling before retrying `bun install`.
 

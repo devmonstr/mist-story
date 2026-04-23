@@ -4,7 +4,7 @@ This file provides guidance to Claude Code and similar coding assistants when wo
 
 ## Project Overview
 
-**Mist Story** is a monorepo for a novel platform with:
+**Myth Story** is a monorepo for a novel platform with:
 - `apps/web` - Next.js 16 frontend
 - `apps/api` - Express.js API
 - `apps/worker` - BullMQ worker

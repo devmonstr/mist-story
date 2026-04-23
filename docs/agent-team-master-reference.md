@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-03-26
 
-This guide turns the current Claude Code agent-team guidance and OpenAI Codex subagent guidance into a project-specific operating model for `mist-story`.
+This guide turns the current Claude Code agent-team guidance and OpenAI Codex subagent guidance into a project-specific operating model for `myth_story`.
 
 ## Sources
 
@@ -35,7 +35,7 @@ Codex subagents are better when the lead only needs distilled results back from 
 
 ## Repo Fit
 
-Mist Story is a Bun monorepo with these working areas:
+Myth Story is a Bun monorepo with these working areas:
 
 | Area | Purpose | Typical change pressure |
 | --- | --- | --- |

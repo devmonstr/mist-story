@@ -13,7 +13,7 @@ const guides = [
   {
     icon: PenTool,
     title: "Getting Started with Writing",
-    description: "Learn the basics of publishing your first novel on Mist Story.",
+    description: "Learn the basics of publishing your first novel on Myth Story.",
   },
   {
     icon: BookOpen,

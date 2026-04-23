@@ -14,7 +14,7 @@ Recommended options:
   - keep the repo on `D:\...`
   - use Git, Bun, and `bun` commands from PowerShell or Windows Terminal
 - WSL-first workflow:
-  - keep the repo under your WSL home directory, for example `~/projects/mist-story`
+  - keep the repo under your WSL home directory, for example `~/projects/myth_story`
   - use Git, Bun, and `bun` commands from WSL only
 
 Avoid mixing Windows Git and WSL Git against the same working copy when possible. That is the most common cause of noisy `git status` metadata changes.

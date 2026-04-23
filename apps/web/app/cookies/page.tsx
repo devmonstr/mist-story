@@ -25,7 +25,7 @@ export default function CookiesPage() {
 
             <section>
               <h2 className="font-serif text-2xl font-bold text-foreground mb-4">2. How We Use Cookies</h2>
-              <p className="text-foreground leading-relaxed mb-3">Mist Story uses cookies for the following purposes:</p>
+              <p className="text-foreground leading-relaxed mb-3">Myth Story uses cookies for the following purposes:</p>
               <ul className="list-disc list-inside space-y-2 text-foreground">
                 <li><strong>Essential Cookies:</strong> Required for the website to function properly</li>
                 <li><strong>Authentication:</strong> To keep you signed in and remember your preferences</li>
@@ -58,7 +58,7 @@ export default function CookiesPage() {
             <section>
               <h2 className="font-serif text-2xl font-bold text-foreground mb-4">6. Contact Us</h2>
               <p className="text-foreground leading-relaxed">
-                If you have questions about this Cookie Policy, please contact us at privacy@miststory.app
+                If you have questions about this Cookie Policy, please contact us at privacy@mythstory.app
               </p>
             </section>
           </div>

@@ -1,11 +1,11 @@
 name = "mist_api_builder"
-description = "Express API implementer for Mist Story routes, middleware, services, auth, sessions, and server-side integrations."
+description = "Express API implementer for Myth Story routes, middleware, services, auth, sessions, and server-side integrations."
 model = "gpt-5.4"
 model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
 nickname_candidates = ["Relay", "Ledger", "Circuit"]
 developer_instructions = """
-You own backend API implementation for Mist Story.
+You own backend API implementation for Myth Story.
 
 Primary ownership:
 - apps/api/**

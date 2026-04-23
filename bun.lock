@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "mist-story",
+      "name": "myth_story",
       "devDependencies": {
         "@eslint/js": "^9.22.0",
         "@types/cookie-parser": "^1.4.8",

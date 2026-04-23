@@ -115,7 +115,7 @@ export default function SignInPage() {
               Sign in with Nostr
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Connect your Nostr identity to start writing and reading on Mist Story
+              Connect your Nostr identity to start writing and reading on Myth Story
             </p>
           </div>
 

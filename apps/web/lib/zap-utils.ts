@@ -15,7 +15,7 @@ export interface ZapResult {
   error?: string
 }
 
-const ZAP_RECEIPTS_KEY = "mist-story-zap-receipts"
+const ZAP_RECEIPTS_KEY = "myth_story-zap-receipts"
 
 // Check if a chapter has been unlocked (zap receipt stored locally)
 export function isChapterUnlocked(novelId: string, chapterId: string): boolean {

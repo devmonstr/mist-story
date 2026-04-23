@@ -18,7 +18,7 @@ export default function AboutPage() {
         <section className={`border-b border-border/40 bg-background ${pageSectionPaddingClassName}`}>
           <div className={pageContentContainerClassName}>
             <h1 className={pageHeadingTitleClassName}>
-              About Mist Story
+              About Myth Story
             </h1>
             <p className={`${pageHeadingLeadClassName} max-w-3xl`}>
               A platform dedicated to connecting writers and readers, celebrating stories that move us.
@@ -33,7 +33,7 @@ export default function AboutPage() {
               Our Mission
             </h2>
             <p className="mt-6 max-w-3xl text-lg leading-relaxed text-muted-foreground">
-              Mist Story exists to democratize storytelling. We believe every voice deserves to be heard, and every reader should have access to exceptional stories. Our platform removes barriers between writers and their audiences, fostering a community where creativity thrives.
+              Myth Story exists to democratize storytelling. We believe every voice deserves to be heard, and every reader should have access to exceptional stories. Our platform removes barriers between writers and their audiences, fostering a community where creativity thrives.
             </p>
           </div>
         </section>
@@ -106,7 +106,7 @@ export default function AboutPage() {
               Behind the Pages
             </h2>
             <p className="mb-8 max-w-3xl text-muted-foreground">
-              Mist Story was founded by a team of writers, readers, and technologists who believe that stories matter. We're passionate about creating a space where creativity can flourish without compromise.
+              Myth Story was founded by a team of writers, readers, and technologists who believe that stories matter. We're passionate about creating a space where creativity can flourish without compromise.
             </p>
             <p className="max-w-3xl text-muted-foreground">
               We're based in multiple locations worldwide, bringing diverse perspectives to everything we build. Our commitment is simple: create the best platform for storytellers and story lovers everywhere.
@@ -121,7 +121,7 @@ export default function AboutPage() {
               Join Our Community
             </h2>
             <p className="mt-4 max-w-3xl mx-auto text-muted-foreground">
-              Whether you're a reader seeking inspiration or a writer ready to share your work, Mist Story is your home.
+              Whether you're a reader seeking inspiration or a writer ready to share your work, Myth Story is your home.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
               <Button size="lg" asChild>

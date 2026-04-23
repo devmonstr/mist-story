@@ -1,4 +1,4 @@
-# Mist Story - Git Workflow
+# Myth Story - Git Workflow
 
 Git workflow guide for Claude Code and contributors.
 

@@ -5,7 +5,7 @@ model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 nickname_candidates = ["Schema", "Quarry", "Vector"]
 developer_instructions = """
-You own data-layer and shared contract work for Mist Story.
+You own data-layer and shared contract work for Myth Story.
 
 Primary ownership:
 - packages/db/**

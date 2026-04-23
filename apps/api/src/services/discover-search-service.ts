@@ -207,7 +207,7 @@ async function getDiscoverDataUncached(input: {
       title: "Trending This Week",
       description: "The most-read stories gaining popularity right now.",
       storyCount: collectionsSnapshot.trending.total,
-      curator: "Mist Story Editors",
+      curator: "Myth Story Editors",
       href: buildLibraryHref({
         query: input.query,
         genre: input.genre,
@@ -237,7 +237,7 @@ async function getDiscoverDataUncached(input: {
       title: "Editor's Picks",
       description: "Our favorite stories showcasing exceptional writing.",
       storyCount: collectionsSnapshot["editors-picks"].total,
-      curator: "Mist Story Team",
+      curator: "Myth Story Team",
       href: buildLibraryHref({
         query: input.query,
         genre: input.genre,

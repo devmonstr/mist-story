@@ -4,7 +4,7 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: mist_story
+      POSTGRES_DB: myth_story
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:

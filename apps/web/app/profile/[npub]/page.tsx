@@ -25,7 +25,7 @@ export async function generateMetadata({
       profile.displayName ?? profile.handle ?? truncateNpub(profile.npub, 10)
     const description =
       profile.about?.trim() ||
-      `${displayName} on Mist Story. ${data.stats.novels.toLocaleString()} novels, ${data.stats.followers.toLocaleString()} followers, ${data.stats.totalReads.toLocaleString()} total reads.`
+      `${displayName} on Myth Story. ${data.stats.novels.toLocaleString()} novels, ${data.stats.followers.toLocaleString()} followers, ${data.stats.totalReads.toLocaleString()} total reads.`
     const canonicalUrl = buildCanonicalUrl(`/profile/${profile.npub}`)
     const imageUrl = resolveMetadataImageUrl(profile.bannerUrl ?? profile.avatarUrl)
     const images = imageUrl ? [{ url: imageUrl, alt: displayName }] : undefined
@@ -39,13 +39,13 @@ export async function generateMetadata({
       openGraph: {
         type: "profile",
         url: canonicalUrl,
-        title: `${displayName} | Mist Story`,
+        title: `${displayName} | Myth Story`,
         description,
         images,
       },
       twitter: {
         card: imageUrl ? "summary_large_image" : "summary",
-        title: `${displayName} | Mist Story`,
+        title: `${displayName} | Myth Story`,
         description,
         images,
       },
@@ -53,7 +53,7 @@ export async function generateMetadata({
   } catch {
     return {
       title: "Profile",
-      description: "Read writer profiles and published novels on Mist Story.",
+      description: "Read writer profiles and published novels on Myth Story.",
     }
   }
 }

@@ -36,7 +36,7 @@ export function Footer() {
           <div className="col-span-2 md:col-span-4 lg:col-span-1">
             <Link href="/" className="inline-block">
               <span className="font-serif text-xl tracking-tight text-foreground">
-                Mist Story
+                Myth Story
               </span>
             </Link>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
@@ -117,7 +117,7 @@ export function Footer() {
 
         <div className="flex flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-left">
           <p className="text-sm text-muted-foreground">
-            {new Date().getFullYear()} Mist Story. All rights reserved.
+            {new Date().getFullYear()} Myth Story. All rights reserved.
           </p>
           <p className="text-sm text-muted-foreground">
             Made for storytellers, by storytellers.

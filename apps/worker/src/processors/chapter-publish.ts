@@ -88,7 +88,7 @@ export async function processChapterPublishJob(payload: ChapterPublishJobPayload
     const message = error instanceof Error ? error.message : "Publish failed"
     await upsertChapterVersionRelayPublish({
       chapterVersionId: payload.chapterVersionId,
-      relayUrl: "wss://relay.mist-story.local",
+      relayUrl: "wss://relay.myth_story.local",
       publishState: "FAILED",
       lastError: message,
     })

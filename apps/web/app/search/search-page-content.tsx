@@ -483,7 +483,7 @@ export function SearchPageContent() {
         <div className={pageContentContainerClassName}>
           <h1 className={pageHeadingTitleClassName}>Search Results</h1>
           <p className={pageHeadingLeadClassName}>
-            Search stories and writers across Mist Story.
+            Search stories and writers across Myth Story.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-2 sm:mt-8 sm:flex-row">

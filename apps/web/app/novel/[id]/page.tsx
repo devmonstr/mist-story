@@ -53,7 +53,7 @@ export async function generateMetadata({
   const { novel, author } = result.data
   const canonicalUrl = buildCanonicalUrl(`/novel/${novel.slug}`)
   const summary = novel.summary.trim()
-  const description = summary || `Read ${novel.title} by ${author.displayName} on Mist Story.`
+  const description = summary || `Read ${novel.title} by ${author.displayName} on Myth Story.`
   const coverImage = novel.coverStorageKey
     ? resolveMetadataImageUrl(`/api/v1/novels/${novel.id}/cover`)
     : resolveMetadataImageUrl(novel.coverUrl)

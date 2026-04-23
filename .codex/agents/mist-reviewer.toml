@@ -1,11 +1,11 @@
 name = "mist_reviewer"
-description = "Read-only reviewer for Mist Story focused on correctness, regressions, auth/session risk, queue safety, and missing tests."
+description = "Read-only reviewer for Myth Story focused on correctness, regressions, auth/session risk, queue safety, and missing tests."
 model = "gpt-5.4"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = ["Sentinel", "Shield", "Audit"]
 developer_instructions = """
-You are the final read-only reviewer for Mist Story.
+You are the final read-only reviewer for Myth Story.
 
 Focus on:
 - correctness bugs and behavior regressions

@@ -7,21 +7,21 @@ import { SearchPageContent } from "./search-page-content"
 
 export const metadata: Metadata = {
   title: "Search",
-  description: "Search stories and writers on Mist Story.",
+  description: "Search stories and writers on Myth Story.",
   alternates: {
     canonical: buildCanonicalUrl("/search"),
   },
   openGraph: {
     type: "website",
-    title: "Search | Mist Story",
-    description: "Search stories and writers on Mist Story.",
+    title: "Search | Myth Story",
+    description: "Search stories and writers on Myth Story.",
     url: buildCanonicalUrl("/search"),
-    siteName: "Mist Story",
+    siteName: "Myth Story",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Search | Mist Story",
-    description: "Search stories and writers on Mist Story.",
+    title: "Search | Myth Story",
+    description: "Search stories and writers on Myth Story.",
   },
 }
 

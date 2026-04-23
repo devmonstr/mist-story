@@ -1,4 +1,4 @@
-# Mist Story Bun Playbook
+# Myth Story Bun Playbook
 
 ## Primary Commands
 

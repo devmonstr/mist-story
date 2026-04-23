@@ -8,21 +8,21 @@ import { StoriesGrid } from "./stories-grid"
 
 export const metadata: Metadata = {
   title: "Library",
-  description: "Browse published stories from writers on Mist Story.",
+  description: "Browse published stories from writers on Myth Story.",
   alternates: {
     canonical: buildCanonicalUrl("/library"),
   },
   openGraph: {
     type: "website",
-    title: "Library | Mist Story",
-    description: "Browse published stories from writers on Mist Story.",
+    title: "Library | Myth Story",
+    description: "Browse published stories from writers on Myth Story.",
     url: buildCanonicalUrl("/library"),
-    siteName: "Mist Story",
+    siteName: "Myth Story",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Library | Mist Story",
-    description: "Browse published stories from writers on Mist Story.",
+    title: "Library | Myth Story",
+    description: "Browse published stories from writers on Myth Story.",
   },
 }
 

@@ -60,7 +60,7 @@ export async function generateMetadata({
   )
   const description =
     currentChapter.previewText.trim() ||
-    `Read Chapter ${currentChapter.number} of ${novel.title} by ${author.displayName} on Mist Story.`
+    `Read Chapter ${currentChapter.number} of ${novel.title} by ${author.displayName} on Myth Story.`
   const coverImage = novel.coverStorageKey
     ? resolveMetadataImageUrl(`/api/v1/novels/${novel.id}/cover`)
     : resolveMetadataImageUrl(novel.coverUrl)

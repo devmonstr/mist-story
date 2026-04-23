@@ -1,8 +1,8 @@
-# Mist Story - Project Context
+# Myth Story - Project Context
 
 ## Overview
 
-Mist Story is a Bun monorepo for a writing and reading platform with a separated frontend, API, worker, and shared packages.
+Myth Story is a Bun monorepo for a writing and reading platform with a separated frontend, API, worker, and shared packages.
 
 ## Tech Stack
 

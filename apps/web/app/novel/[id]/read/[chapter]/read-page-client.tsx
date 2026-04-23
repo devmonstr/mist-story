@@ -49,8 +49,8 @@ import {
   type PublicNovelReaderResponse,
 } from "@mist/shared"
 
-const READER_SETTINGS_KEY = "mist-story-reader-settings"
-const READING_PROGRESS_KEY = "mist-story-reading-progress"
+const READER_SETTINGS_KEY = "myth_story-reader-settings"
+const READING_PROGRESS_KEY = "myth_story-reading-progress"
 
 function getDefaultThemeStyles(readerTheme: "light" | "dark" | "sepia") {
   return {

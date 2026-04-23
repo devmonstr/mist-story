@@ -212,7 +212,7 @@ function buildAuthorSeeds(authorCount: number): AuthorSeed[] {
       pubkey: hashHex(`mist-sample-author-${index}`),
       handle,
       displayName,
-      about: `${displayName} writes benchmark novels for Mist Story search and catalog testing.`,
+      about: `${displayName} writes benchmark novels for Myth Story search and catalog testing.`,
     }
   })
 }

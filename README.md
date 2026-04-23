@@ -1,4 +1,4 @@
-# Mist Story Monorepo
+# Myth Story Monorepo
 
 This repository is a Bun monorepo with:
 

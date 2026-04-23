@@ -1,10 +1,10 @@
-# Mist Story - Project Overview
+# Myth Story - Project Overview
 
 **Last updated:** 2026-03-31
 
 ## Executive Summary
 
-Mist Story is a full-stack novel reading/writing platform built with Nostr authentication, Bitcoin Lightning payments, and a PostgreSQL/Redis backend. The application supports authors publishing serialized novels with paid chapters, readers building libraries and tracking progress, and a comprehensive moderation system.
+Myth Story is a full-stack novel reading/writing platform built with Nostr authentication, Bitcoin Lightning payments, and a PostgreSQL/Redis backend. The application supports authors publishing serialized novels with paid chapters, readers building libraries and tracking progress, and a comprehensive moderation system.
 
 ---
 
@@ -27,7 +27,7 @@ Mist Story is a full-stack novel reading/writing platform built with Nostr authe
 ## Monorepo Structure
 
 ```
-mist-story/
+myth_story/
 ├── apps/
 │   ├── web/          # Next.js 16 frontend application
 │   ├── api/          # Express.js REST API

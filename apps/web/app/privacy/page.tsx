@@ -19,7 +19,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="font-serif text-2xl font-bold text-foreground mb-4">1. Introduction</h2>
             <p className="text-foreground leading-relaxed">
-              Mist Story ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website and use our services.
+              Myth Story ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website and use our services.
             </p>
           </section>
 
@@ -78,7 +78,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="font-serif text-2xl font-bold text-foreground mb-4">8. Contact Us</h2>
             <p className="text-foreground leading-relaxed">
-              If you have questions about this Privacy Policy, please contact us at privacy@Mist Story.app
+              If you have questions about this Privacy Policy, please contact us at privacy@Myth Story.app
             </p>
           </section>
         </div>

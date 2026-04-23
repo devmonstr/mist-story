@@ -1672,14 +1672,14 @@ export default function SettingsPage() {
       setProfileForm(nextProfileForm)
       setDirtyProfileFields(EMPTY_DIRTY_PROFILE_FIELDS)
       setProfileSaveSuccess(
-        `Published kind 0 metadata to ${successfulRelayCount}/${relayResults.length} relays and refreshed Mist Story's cache.`
+        `Published kind 0 metadata to ${successfulRelayCount}/${relayResults.length} relays and refreshed Myth Story's cache.`
       )
       await refreshProfile()
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Mist Story failed to refresh its cached profile'
+        error instanceof Error ? error.message : 'Myth Story failed to refresh its cached profile'
       setProfileSaveError(
-        `${message}. Your metadata was still published to Nostr. You can use "Refresh from Nostr" to pull the latest copy back into Mist Story.`
+        `${message}. Your metadata was still published to Nostr. You can use "Refresh from Nostr" to pull the latest copy back into Myth Story.`
       )
     } finally {
       setProfileSaving(false)
@@ -2322,13 +2322,13 @@ export default function SettingsPage() {
                   <div className="rounded border border-border/40 bg-card p-6">
                     <div className="space-y-3 text-sm leading-relaxed text-muted-foreground">
                       <p>
-                        This form edits your public Nostr kind `0` metadata. Mist Story supports the
+                        This form edits your public Nostr kind `0` metadata. Myth Story supports the
                         core NIP-01 fields `name`, `about`, and `picture`, plus the profile fields we
                         already surface in-app such as `display_name`, `banner`, `website`, `nip05`,
                         and `lud16`.
                       </p>
                       <p>
-                        When you save, Mist Story signs a fresh kind `0` event through your NIP-07
+                        When you save, Myth Story signs a fresh kind `0` event through your NIP-07
                         extension, broadcasts it to your write relays, and then updates the cached
                         profile used across the site.
                       </p>
@@ -2726,7 +2726,7 @@ export default function SettingsPage() {
                                 className="font-mono text-xs"
                               />
                               <p className="text-xs text-muted-foreground">
-                                Use this for any extra kind `0` metadata keys that Mist Story does not
+                                Use this for any extra kind `0` metadata keys that Myth Story does not
                                 expose as dedicated inputs. Keys managed by the form above override this
                                 JSON when publishing.
                               </p>
@@ -2744,7 +2744,7 @@ export default function SettingsPage() {
                                 </p>
                                 {!hasLoadedLiveProfileMetadata ? (
                                   <p className="text-xs text-muted-foreground">
-                                    Load the latest live metadata before broadcasting so Mist Story can
+                                    Load the latest live metadata before broadcasting so Myth Story can
                                     preserve unmanaged kind 0 fields.
                                   </p>
                                 ) : null}
@@ -2846,7 +2846,7 @@ export default function SettingsPage() {
                           <p className="text-sm text-muted-foreground">
                             Your public profile URL:{' '}
                             <code className="rounded bg-muted px-2 py-1 text-xs">
-                              Mist Story.app/profile/{user?.npub?.slice(0, 16)}...
+                              Myth Story.app/profile/{user?.npub?.slice(0, 16)}...
                             </code>
                           </p>
                         </div>
@@ -2879,7 +2879,7 @@ export default function SettingsPage() {
                             Delivery overview
                           </h3>
                           <p className="text-sm text-muted-foreground">
-                            Choose how much Mist Story should tap you on the shoulder. Changes save automatically as you toggle.
+                            Choose how much Myth Story should tap you on the shoulder. Changes save automatically as you toggle.
                           </p>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
@@ -3044,7 +3044,7 @@ export default function SettingsPage() {
                                   : 'border-sky-200 bg-gradient-to-br from-sky-50 via-stone-50 to-white text-stone-900'
                             )}
                           >
-                            <p className="text-xs uppercase tracking-[0.25em] opacity-70">Mist Story Reader</p>
+                            <p className="text-xs uppercase tracking-[0.25em] opacity-70">Myth Story Reader</p>
                             <p className={cn('mt-3 font-serif leading-relaxed', selectedFontSizeOption?.previewClassName ?? 'text-base')}>
                               The lantern at the harbor flickered once, then steadied. Mina turned the page and kept reading.
                             </p>
@@ -3205,7 +3205,7 @@ export default function SettingsPage() {
                         <div className="flex-1">
                           <h3 className="font-medium text-foreground mb-2">Nostr Account</h3>
                           <p className="text-sm text-muted-foreground mb-4">
-                            Your account is secured through your Nostr identity and the session managed by Mist Story.
+                            Your account is secured through your Nostr identity and the session managed by Myth Story.
                           </p>
 
                           <div className="space-y-3">
@@ -3474,7 +3474,7 @@ export default function SettingsPage() {
                               <div>
                                 <h3 className="font-medium text-foreground">Relay Manager</h3>
                                 <p className="mt-2 text-sm text-muted-foreground">
-                                  Control the Nostr relays Mist Story uses to refresh and broadcast your
+                                  Control the Nostr relays Myth Story uses to refresh and broadcast your
                                   profile metadata.
                                 </p>
                               </div>
@@ -3560,7 +3560,7 @@ export default function SettingsPage() {
                               </div>
 
                               <p className="text-xs text-muted-foreground">
-                                If no custom read or write relays are enabled for a mode, Mist Story falls
+                                If no custom read or write relays are enabled for a mode, Myth Story falls
                                 back to the built-in profile relays above.
                               </p>
                             </div>
@@ -3764,7 +3764,7 @@ export default function SettingsPage() {
                             <div>
                               <h3 className="font-medium text-foreground">Recommended profile relays</h3>
                               <p className="mt-2 text-sm text-muted-foreground">
-                                Quick-add the default relays Mist Story falls back to for profile refresh and
+                                Quick-add the default relays Myth Story falls back to for profile refresh and
                                 publish.
                               </p>
                             </div>

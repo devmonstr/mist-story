@@ -37,14 +37,14 @@ export default function PressPage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button asChild>
-                  <a href="mailto:press@miststory.app">
+                  <a href="mailto:press@mythstory.app">
                     <Mail className="mr-2 h-4 w-4" />
-                    press@miststory.app
+                    press@mythstory.app
                   </a>
                 </Button>
                 <Button variant="outline" asChild>
                   <a href="/about">
-                    About Mist Story
+                    About Myth Story
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </a>
                 </Button>

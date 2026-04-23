@@ -22,8 +22,8 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: getConfiguredSiteUrl(),
   title: {
-    default: 'Mist Story — Where Stories Come to Life',
-    template: '%s | Mist Story',
+    default: 'Myth Story — Where Stories Come to Life',
+    template: '%s | Myth Story',
   },
   description: 'A minimalist platform for novel writers and readers. Write, read, and discover extraordinary stories.',
   generator: 'v0.app',
@@ -33,14 +33,14 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     url: buildCanonicalUrl('/'),
-    siteName: 'Mist Story',
-    title: 'Mist Story — Where Stories Come to Life',
+    siteName: 'Myth Story',
+    title: 'Myth Story — Where Stories Come to Life',
     description:
       'A minimalist platform for novel writers and readers. Write, read, and discover extraordinary stories.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Mist Story — Where Stories Come to Life',
+    title: 'Myth Story — Where Stories Come to Life',
     description:
       'A minimalist platform for novel writers and readers. Write, read, and discover extraordinary stories.',
   },

@@ -238,7 +238,7 @@ export async function listSessionRecordsForUser(userId: string) {
 }
 
 export async function issueChallenge(pubkey: string, request?: Request) {
-  const challenge = `mist-story:${randomUUID()}`
+  const challenge = `myth_story:${randomUUID()}`
   const expiresAt = new Date(Date.now() + AUTH_CHALLENGE_TTL_SECONDS * 1000)
   const requestContext = request ? getClientRequestContext(request) : null
 
@@ -275,7 +275,7 @@ export async function issueReauthChallenge(input: {
   userId: string
   request?: Request
 }) {
-  const challenge = `mist-story:reauth:${randomUUID()}`
+  const challenge = `myth_story:reauth:${randomUUID()}`
   const expiresAt = new Date(Date.now() + AUTH_CHALLENGE_TTL_SECONDS * 1000)
   const requestContext = input.request ? getClientRequestContext(input.request) : null
 

@@ -41,7 +41,7 @@ export default function CareersPage() {
               </div>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button variant="outline" asChild>
-                  <a href="mailto:careers@miststory.app">
+                  <a href="mailto:careers@mythstory.app">
                     Contact Us
                   </a>
                 </Button>

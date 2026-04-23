@@ -27,7 +27,7 @@ function buildChapterHtml(input: {
   return [
     `<h1>${input.chapterTitle}</h1>`,
     `<p>${input.novelTitle} continues with chapter ${input.chapterNumber}.</p>`,
-    `<p>This benchmark chapter was generated to stress-test Mist Story search, catalog, and reading performance with large chapter counts.</p>`,
+    `<p>This benchmark chapter was generated to stress-test Myth Story search, catalog, and reading performance with large chapter counts.</p>`,
     `<p>The scene keeps the serialization moving while preserving deterministic content for repeatable testing.</p>`,
   ].join("")
 }

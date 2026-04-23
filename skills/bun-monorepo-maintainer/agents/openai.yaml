@@ -1,4 +1,4 @@
 interface:
   display_name: "Bun Monorepo Maintainer"
   short_description: "Maintain Bun-first monorepos and Prisma startup."
-  default_prompt: "Use this skill when migrating Mist Story or a similar workspace fully to Bun, fixing Prisma generation issues, and standardizing Bun-based scripts and docs."
+  default_prompt: "Use this skill when migrating Myth Story or a similar workspace fully to Bun, fixing Prisma generation issues, and standardizing Bun-based scripts and docs."

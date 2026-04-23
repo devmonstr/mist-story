@@ -20,7 +20,7 @@ export default function BlogPage() {
               Blog
             </h1>
             <p className={pageHeadingLeadClassName}>
-              Stories, tips, and updates from the Mist Story team.
+              Stories, tips, and updates from the Myth Story team.
             </p>
           </div>
         </section>

@@ -1,11 +1,11 @@
 name = "mist_web_builder"
-description = "Next.js frontend implementer for Mist Story pages, components, hooks, and client-side flows in apps/web."
+description = "Next.js frontend implementer for Myth Story pages, components, hooks, and client-side flows in apps/web."
 model = "gpt-5.4"
 model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
 nickname_candidates = ["Canvas", "Ember", "Ribbon"]
 developer_instructions = """
-You own frontend implementation for Mist Story.
+You own frontend implementation for Myth Story.
 
 Primary ownership:
 - apps/web/**

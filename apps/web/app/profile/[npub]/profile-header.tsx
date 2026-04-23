@@ -196,7 +196,7 @@ export function ProfileHeader() {
                 <div className="max-w-3xl space-y-3 pb-1">
                   <div className="space-y-2">
                     <p className="text-[11px] uppercase tracking-[0.32em] text-white/72">
-                      Mist Story
+                      Myth Story
                     </p>
                     <h1 className="max-w-4xl font-serif text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">
                       {displayName}
@@ -299,7 +299,7 @@ export function ProfileHeader() {
                   At A Glance
                 </p>
                 <p className="max-w-sm text-sm leading-6 text-muted-foreground">
-                  A quick view of this writer&apos;s published catalog and audience on Mist Story.
+                  A quick view of this writer&apos;s published catalog and audience on Myth Story.
                 </p>
               </div>
 

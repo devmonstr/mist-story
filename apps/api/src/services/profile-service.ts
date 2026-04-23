@@ -334,7 +334,7 @@ export async function followProfile(
       actorUserId: viewerUserId,
       type: "USER_FOLLOWED",
       title: "New follower",
-      message: "Someone started following you on Mist Story.",
+      message: "Someone started following you on Myth Story.",
       targetUrl: actorUser ? `/profile/${hexToNpub(actorUser.pubkey)}` : undefined,
       metadata: {
         eventType: "USER_FOLLOWED",
