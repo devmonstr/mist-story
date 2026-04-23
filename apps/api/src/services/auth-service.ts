@@ -1,20 +1,20 @@
 import { createHash, randomUUID } from "node:crypto"
 import type { Request } from "express"
-import { createAuthAuditLog, serializeUser, upsertUserByPubkey } from "@mist/db"
+import { createAuthAuditLog, serializeUser, upsertUserByPubkey } from "@myth/db"
 import {
   AUTH_CHALLENGE_TTL_SECONDS,
   REAUTH_TTL_SECONDS,
   SESSION_TTL_SECONDS,
   createRedisClient,
   redisKeys,
-} from "@mist/redis"
-import { authSessionPayloadSchema, serializeSecurityAuditDetail } from "@mist/shared"
+} from "@myth/redis"
+import { authSessionPayloadSchema, serializeSecurityAuditDetail } from "@myth/shared"
 import type {
   AuthReverifyResponse,
   AuthSessionPayload,
   AuthUserDto,
   SignedNostrEvent,
-} from "@mist/shared"
+} from "@myth/shared"
 import { verifyEvent } from "nostr-tools"
 import { env } from "../config/env"
 import { HttpError } from "../utils/http-error"

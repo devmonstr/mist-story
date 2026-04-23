@@ -15,12 +15,12 @@ import {
   updateUserSetting,
   updateRelayForUser,
   setNotificationPreferencesForUser,
-} from "@mist/db"
-import { REAUTH_TTL_SECONDS } from "@mist/redis"
+} from "@myth/db"
+import { REAUTH_TTL_SECONDS } from "@myth/redis"
 import {
   normalizeRelayUrl,
   parseSecurityAuditDetail,
-} from "@mist/shared"
+} from "@myth/shared"
 import type {
   AppearanceSettings,
   AuthSessionPayload,
@@ -34,7 +34,7 @@ import type {
   SecuritySettings,
   SecuritySessionItem,
   UpdateRelayInput,
-} from "@mist/shared"
+} from "@myth/shared"
 import { HttpError } from "../utils/http-error"
 import {
   destroyAllSessionsForUser,

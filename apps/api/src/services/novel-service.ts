@@ -6,11 +6,11 @@ import {
   listPublishedNovels,
   serializeNovel,
   updateNovelForAuthor,
-} from "@mist/db"
+} from "@myth/db"
 import type { Response } from "express"
-import type { CreateNovelInput, UpdateNovelInput } from "@mist/shared"
-import { enqueuePublicCatalogMetricsRefresh } from "@mist/queue"
-import { createRedisClient } from "@mist/redis"
+import type { CreateNovelInput, UpdateNovelInput } from "@myth/shared"
+import { enqueuePublicCatalogMetricsRefresh } from "@myth/queue"
+import { createRedisClient } from "@myth/redis"
 import { env } from "../config/env"
 import { HttpError } from "../utils/http-error"
 import {

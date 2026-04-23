@@ -1,4 +1,4 @@
-name = "mist_data_builder"
+name = "myth_data_builder"
 description = "Data and contract owner for Prisma schema, repositories, shared Zod contracts, and shared env definitions."
 model = "gpt-5.4"
 model_reasoning_effort = "high"

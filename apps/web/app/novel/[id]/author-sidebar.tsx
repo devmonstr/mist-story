@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import {
   type PublicNovelAuthorDto,
   type PublicNovelDetailDto,
-} from "@mist/shared"
+} from "@myth/shared"
 import { formatPublishedDate } from "./novel-utils"
 
 interface AuthorSidebarProps {

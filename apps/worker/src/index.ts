@@ -2,16 +2,16 @@ import { Worker } from "bullmq"
 import {
   ensurePublicCatalogMetricsInfrastructure,
   refreshPublicCatalogMetrics,
-} from "@mist/db"
-import { queueNames } from "@mist/queue"
-import { createBullMQConnection } from "@mist/redis"
+} from "@myth/db"
+import { queueNames } from "@myth/queue"
+import { createBullMQConnection } from "@myth/redis"
 import type {
   ChapterPublishJobPayload,
   NotificationDispatchJobPayload,
   PublicCatalogMetricsRefreshJobPayload,
   ProfileImageOptimizeJobPayload,
   ProfileSyncJobPayload,
-} from "@mist/shared"
+} from "@myth/shared"
 import { env } from "./config/env"
 import { processChapterPublishJob } from "./processors/chapter-publish"
 import { processProfileImageOptimizeJob } from "./processors/profile-image-optimize"

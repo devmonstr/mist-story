@@ -7,14 +7,14 @@ import {
   listNotificationsForUserPage,
   markAllNotificationsReadForUser,
   markNotificationReadForUser,
-} from "@mist/db"
+} from "@myth/db"
 import type {
   NotificationDto,
   NotificationListQuery,
   NotificationNovelDto,
   NotificationsResponse,
   NotificationSummaryResponse,
-} from "@mist/shared"
+} from "@myth/shared"
 import { HttpError } from "../utils/http-error"
 
 type NotificationRecord = Awaited<

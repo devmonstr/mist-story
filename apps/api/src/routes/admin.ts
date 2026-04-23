@@ -4,7 +4,7 @@ import {
   adminUserListQuerySchema,
   updateAdminNovelVisibilityInputSchema,
   updateAdminUserRolesInputSchema,
-} from "@mist/shared"
+} from "@myth/shared"
 import { requireAdmin } from "../middleware/require-admin"
 import { requireAuth } from "../middleware/require-auth"
 import { validateBody } from "../middleware/validate"

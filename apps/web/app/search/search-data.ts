@@ -3,7 +3,7 @@ import type {
   SearchFilterType,
   SearchResultItemDto,
   SearchSortBy,
-} from "@mist/shared"
+} from "@myth/shared"
 
 export interface SearchPagination {
   currentCursor: string | null

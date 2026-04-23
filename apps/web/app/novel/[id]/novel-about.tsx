@@ -1,7 +1,7 @@
 import { Separator } from "@/components/ui/separator"
 import {
   type PublicNovelDetailDto,
-} from "@mist/shared"
+} from "@myth/shared"
 
 interface NovelAboutProps {
   novel: PublicNovelDetailDto

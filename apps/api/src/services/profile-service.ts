@@ -22,13 +22,13 @@ import {
   toIsoString,
   unfollowUser,
   upsertUserByPubkey,
-} from "@mist/db"
+} from "@myth/db"
 import {
   enqueueNotificationDispatch,
   enqueuePublicCatalogMetricsRefresh,
   enqueueProfileImageOptimize,
-} from "@mist/queue"
-import { createRedisClient } from "@mist/redis"
+} from "@myth/queue"
+import { createRedisClient } from "@myth/redis"
 import type {
   MyProfileResponse,
   ProfileImageAssetType,
@@ -40,7 +40,7 @@ import type {
   UpdateMyProfileInput,
   UploadProfileImageInput,
   UploadProfileImageResponse,
-} from "@mist/shared"
+} from "@myth/shared"
 import { verifyEvent } from "nostr-tools"
 import { env } from "../config/env"
 import { HttpError } from "../utils/http-error"

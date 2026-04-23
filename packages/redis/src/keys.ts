@@ -1,4 +1,4 @@
-export const REDIS_PREFIX = "mist"
+export const REDIS_PREFIX = "myth"
 
 export const REDIS_NAMESPACES = {
   session: `${REDIS_PREFIX}:session`,

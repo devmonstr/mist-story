@@ -3,7 +3,7 @@ import type {
   CreateNovelInput,
   NovelDto,
   StudioChapterListResponse,
-} from "@mist/shared"
+} from "@myth/shared"
 import { resolveNovelCoverSrc } from "./novel-cover"
 
 export interface StudioNovelCard {

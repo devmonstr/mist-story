@@ -16,7 +16,7 @@ import { BookOpen, Bookmark, Loader2, Trash2 } from 'lucide-react'
 import { useRequireAuth } from '@/hooks/use-require-auth'
 import { fetchMyLibrary, removeBookmark } from '@/lib/api'
 import { resolveNovelCoverSrc } from '@/lib/novel-cover'
-import type { MyLibrarySavedNovelDto } from '@mist/shared'
+import type { MyLibrarySavedNovelDto } from '@myth/shared'
 
 function formatSavedDate(value: string) {
   const date = new Date(value)

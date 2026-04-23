@@ -17,7 +17,7 @@ import { truncateNpub } from '@/lib/nostr-utils'
 import type {
   ProfileConnectionsPagination,
   ProfileConnectionsResponse,
-} from '@mist/shared'
+} from '@myth/shared'
 import { Loader2, Users } from 'lucide-react'
 
 const DEFAULT_PAGE_SIZE = 20

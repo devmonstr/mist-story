@@ -5,10 +5,10 @@ import {
   markChapterVersionFailed,
   markChapterVersionPublished,
   upsertChapterVersionRelayPublish,
-} from "@mist/db"
-import { enqueueNotificationDispatch } from "@mist/queue"
-import { createRedisClient } from "@mist/redis"
-import type { ChapterPublishJobPayload } from "@mist/shared"
+} from "@myth/db"
+import { enqueueNotificationDispatch } from "@myth/queue"
+import { createRedisClient } from "@myth/redis"
+import type { ChapterPublishJobPayload } from "@myth/shared"
 import { env } from "../config/env"
 import { publishChapterVersionToRelay } from "../adapters/relay-publisher"
 

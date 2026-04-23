@@ -36,7 +36,7 @@ export type SearchAuthorKeysetCursor = {
 
 function buildNovelSearchDocumentSql() {
   return Prisma.sql`
-    mist_novel_search_document(
+    myth_novel_search_document(
       n."title",
       n."authorDisplayName",
       n."genre",
@@ -122,7 +122,7 @@ function buildNovelSearchCandidatesCte(filters: PublicCatalogNovelFilters, query
 
 function buildAuthorSearchDocumentSql() {
   return Prisma.sql`
-    mist_user_search_document(
+    myth_user_search_document(
       u."displayName",
       u."handle",
       u."nip05",

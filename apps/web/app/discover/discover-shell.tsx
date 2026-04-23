@@ -1,5 +1,5 @@
 import Link from "next/link"
-import type { DiscoverResponse } from "@mist/shared"
+import type { DiscoverResponse } from "@myth/shared"
 import {
   pageContentContainerClassName,
   pageHeadingLeadClassName,

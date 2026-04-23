@@ -251,7 +251,7 @@ export function createAuthEvent(pubkey: string, challenge: string): NostrEvent &
     pubkey,
     created_at: Math.floor(Date.now() / 1000),
     kind: 27235,
-    tags: [["t", "mist-auth"]],
+    tags: [["t", "myth-auth"]],
     content: challenge,
   }
 }

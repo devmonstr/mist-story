@@ -12,7 +12,7 @@ import type {
   AdminUserListQuery,
   AdminUserListResponse,
   AdminUserSummary,
-} from "@mist/shared"
+} from "@myth/shared"
 import { Footer } from "@/components/footer"
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"

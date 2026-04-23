@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express"
-import { findUserById, serializeUser } from "@mist/db"
-import { SESSION_TTL_SECONDS, createRedisClient, redisKeys } from "@mist/redis"
-import { authSessionPayloadSchema } from "@mist/shared"
+import { findUserById, serializeUser } from "@myth/db"
+import { SESSION_TTL_SECONDS, createRedisClient, redisKeys } from "@myth/redis"
+import { authSessionPayloadSchema } from "@myth/shared"
 import { env } from "../config/env"
 import { SESSION_COOKIE_NAME } from "../config/constants"
 

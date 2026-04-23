@@ -11,7 +11,7 @@ import type {
   ChapterDto,
   ChapterVersionDto,
   NovelDto,
-} from "@mist/shared"
+} from "@myth/shared"
 
 export function slugify(value: string) {
   return value

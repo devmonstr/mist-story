@@ -12,7 +12,7 @@ import type {
   AdminUserListQuery,
   AdminUserListResponse,
   AdminUserSummary,
-} from "@mist/shared"
+} from "@myth/shared"
 import { Button } from "@/components/ui/button"
 import {
   Select,

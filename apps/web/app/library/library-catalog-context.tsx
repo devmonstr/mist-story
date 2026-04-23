@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import type { CatalogSortBy } from "@mist/shared"
+import type { CatalogSortBy } from "@myth/shared"
 
 type WorkTypeFilter = "ORIGINAL" | "TRANSLATION" | null
 type StatusFilter = "Ongoing" | "Completed" | "Hiatus" | null

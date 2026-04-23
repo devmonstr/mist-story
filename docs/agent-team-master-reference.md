@@ -62,13 +62,13 @@ Project-scoped Codex agents now live under `.codex/agents/`, with shared agent s
 
 | Agent | Mode | Model | Owns | Use when |
 | --- | --- | --- | --- | --- |
-| `mist_architect` | read-only | `gpt-5.4` high | planning only | multi-layer work, risky refactors, schema or contract changes, team shaping |
-| `mist_web_builder` | workspace-write | `gpt-5.4` medium | `apps/web/**` | UI work, client flows, studio UX, app-router behavior |
-| `mist_api_builder` | workspace-write | `gpt-5.4` medium | `apps/api/**` | routes, middleware, auth/session server logic, service behavior |
-| `mist_data_builder` | workspace-write | `gpt-5.4` high | `packages/db/**`, `packages/shared/**`, `schema.prisma` | schema work, repositories, shared contracts, env definitions |
-| `mist_media_builder` | workspace-write | `gpt-5.4` medium | `packages/media/**` | Cloudflare R2 helpers, image processing, media storage behavior |
-| `mist_jobs_builder` | workspace-write | `gpt-5.4` medium | `apps/worker/**`, `packages/queue/**`, `packages/redis/**` | BullMQ, queue payloads, Redis-backed async behavior |
-| `mist_reviewer` | read-only | `gpt-5.4` high | review only | correctness, regression, security, contract drift, missing tests |
+| `myth_architect` | read-only | `gpt-5.4` high | planning only | multi-layer work, risky refactors, schema or contract changes, team shaping |
+| `myth_web_builder` | workspace-write | `gpt-5.4` medium | `apps/web/**` | UI work, client flows, studio UX, app-router behavior |
+| `myth_api_builder` | workspace-write | `gpt-5.4` medium | `apps/api/**` | routes, middleware, auth/session server logic, service behavior |
+| `myth_data_builder` | workspace-write | `gpt-5.4` high | `packages/db/**`, `packages/shared/**`, `schema.prisma` | schema work, repositories, shared contracts, env definitions |
+| `myth_media_builder` | workspace-write | `gpt-5.4` medium | `packages/media/**` | Cloudflare R2 helpers, image processing, media storage behavior |
+| `myth_jobs_builder` | workspace-write | `gpt-5.4` medium | `apps/worker/**`, `packages/queue/**`, `packages/redis/**` | BullMQ, queue payloads, Redis-backed async behavior |
+| `myth_reviewer` | read-only | `gpt-5.4` high | review only | correctness, regression, security, contract drift, missing tests |
 
 Built-in Codex agents are still useful:
 
@@ -78,12 +78,12 @@ Built-in Codex agents are still useful:
 ## Default Management Rules
 
 1. Use a single agent first unless the work is clearly parallel.
-2. If more than one layer is involved, start with `mist_architect`.
+2. If more than one layer is involved, start with `myth_architect`.
 3. Keep active write agents to `2-4` most of the time. The full roster is a menu, not a default spawn set.
-4. Keep `packages/shared/**` and `packages/db/prisma/schema.prisma` under one owner, usually `mist_data_builder`.
+4. Keep `packages/shared/**` and `packages/db/prisma/schema.prisma` under one owner, usually `myth_data_builder`.
 5. Do not let two writers touch the same file tree at once.
 6. Ask each worker for file ownership, assumptions, and a short validation plan before large edits.
-7. Wait for write agents to finish before running `mist_reviewer`.
+7. Wait for write agents to finish before running `myth_reviewer`.
 8. Use the reviewer last, then integrate, summarize, and close completed agent threads.
 9. Keep `agents.max_depth = 1` so the lead delegates once and children do not create uncontrolled fan-out.
 
@@ -107,19 +107,19 @@ Use for features that touch one UI surface plus one or two backend layers.
 
 Recommended agents:
 
-- `mist_architect`
-- one or more of `mist_web_builder`, `mist_api_builder`, `mist_data_builder`, `mist_media_builder`, `mist_jobs_builder`
-- `mist_reviewer`
+- `myth_architect`
+- one or more of `myth_web_builder`, `myth_api_builder`, `myth_data_builder`, `myth_media_builder`, `myth_jobs_builder`
+- `myth_reviewer`
 
 Codex prompt starter:
 
 ```text
-Use subagents for this task. First spawn mist_architect to map impact, split the work,
-and assign file ownership. Then spawn mist_web_builder for apps/web changes and
-mist_api_builder for apps/api changes. Keep packages/shared and schema files under
-mist_data_builder if they need to change. Use mist_media_builder for packages/media
+Use subagents for this task. First spawn myth_architect to map impact, split the work,
+and assign file ownership. Then spawn myth_web_builder for apps/web changes and
+myth_api_builder for apps/api changes. Keep packages/shared and schema files under
+myth_data_builder if they need to change. Use myth_media_builder for packages/media
 or Cloudflare R2 image pipeline work. Wait for the write agents, then run
-mist_reviewer and summarize the outcome plus residual risk.
+myth_reviewer and summarize the outcome plus residual risk.
 ```
 
 ### 2. Auth and session team
@@ -128,17 +128,17 @@ Use for Nostr auth, cookies, session validation, and protected-route behavior.
 
 Recommended agents:
 
-- `mist_architect`
-- `mist_api_builder`
-- `mist_web_builder`
-- `mist_data_builder` only if contracts or env definitions change
-- `mist_reviewer`
+- `myth_architect`
+- `myth_api_builder`
+- `myth_web_builder`
+- `myth_data_builder` only if contracts or env definitions change
+- `myth_reviewer`
 
 Ownership rule:
 
-- `mist_api_builder` owns session and middleware behavior in `apps/api/**`
-- `mist_web_builder` owns sign-in UX and client auth flow in `apps/web/**`
-- `mist_data_builder` owns shared auth contracts and env changes
+- `myth_api_builder` owns session and middleware behavior in `apps/api/**`
+- `myth_web_builder` owns sign-in UX and client auth flow in `apps/web/**`
+- `myth_data_builder` owns shared auth contracts and env changes
 
 ### 3. Publishing and notification team
 
@@ -146,16 +146,16 @@ Use for chapter publishing, notification dispatch, or profile sync work.
 
 Recommended agents:
 
-- `mist_architect`
-- `mist_api_builder`
-- `mist_jobs_builder`
-- `mist_data_builder`
-- `mist_reviewer`
+- `myth_architect`
+- `myth_api_builder`
+- `myth_jobs_builder`
+- `myth_data_builder`
+- `myth_reviewer`
 
 Ownership rule:
 
-- `mist_jobs_builder` owns `apps/worker/**`, `packages/queue/**`, and `packages/redis/**`
-- `mist_data_builder` owns queue payload contract changes only if they live in shared or DB-owned files
+- `myth_jobs_builder` owns `apps/worker/**`, `packages/queue/**`, and `packages/redis/**`
+- `myth_data_builder` owns queue payload contract changes only if they live in shared or DB-owned files
 
 ### 4. Media and image pipeline team
 
@@ -163,18 +163,18 @@ Use for profile images, cover uploads, R2 object lifecycle, or image optimizatio
 
 Recommended agents:
 
-- `mist_architect`
-- `mist_api_builder`
-- `mist_media_builder`
-- `mist_jobs_builder` if a worker touches optimization or async cleanup
-- `mist_data_builder` only if shared media contracts or env definitions change
-- `mist_reviewer`
+- `myth_architect`
+- `myth_api_builder`
+- `myth_media_builder`
+- `myth_jobs_builder` if a worker touches optimization or async cleanup
+- `myth_data_builder` only if shared media contracts or env definitions change
+- `myth_reviewer`
 
 Ownership rule:
 
-- `mist_media_builder` owns `packages/media/**`
-- `mist_api_builder` owns upload endpoints and request validation in `apps/api/**`
-- `mist_jobs_builder` owns background image optimization or cleanup in `apps/worker/**`, `packages/queue/**`, and `packages/redis/**`
+- `myth_media_builder` owns `packages/media/**`
+- `myth_api_builder` owns upload endpoints and request validation in `apps/api/**`
+- `myth_jobs_builder` owns background image optimization or cleanup in `apps/worker/**`, `packages/queue/**`, and `packages/redis/**`
 
 ### 5. PR review team
 
@@ -182,15 +182,15 @@ Use when you want maximum signal with minimal edit risk.
 
 Recommended agents:
 
-- `mist_architect` or built-in `explorer` for affected-area mapping
-- `mist_reviewer`
+- `myth_architect` or built-in `explorer` for affected-area mapping
+- `myth_reviewer`
 - optional second read-only specialist if the review needs deep docs verification
 
 Codex prompt starter:
 
 ```text
-Review this branch with subagents. Spawn mist_architect to map the affected code paths,
-spawn mist_reviewer to find correctness, auth/session, queue, and test risks, wait for
+Review this branch with subagents. Spawn myth_architect to map the affected code paths,
+spawn myth_reviewer to find correctness, auth/session, queue, and test risks, wait for
 both, then summarize findings by severity with file references.
 ```
 
@@ -217,14 +217,14 @@ Use this matrix before spawning writers:
 
 | File tree | Default owner |
 | --- | --- |
-| `apps/web/**` | `mist_web_builder` |
-| `apps/api/**` | `mist_api_builder` |
-| `apps/worker/**` | `mist_jobs_builder` |
-| `packages/db/**` | `mist_data_builder` |
-| `packages/media/**` | `mist_media_builder` |
-| `packages/shared/**` | `mist_data_builder` |
-| `packages/queue/**` | `mist_jobs_builder` |
-| `packages/redis/**` | `mist_jobs_builder` |
+| `apps/web/**` | `myth_web_builder` |
+| `apps/api/**` | `myth_api_builder` |
+| `apps/worker/**` | `myth_jobs_builder` |
+| `packages/db/**` | `myth_data_builder` |
+| `packages/media/**` | `myth_media_builder` |
+| `packages/shared/**` | `myth_data_builder` |
+| `packages/queue/**` | `myth_jobs_builder` |
+| `packages/redis/**` | `myth_jobs_builder` |
 
 If a task needs multiple owners in one tree, the split is probably still too broad.
 

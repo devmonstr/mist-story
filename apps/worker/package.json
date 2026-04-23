@@ -1,5 +1,5 @@
 {
-  "name": "@mist/worker",
+  "name": "@myth/worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,11 +11,11 @@
     "typecheck": "bun --bun tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@mist/db": "workspace:*",
-    "@mist/media": "workspace:*",
-    "@mist/queue": "workspace:*",
-    "@mist/redis": "workspace:*",
-    "@mist/shared": "workspace:*",
+    "@myth/db": "workspace:*",
+    "@myth/media": "workspace:*",
+    "@myth/queue": "workspace:*",
+    "@myth/redis": "workspace:*",
+    "@myth/shared": "workspace:*",
     "bullmq": "^5.43.1"
   }
 }

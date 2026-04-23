@@ -13,16 +13,16 @@ import {
   serializeChapter,
   serializeChapterVersion,
   updateChapterById,
-} from "@mist/db"
-import { enqueueChapterPublish } from "@mist/queue"
-import { createRedisClient } from "@mist/redis"
+} from "@myth/db"
+import { enqueueChapterPublish } from "@myth/queue"
+import { createRedisClient } from "@myth/redis"
 import type {
   CreateChapterInput,
   PublishChapterInput,
   ReorderChaptersInput,
   StudioChapterListResponse,
   UpdateChapterInput,
-} from "@mist/shared"
+} from "@myth/shared"
 import { env } from "../config/env"
 import { HttpError } from "../utils/http-error"
 

@@ -12,7 +12,7 @@ import {
   findReadingProgressForUserAndNovel,
   deleteReadingProgressForUserAndNovel,
   clearReadingProgressForUser,
-} from "@mist/db"
+} from "@myth/db"
 import type {
   BookmarkState,
   MyLibraryContinueReadingDto,
@@ -20,12 +20,12 @@ import type {
   MyLibrarySavedNovelDto,
   ReadingProgressState,
   UpsertReadingProgressInput,
-} from "@mist/shared"
+} from "@myth/shared"
 import {
   enqueueNotificationDispatch,
   enqueuePublicCatalogMetricsRefresh,
-} from "@mist/queue"
-import { createRedisClient } from "@mist/redis"
+} from "@myth/queue"
+import { createRedisClient } from "@myth/redis"
 import { env } from "../config/env"
 import { HttpError } from "../utils/http-error"
 

@@ -1,5 +1,5 @@
 {
-  "name": "@mist/queue",
+  "name": "@myth/queue",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "typecheck": "bun --bun tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@mist/shared": "workspace:*",
+    "@myth/shared": "workspace:*",
     "bullmq": "^5.43.1"
   }
 }

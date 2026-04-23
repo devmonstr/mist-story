@@ -49,20 +49,20 @@ myth_story/
 ### Internal Dependencies
 
 ```
-@mist/web    → @mist/shared
-@mist/api    → @mist/db, @mist/media, @mist/queue, @mist/redis, @mist/shared
-@mist/worker → @mist/db, @mist/media, @mist/queue, @mist/redis, @mist/shared
+@myth/web    → @myth/shared
+@myth/api    → @myth/db, @myth/media, @myth/queue, @myth/redis, @myth/shared
+@myth/worker → @myth/db, @myth/media, @myth/queue, @myth/redis, @myth/shared
 ```
 
 ### Shared Packages
 
 | Package | Purpose | Key Dependencies |
 |---------|---------|-----------------|
-| `@mist/db` | Prisma client, repositories, migrations | `@prisma/client`, `prisma` |
-| `@mist/shared` | Zod schemas, Nostr contracts, env parsing | `nostr-tools`, `zod`, `ws` |
-| `@mist/redis` | Redis client wrapper, key namespaces | `ioredis` |
-| `@mist/queue` | BullMQ queues, job producers | `bullmq`, `@mist/shared` |
-| `@mist/media` | R2 uploads, image processing | `@aws-sdk/client-s3`, `sharp` |
+| `@myth/db` | Prisma client, repositories, migrations | `@prisma/client`, `prisma` |
+| `@myth/shared` | Zod schemas, Nostr contracts, env parsing | `nostr-tools`, `zod`, `ws` |
+| `@myth/redis` | Redis client wrapper, key namespaces | `ioredis` |
+| `@myth/queue` | BullMQ queues, job producers | `bullmq`, `@myth/shared` |
+| `@myth/media` | R2 uploads, image processing | `@aws-sdk/client-s3`, `sharp` |
 
 ---
 
@@ -306,14 +306,14 @@ bun run typecheck             # Type check all packages
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   @mist/web     │────▶│    @mist/api    │────▶│   @mist/worker  │
+│   @myth/web     │────▶│    @myth/api    │────▶│   @myth/worker  │
 │   Next.js 16    │◀────│  Express.js 5   │◀────│   BullMQ        │
 └─────────────────┘     └────────┬────────┘     └─────────────────┘
                                  │
                     ┌────────────┼────────────┐
                     ▼            ▼            ▼
             ┌───────────┐ ┌───────────┐ ┌───────────┐
-            │@mist/db   │ │@mist/redis│ │@mist/media│
+            │@myth/db   │ │@myth/redis│ │@myth/media│
             │Prisma     │ │Sessions   │ │R2 Storage │
             └───────────┘ └───────────┘ └───────────┘
                                  │
@@ -345,13 +345,13 @@ This project has predefined Codex agents in `.codex/agents/`:
 
 | Agent | Scope | Model |
 |-------|-------|-------|
-| `mist_architect` | Planning, cross-layer work | GPT-5.4 |
-| `mist_web_builder` | `apps/web/**` | GPT-5.4 |
-| `mist_api_builder` | `apps/api/**` | GPT-5.4 |
-| `mist_data_builder` | `packages/db/**`, `packages/shared/**` | GPT-5.4 |
-| `mist_media_builder` | `packages/media/**` | GPT-5.4 |
-| `mist_jobs_builder` | `apps/worker/**`, `packages/queue/**`, `packages/redis/**` | GPT-5.4 |
-| `mist_reviewer` | Code review | GPT-5.4 |
+| `myth_architect` | Planning, cross-layer work | GPT-5.4 |
+| `myth_web_builder` | `apps/web/**` | GPT-5.4 |
+| `myth_api_builder` | `apps/api/**` | GPT-5.4 |
+| `myth_data_builder` | `packages/db/**`, `packages/shared/**` | GPT-5.4 |
+| `myth_media_builder` | `packages/media/**` | GPT-5.4 |
+| `myth_jobs_builder` | `apps/worker/**`, `packages/queue/**`, `packages/redis/**` | GPT-5.4 |
+| `myth_reviewer` | Code review | GPT-5.4 |
 
 See `docs/agent-team-master-reference.md` for detailed usage.
 

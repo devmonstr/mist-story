@@ -1,8 +1,8 @@
 import {
   countPublishedNovelsForUsers,
   decimalToNumber,
-} from "@mist/db"
-import type { CatalogSortBy, PublicCatalogSortBy } from "@mist/shared"
+} from "@myth/db"
+import type { CatalogSortBy, PublicCatalogSortBy } from "@myth/shared"
 
 type CatalogNovelCounts = {
   _count: {

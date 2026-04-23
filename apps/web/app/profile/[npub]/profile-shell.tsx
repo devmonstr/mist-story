@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react"
-import type { ProfilePageResponse } from "@mist/shared"
+import type { ProfilePageResponse } from "@myth/shared"
 import { fetchProfilePage, followProfile, unfollowProfile } from "@/lib/api"
 import { useAuth } from "@/context/auth-context"
 

@@ -1,4 +1,4 @@
-name = "mist_architect"
+name = "myth_architect"
 description = "Read-only planner for Myth Story that maps impact, proposes file ownership, and shapes low-conflict parallel work."
 model = "gpt-5.4"
 model_reasoning_effort = "high"

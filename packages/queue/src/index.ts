@@ -5,7 +5,7 @@ import type {
   PublicCatalogMetricsRefreshJobPayload,
   ProfileImageOptimizeJobPayload,
   ProfileSyncJobPayload,
-} from "@mist/shared"
+} from "@myth/shared"
 
 export const queueNames = {
   chapterPublish: "chapter-publish",

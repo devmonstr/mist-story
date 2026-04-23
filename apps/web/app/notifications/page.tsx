@@ -35,7 +35,7 @@ import {
   markNotificationAsRead,
 } from '@/lib/api'
 import { resolveNovelCoverSrc } from '@/lib/novel-cover'
-import type { NotificationDto, NotificationPagination } from '@mist/shared'
+import type { NotificationDto, NotificationPagination } from '@myth/shared'
 import { useAuth } from '@/context/auth-context'
 
 const DEFAULT_PAGE_SIZE = 20

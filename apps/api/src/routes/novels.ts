@@ -2,7 +2,7 @@ import { Router } from "express"
 import {
   createNovelInputSchema,
   updateNovelInputSchema,
-} from "@mist/shared"
+} from "@myth/shared"
 import { requireAuth } from "../middleware/require-auth"
 import { validateBody } from "../middleware/validate"
 import {

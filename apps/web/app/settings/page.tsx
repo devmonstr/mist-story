@@ -1958,7 +1958,7 @@ export default function SettingsPage() {
       await runSecurityReauth()
       setSecurityActionInFlight('download-audit')
       const payload = await downloadSecurityAuditLog()
-      const fallbackFileName = `mist-security-audit-${new Date().toISOString().slice(0, 10)}.json`
+      const fallbackFileName = `myth-security-audit-${new Date().toISOString().slice(0, 10)}.json`
       downloadBlobFile(
         payload.blob,
         resolveDownloadFileName(payload.fileName, fallbackFileName)

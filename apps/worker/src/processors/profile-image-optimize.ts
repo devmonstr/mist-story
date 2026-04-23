@@ -1,5 +1,5 @@
-import { createR2MediaConfig, optimizeProfileImageToWebp } from "@mist/media"
-import type { ProfileImageOptimizeJobPayload } from "@mist/shared"
+import { createR2MediaConfig, optimizeProfileImageToWebp } from "@myth/media"
+import type { ProfileImageOptimizeJobPayload } from "@myth/shared"
 import { env } from "../config/env"
 
 function getProfileImageMediaConfig() {

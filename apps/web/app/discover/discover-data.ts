@@ -1,4 +1,4 @@
-import type { DiscoverResponse } from "@mist/shared"
+import type { DiscoverResponse } from "@myth/shared"
 import { fetchDiscoverData } from "@/lib/api"
 
 export type DiscoverCategory = DiscoverResponse["genres"][number]

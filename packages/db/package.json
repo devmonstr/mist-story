@@ -1,5 +1,5 @@
 {
-  "name": "@mist/db",
+  "name": "@myth/db",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -19,7 +19,7 @@
     "db:refresh-public-metrics": "bun --env-file=../../.env.local ./src/scripts/refresh-public-catalog-metrics.ts"
   },
   "dependencies": {
-    "@mist/shared": "workspace:*",
+    "@myth/shared": "workspace:*",
     "@prisma/client": "^6.5.0"
   },
   "devDependencies": {

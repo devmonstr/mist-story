@@ -2,7 +2,7 @@ import { prisma } from "./client"
 
 const SEARCH_INFRA_SQL = [
   `CREATE EXTENSION IF NOT EXISTS pg_trgm`,
-  `CREATE OR REPLACE FUNCTION mist_novel_search_document(
+  `CREATE OR REPLACE FUNCTION myth_novel_search_document(
     title text,
     author_display_name text,
     genre text,
@@ -21,7 +21,7 @@ const SEARCH_INFRA_SQL = [
       setweight(to_tsvector('simple', array_to_string(coalesce(subgenres, ARRAY[]::text[]), ' ')), 'B') ||
       setweight(to_tsvector('simple', coalesce(summary, '')), 'C')
   $$`,
-  `CREATE OR REPLACE FUNCTION mist_user_search_document(
+  `CREATE OR REPLACE FUNCTION myth_user_search_document(
     display_name text,
     handle text,
     nip05 text,
@@ -44,8 +44,8 @@ const SEARCH_INFRA_SQL = [
   `CREATE INDEX IF NOT EXISTS "User_handle_trgm_idx" ON "User" USING GIN ("handle" gin_trgm_ops)`,
   `CREATE INDEX IF NOT EXISTS "User_about_trgm_idx" ON "User" USING GIN ("about" gin_trgm_ops)`,
   `CREATE INDEX IF NOT EXISTS "User_nip05_trgm_idx" ON "User" USING GIN ("nip05" gin_trgm_ops)`,
-  `CREATE INDEX IF NOT EXISTS "Novel_public_search_tsv_idx" ON "Novel" USING GIN (mist_novel_search_document("title", "authorDisplayName", "genre", "tags", "subgenres", "summary"))`,
-  `CREATE INDEX IF NOT EXISTS "User_public_search_tsv_idx" ON "User" USING GIN (mist_user_search_document("displayName", "handle", "nip05", "about"))`,
+  `CREATE INDEX IF NOT EXISTS "Novel_public_search_tsv_idx" ON "Novel" USING GIN (myth_novel_search_document("title", "authorDisplayName", "genre", "tags", "subgenres", "summary"))`,
+  `CREATE INDEX IF NOT EXISTS "User_public_search_tsv_idx" ON "User" USING GIN (myth_user_search_document("displayName", "handle", "nip05", "about"))`,
 ]
 
 let prepared = false

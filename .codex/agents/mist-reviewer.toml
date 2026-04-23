@@ -1,4 +1,4 @@
-name = "mist_reviewer"
+name = "myth_reviewer"
 description = "Read-only reviewer for Myth Story focused on correctness, regressions, auth/session risk, queue safety, and missing tests."
 model = "gpt-5.4"
 model_reasoning_effort = "high"

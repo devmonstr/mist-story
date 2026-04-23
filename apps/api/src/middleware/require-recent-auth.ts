@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express"
-import { REAUTH_TTL_SECONDS } from "@mist/redis"
-import type { AuthSessionPayload } from "@mist/shared"
+import { REAUTH_TTL_SECONDS } from "@myth/redis"
+import type { AuthSessionPayload } from "@myth/shared"
 import { HttpError } from "../utils/http-error"
 
 export function requireRecentAuth(

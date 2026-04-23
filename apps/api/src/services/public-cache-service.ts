@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { createRedisClient, redisKeys } from "@mist/redis"
+import { createRedisClient, redisKeys } from "@myth/redis"
 import { env } from "../config/env"
 
 const redis = createRedisClient(env.REDIS_URL)

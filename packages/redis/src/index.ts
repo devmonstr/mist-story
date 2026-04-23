@@ -6,12 +6,12 @@ export const PROFILE_SYNC_THROTTLE_SECONDS = 60 * 30
 export const REAUTH_TTL_SECONDS = 60 * 10
 
 export const redisKeys = {
-  session: (sessionId: string) => `mist:session:${sessionId}`,
-  userSessions: (userId: string) => `mist:user-sessions:${userId}`,
-  authChallenge: (pubkey: string) => `mist:auth-challenge:${pubkey}`,
-  reauthChallenge: (sessionId: string) => `mist:reauth-challenge:${sessionId}`,
-  cache: (key: string) => `mist:cache:${key}`,
-  profileSyncThrottle: (pubkey: string) => `mist:profile-sync:${pubkey}`,
+  session: (sessionId: string) => `myth:session:${sessionId}`,
+  userSessions: (userId: string) => `myth:user-sessions:${userId}`,
+  authChallenge: (pubkey: string) => `myth:auth-challenge:${pubkey}`,
+  reauthChallenge: (sessionId: string) => `myth:reauth-challenge:${sessionId}`,
+  cache: (key: string) => `myth:cache:${key}`,
+  profileSyncThrottle: (pubkey: string) => `myth:profile-sync:${pubkey}`,
 }
 
 export function createRedisClient(redisUrl: string) {

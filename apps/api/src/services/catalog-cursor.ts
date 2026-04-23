@@ -1,4 +1,4 @@
-import type { CatalogSortBy } from "@mist/shared"
+import type { CatalogSortBy } from "@myth/shared"
 
 type PageCursorPayload = {
   kind: "page"

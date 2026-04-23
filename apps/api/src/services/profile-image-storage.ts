@@ -6,8 +6,8 @@ import {
   uploadManagedProfileImage,
   type ManagedProfileImageUploadResult,
   type R2MediaConfig,
-} from "@mist/media"
-import type { ProfileImageAssetType, UploadProfileImageInput } from "@mist/shared"
+} from "@myth/media"
+import type { ProfileImageAssetType, UploadProfileImageInput } from "@myth/shared"
 import { env } from "../config/env"
 import { HttpError } from "../utils/http-error"
 

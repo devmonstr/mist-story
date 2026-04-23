@@ -6,7 +6,7 @@ import {
   createRelayInputSchema,
   notificationSettingsSchema,
   updateRelayInputSchema,
-} from "@mist/shared"
+} from "@myth/shared"
 import {
   SESSION_COOKIE_NAME,
   SESSION_PRESENCE_COOKIE_NAME,
@@ -112,7 +112,7 @@ settingsRouter.get(
       response.setHeader("Content-Type", "application/json; charset=utf-8")
       response.setHeader(
         "Content-Disposition",
-        `attachment; filename="mist-security-audit-${fileStamp}.json"`
+        `attachment; filename="myth-security-audit-${fileStamp}.json"`
       )
       return response.send(JSON.stringify(payload, null, 2))
     } catch (error) {

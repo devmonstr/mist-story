@@ -7,7 +7,7 @@ import {
   searchAuthorsWithPagination,
   searchPublishedNovelsWithCursor,
   searchPublishedNovelsWithPagination,
-} from "@mist/db"
+} from "@myth/db"
 import type {
   DiscoverCollectionDto,
   DiscoverGenreDto,
@@ -19,7 +19,7 @@ import type {
   SearchResponse,
   SearchResultItemDto,
   SearchSortBy,
-} from "@mist/shared"
+} from "@myth/shared"
 import {
   decodeCatalogCursor,
   decodeSearchAuthorCursor,

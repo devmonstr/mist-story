@@ -20,7 +20,7 @@ import {
   listPublicNovelChaptersPage,
   normalizeCatalogPagination,
   toIsoString,
-} from "@mist/db"
+} from "@myth/db"
 import type {
   CatalogSortBy,
   LibraryCatalogResponse,
@@ -34,7 +34,7 @@ import type {
   PublicNovelReaderChapterDto,
   PublicNovelReaderResponse,
   PublicNovelViewerStateDto,
-} from "@mist/shared"
+} from "@myth/shared"
 import {
   decodeLibraryCatalogCursor,
   encodeLibraryCatalogCursor,

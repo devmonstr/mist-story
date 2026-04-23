@@ -163,7 +163,7 @@ export async function listApiKeysForUser(userId: string) {
 }
 
 export async function createApiKeyForUser(userId: string, name: string) {
-  const rawToken = `mist_${randomToken(24)}`
+  const rawToken = `myth_${randomToken(24)}`
   const preview = `${rawToken.slice(0, 10)}...${rawToken.slice(-6)}`
 
   const apiKey = await prisma.userApiKey.create({

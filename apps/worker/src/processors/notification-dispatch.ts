@@ -1,5 +1,5 @@
-import { findNotificationById } from "@mist/db"
-import type { NotificationDispatchJobPayload } from "@mist/shared"
+import { findNotificationById } from "@myth/db"
+import type { NotificationDispatchJobPayload } from "@myth/shared"
 import { dispatchNotification } from "../adapters/notification-dispatcher"
 
 export async function processNotificationDispatchJob(

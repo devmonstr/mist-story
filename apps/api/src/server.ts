@@ -1,7 +1,7 @@
 import {
   ensureCatalogSearchInfrastructure,
   ensurePublicCatalogMetricsInfrastructure,
-} from "@mist/db"
+} from "@myth/db"
 import { createApp } from "./app"
 import { env } from "./config/env"
 

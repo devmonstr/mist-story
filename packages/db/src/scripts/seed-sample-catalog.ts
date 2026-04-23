@@ -209,7 +209,7 @@ function buildAuthorSeeds(authorCount: number): AuthorSeed[] {
     const displayName = `Sample Author ${pad(index, 3)}`
     return {
       id: `sample-user-${pad(index, 4)}`,
-      pubkey: hashHex(`mist-sample-author-${index}`),
+      pubkey: hashHex(`myth-sample-author-${index}`),
       handle,
       displayName,
       about: `${displayName} writes benchmark novels for Myth Story search and catalog testing.`,

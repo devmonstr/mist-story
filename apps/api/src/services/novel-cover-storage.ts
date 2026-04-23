@@ -6,7 +6,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3"
-import type { CreateNovelInput, UpdateNovelInput } from "@mist/shared"
+import type { CreateNovelInput, UpdateNovelInput } from "@myth/shared"
 import { env } from "../config/env"
 import { HttpError } from "../utils/http-error"
 

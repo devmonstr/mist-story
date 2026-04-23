@@ -8,7 +8,7 @@ import type {
   PublicCatalogFacetCounts,
   SearchFilterType,
   SearchSortBy,
-} from "@mist/shared"
+} from "@myth/shared"
 import { NovelCard } from "@/components/novel/novel-card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"

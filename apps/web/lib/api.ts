@@ -46,7 +46,7 @@ import type {
   UpsertReadingProgressInput,
   UpdateChapterInput,
   UpdateNovelInput,
-} from "@mist/shared"
+} from "@myth/shared"
 import type { NostrUser } from "@/lib/nostr-types"
 
 export type NotificationSettingsDto = {

@@ -5,9 +5,9 @@ import {
   hexToNpub,
   npubToHex,
   prisma,
-} from "@mist/db"
-import { enqueuePublicCatalogMetricsRefresh } from "@mist/queue"
-import { createRedisClient } from "@mist/redis"
+} from "@myth/db"
+import { enqueuePublicCatalogMetricsRefresh } from "@myth/queue"
+import { createRedisClient } from "@myth/redis"
 import type {
   AdminNovelListQuery,
   AdminNovelListResponse,
@@ -16,11 +16,11 @@ import type {
   AdminStudioResponse,
   AdminUserListQuery,
   AdminUserListResponse,
-} from "@mist/shared"
+} from "@myth/shared"
 import type {
   UpdateAdminNovelVisibilityInput,
   UpdateAdminUserRolesInput,
-} from "@mist/shared"
+} from "@myth/shared"
 import { HttpError } from "../utils/http-error"
 import { invalidatePublicCacheScopes } from "./public-cache-service"
 import { env } from "../config/env"

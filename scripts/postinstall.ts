@@ -1,4 +1,4 @@
-const command = ["bun", "run", "--filter", "@mist/db", "db:generate"]
+const command = ["bun", "run", "--filter", "@myth/db", "db:generate"]
 
 const proc = Bun.spawn(command, {
   cwd: process.cwd(),

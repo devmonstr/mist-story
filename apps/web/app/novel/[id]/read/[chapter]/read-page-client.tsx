@@ -47,7 +47,7 @@ import {
   type PublicNovelChapterDto,
   type PublicNovelChapterListDto,
   type PublicNovelReaderResponse,
-} from "@mist/shared"
+} from "@myth/shared"
 
 const READER_SETTINGS_KEY = "myth_story-reader-settings"
 const READING_PROGRESS_KEY = "myth_story-reading-progress"

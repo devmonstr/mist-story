@@ -16,7 +16,7 @@ import { BookOpen, Clock, Loader2, RotateCcw, Trash2 } from 'lucide-react'
 import { useRequireAuth } from '@/hooks/use-require-auth'
 import { clearReadingProgress, fetchMyLibrary, removeReadingProgress } from '@/lib/api'
 import { resolveNovelCoverSrc } from '@/lib/novel-cover'
-import type { MyLibraryContinueReadingDto } from '@mist/shared'
+import type { MyLibraryContinueReadingDto } from '@myth/shared'
 
 function formatRelativeDate(value: string) {
   const date = new Date(value)

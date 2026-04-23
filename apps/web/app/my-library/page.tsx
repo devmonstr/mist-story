@@ -14,7 +14,7 @@ import {
 import { BookMarked, Bookmark, Clock, Loader2 } from "lucide-react"
 import { useRequireAuth } from "@/hooks/use-require-auth"
 import { fetchMyLibrary } from "@/lib/api"
-import type { MyLibraryResponse } from "@mist/shared"
+import type { MyLibraryResponse } from "@myth/shared"
 
 function formatRelativeDate(value: string) {
   const date = new Date(value)

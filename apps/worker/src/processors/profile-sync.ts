@@ -1,6 +1,6 @@
-import { markUserProfileFetchAttempt, saveUserNostrProfileSnapshot, upsertUserByPubkey } from "@mist/db"
-import type { ProfileSyncJobPayload } from "@mist/shared"
-import { fetchLatestNostrProfile } from "@mist/shared/nostr-profile"
+import { markUserProfileFetchAttempt, saveUserNostrProfileSnapshot, upsertUserByPubkey } from "@myth/db"
+import type { ProfileSyncJobPayload } from "@myth/shared"
+import { fetchLatestNostrProfile } from "@myth/shared/nostr-profile"
 
 export async function processProfileSyncJob(payload: ProfileSyncJobPayload) {
   await upsertUserByPubkey(payload.pubkey)

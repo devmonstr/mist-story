@@ -4,7 +4,7 @@ import {
   publishChapterInputSchema,
   reorderChaptersInputSchema,
   updateChapterInputSchema,
-} from "@mist/shared"
+} from "@myth/shared"
 import { requireAuth } from "../middleware/require-auth"
 import { validateBody } from "../middleware/validate"
 import {

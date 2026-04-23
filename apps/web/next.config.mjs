@@ -77,7 +77,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  transpilePackages: ["@mist/shared"],
+  transpilePackages: ["@myth/shared"],
 }
 
 export default nextConfig

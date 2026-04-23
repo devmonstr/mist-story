@@ -15,7 +15,7 @@ bun run typecheck
 
 ## Script Conventions
 
-- Root workspace fan-out: `bun run --filter @mist/<pkg> <script>`
+- Root workspace fan-out: `bun run --filter @myth/<pkg> <script>`
 - Bun runtime for CLIs: `bun --bun <cli>`
 - Bun runtime for TS entrypoints: `bun <file>.ts`
 - Watch mode: `bun --watch <file>.ts`

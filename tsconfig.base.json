@@ -11,16 +11,16 @@
     "forceConsistentCasingInFileNames": true,
     "moduleDetection": "force",
     "paths": {
-      "@mist/shared": ["./packages/shared/src/index.ts"],
-      "@mist/shared/*": ["./packages/shared/src/*"],
-      "@mist/db": ["./packages/db/src/index.ts"],
-      "@mist/db/*": ["./packages/db/src/*"],
-      "@mist/redis": ["./packages/redis/src/index.ts"],
-      "@mist/redis/*": ["./packages/redis/src/*"],
-      "@mist/queue": ["./packages/queue/src/index.ts"],
-      "@mist/queue/*": ["./packages/queue/src/*"],
-      "@mist/media": ["./packages/media/src/index.ts"],
-      "@mist/media/*": ["./packages/media/src/*"]
+      "@myth/shared": ["./packages/shared/src/index.ts"],
+      "@myth/shared/*": ["./packages/shared/src/*"],
+      "@myth/db": ["./packages/db/src/index.ts"],
+      "@myth/db/*": ["./packages/db/src/*"],
+      "@myth/redis": ["./packages/redis/src/index.ts"],
+      "@myth/redis/*": ["./packages/redis/src/*"],
+      "@myth/queue": ["./packages/queue/src/index.ts"],
+      "@myth/queue/*": ["./packages/queue/src/*"],
+      "@myth/media": ["./packages/media/src/index.ts"],
+      "@myth/media/*": ["./packages/media/src/*"]
     }
   }
 }

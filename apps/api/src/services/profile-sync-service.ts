@@ -3,14 +3,14 @@ import {
   markUserProfileFetchAttempt,
   saveUserNostrProfileSnapshot,
   upsertUserByPubkey,
-} from "@mist/db"
-import { enqueueProfileSync } from "@mist/queue"
+} from "@myth/db"
+import { enqueueProfileSync } from "@myth/queue"
 import {
   createRedisClient,
   PROFILE_SYNC_THROTTLE_SECONDS,
   redisKeys,
-} from "@mist/redis"
-import { fetchLatestNostrProfile } from "@mist/shared/nostr-profile"
+} from "@myth/redis"
+import { fetchLatestNostrProfile } from "@myth/shared/nostr-profile"
 import { env } from "../config/env"
 
 const redis = createRedisClient(env.REDIS_URL)

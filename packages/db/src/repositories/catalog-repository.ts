@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client"
 import { prisma } from "../client"
-import type { CatalogSortBy } from "@mist/shared"
+import type { CatalogSortBy } from "@myth/shared"
 
 export type PublicCatalogNovelFilters = {
   query?: string

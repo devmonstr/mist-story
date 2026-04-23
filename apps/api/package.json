@@ -1,5 +1,5 @@
 {
-  "name": "@mist/api",
+  "name": "@myth/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,11 +12,11 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.899.0",
-    "@mist/db": "workspace:*",
-    "@mist/media": "workspace:*",
-    "@mist/queue": "workspace:*",
-    "@mist/redis": "workspace:*",
-    "@mist/shared": "workspace:*",
+    "@myth/db": "workspace:*",
+    "@myth/media": "workspace:*",
+    "@myth/queue": "workspace:*",
+    "@myth/redis": "workspace:*",
+    "@myth/shared": "workspace:*",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "express": "^5.1.0",

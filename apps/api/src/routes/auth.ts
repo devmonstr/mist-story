@@ -4,7 +4,7 @@ import {
   authMeResponseSchema,
   authReverifyRequestSchema,
   authVerifyRequestSchema,
-} from "@mist/shared"
+} from "@myth/shared"
 import {
   SESSION_COOKIE_NAME,
   SESSION_PRESENCE_COOKIE_NAME,

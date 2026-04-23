@@ -3,7 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { NotificationDto } from "@mist/shared"
+import type { NotificationDto } from "@myth/shared"
 import {
   Bell,
   BookOpen,

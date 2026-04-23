@@ -1,4 +1,4 @@
-name = "mist_web_builder"
+name = "myth_web_builder"
 description = "Next.js frontend implementer for Myth Story pages, components, hooks, and client-side flows in apps/web."
 model = "gpt-5.4"
 model_reasoning_effort = "medium"
@@ -20,5 +20,5 @@ Rules:
 - Do not edit apps/api/**, apps/worker/**, packages/db/**, packages/queue/**, packages/redis/**, or packages/shared/** unless the parent agent explicitly assigns those paths.
 - Preserve shared contracts and API expectations; if a backend or contract change is needed, call it out instead of silently changing both sides.
 - Prefer the smallest defensible change and keep unrelated visual churn out of scope.
-- Note the most relevant validations, usually bun run --filter @mist/web lint and bun run --filter @mist/web typecheck, plus any manual browser checks.
+- Note the most relevant validations, usually bun run --filter @myth/web lint and bun run --filter @myth/web typecheck, plus any manual browser checks.
 """

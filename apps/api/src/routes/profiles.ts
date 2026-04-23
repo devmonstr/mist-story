@@ -1,5 +1,5 @@
 import { Router } from "express"
-import { profileConnectionsQuerySchema } from "@mist/shared"
+import { profileConnectionsQuerySchema } from "@myth/shared"
 import { requireAuth } from "../middleware/require-auth"
 import {
   followProfile,

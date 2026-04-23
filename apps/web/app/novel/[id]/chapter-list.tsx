@@ -8,7 +8,7 @@ import {
   type PublicNovelChapterListDto,
   type PublicNovelChapterDto,
   type PublicNovelDetailDto,
-} from "@mist/shared"
+} from "@myth/shared"
 import { isChapterUnlocked } from "@/lib/zap-utils"
 import { formatPublishedDate } from "./novel-utils"
 import { fetchPublicNovelDetail } from "@/lib/api"

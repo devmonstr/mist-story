@@ -1,5 +1,5 @@
-import { refreshPublicCatalogMetrics } from "@mist/db"
-import type { PublicCatalogMetricsRefreshJobPayload } from "@mist/shared"
+import { refreshPublicCatalogMetrics } from "@myth/db"
+import type { PublicCatalogMetricsRefreshJobPayload } from "@myth/shared"
 
 export async function processPublicCatalogMetricsRefreshJob(
   payload: PublicCatalogMetricsRefreshJobPayload

@@ -6,7 +6,7 @@ Date: 2026-04-09
 
 - Runtime: `bun run start`
 - Infra: local `postgres` + `redis` via `bun run infra:up`
-- Stack under test: `@mist/web`, `@mist/api`, `@mist/worker`
+- Stack under test: `@myth/web`, `@myth/api`, `@myth/worker`
 - Route mix:
   - `/` weight `35`
   - `/discover` weight `25`

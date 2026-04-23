@@ -8,7 +8,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3"
-import type { ProfileImageAssetType } from "@mist/shared"
+import type { ProfileImageAssetType } from "@myth/shared"
 import sharp from "sharp"
 
 export type R2MediaConfig = {

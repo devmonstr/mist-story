@@ -20,15 +20,15 @@
       },
     },
     "apps/api": {
-      "name": "@mist/api",
+      "name": "@myth/api",
       "version": "0.1.0",
       "dependencies": {
         "@aws-sdk/client-s3": "^3.899.0",
-        "@mist/db": "workspace:*",
-        "@mist/media": "workspace:*",
-        "@mist/queue": "workspace:*",
-        "@mist/redis": "workspace:*",
-        "@mist/shared": "workspace:*",
+        "@myth/db": "workspace:*",
+        "@myth/media": "workspace:*",
+        "@myth/queue": "workspace:*",
+        "@myth/redis": "workspace:*",
+        "@myth/shared": "workspace:*",
         "cookie-parser": "^1.4.7",
         "cors": "^2.8.5",
         "express": "^5.1.0",
@@ -37,7 +37,7 @@
       },
     },
     "apps/web": {
-      "name": "@mist/web",
+      "name": "@myth/web",
       "version": "0.1.0",
       "dependencies": {
         "@dnd-kit/core": "^6.3.1",
@@ -45,7 +45,7 @@
         "@dnd-kit/sortable": "^10.0.0",
         "@dnd-kit/utilities": "^3.2.2",
         "@hookform/resolvers": "^3.9.1",
-        "@mist/shared": "workspace:*",
+        "@myth/shared": "workspace:*",
         "@noble/hashes": "^2.0.1",
         "@noble/secp256k1": "^3.0.0",
         "@radix-ui/react-accordion": "1.2.12",
@@ -107,22 +107,22 @@
       },
     },
     "apps/worker": {
-      "name": "@mist/worker",
+      "name": "@myth/worker",
       "version": "0.1.0",
       "dependencies": {
-        "@mist/db": "workspace:*",
-        "@mist/media": "workspace:*",
-        "@mist/queue": "workspace:*",
-        "@mist/redis": "workspace:*",
-        "@mist/shared": "workspace:*",
+        "@myth/db": "workspace:*",
+        "@myth/media": "workspace:*",
+        "@myth/queue": "workspace:*",
+        "@myth/redis": "workspace:*",
+        "@myth/shared": "workspace:*",
         "bullmq": "^5.43.1",
       },
     },
     "packages/db": {
-      "name": "@mist/db",
+      "name": "@myth/db",
       "version": "0.1.0",
       "dependencies": {
-        "@mist/shared": "workspace:*",
+        "@myth/shared": "workspace:*",
         "@prisma/client": "^6.5.0",
       },
       "devDependencies": {
@@ -130,31 +130,31 @@
       },
     },
     "packages/media": {
-      "name": "@mist/media",
+      "name": "@myth/media",
       "version": "0.1.0",
       "dependencies": {
         "@aws-sdk/client-s3": "^3.899.0",
-        "@mist/shared": "workspace:*",
+        "@myth/shared": "workspace:*",
         "sharp": "^0.34.5",
       },
     },
     "packages/queue": {
-      "name": "@mist/queue",
+      "name": "@myth/queue",
       "version": "0.1.0",
       "dependencies": {
-        "@mist/shared": "workspace:*",
+        "@myth/shared": "workspace:*",
         "bullmq": "^5.43.1",
       },
     },
     "packages/redis": {
-      "name": "@mist/redis",
+      "name": "@myth/redis",
       "version": "0.1.0",
       "dependencies": {
         "ioredis": "^5.4.2",
       },
     },
     "packages/shared": {
-      "name": "@mist/shared",
+      "name": "@myth/shared",
       "version": "0.1.0",
       "dependencies": {
         "nostr-tools": "^2.23.3",
@@ -396,21 +396,21 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "3.1.2", "@jridgewell/sourcemap-codec": "1.5.5" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
-    "@mist/api": ["@mist/api@workspace:apps/api"],
+    "@myth/api": ["@myth/api@workspace:apps/api"],
 
-    "@mist/db": ["@mist/db@workspace:packages/db"],
+    "@myth/db": ["@myth/db@workspace:packages/db"],
 
-    "@mist/media": ["@mist/media@workspace:packages/media"],
+    "@myth/media": ["@myth/media@workspace:packages/media"],
 
-    "@mist/queue": ["@mist/queue@workspace:packages/queue"],
+    "@myth/queue": ["@myth/queue@workspace:packages/queue"],
 
-    "@mist/redis": ["@mist/redis@workspace:packages/redis"],
+    "@myth/redis": ["@myth/redis@workspace:packages/redis"],
 
-    "@mist/shared": ["@mist/shared@workspace:packages/shared"],
+    "@myth/shared": ["@myth/shared@workspace:packages/shared"],
 
-    "@mist/web": ["@mist/web@workspace:apps/web"],
+    "@myth/web": ["@myth/web@workspace:apps/web"],
 
-    "@mist/worker": ["@mist/worker@workspace:apps/worker"],
+    "@myth/worker": ["@myth/worker@workspace:apps/worker"],
 
     "@msgpackr-extract/msgpackr-extract-darwin-arm64": ["@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.3", "", { "os": "darwin", "cpu": "arm64" }, "sha512-QZHtlVgbAdy2zAqNA9Gu1UpIuI8Xvsd1v8ic6B2pZmeFnFcMWiPLfWXh7TVw4eGEZ/C9TH281KwhVoeQUKbyjw=="],
 
