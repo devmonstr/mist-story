@@ -1,36 +1,107 @@
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { ArrowRight } from "lucide-react"
+import type { LibraryCatalogNovelDto } from "@myth/shared"
+import { HomeHeroClient, type HomeHeroNovelView } from "@/components/home-hero-client"
+import { fetchLibraryCatalog } from "@/lib/api"
+import { resolveNovelCoverSrc } from "@/lib/novel-cover"
 
-export function HeroSection() {
+type HomeHeroCatalog = {
+  featuredNovels: HomeHeroNovelView[]
+  rankings: {
+    novels: HomeHeroNovelView[]
+    translations: HomeHeroNovelView[]
+    newVoices: HomeHeroNovelView[]
+  }
+}
+
+const genreShortcuts = [
+  { label: "Fantasy", href: "/library?genre=fantasy", icon: "sparkles" as const },
+  { label: "Action", href: "/library?genre=action", icon: "sword" as const },
+  { label: "Romance", href: "/library?genre=romance", icon: "heart" as const },
+  { label: "Mystery", href: "/library?genre=mystery", icon: "search" as const },
+  {
+    label: "Trending",
+    href: "/library?collection=trending&sort=popular",
+    icon: "flame" as const,
+  },
+  { label: "More", href: "/discover", icon: "grid" as const },
+]
+
+function getNovelHref(novel: LibraryCatalogNovelDto) {
+  return `/novel/${novel.slug || novel.id}`
+}
+
+function toHeroNovelView(novel: LibraryCatalogNovelDto): HomeHeroNovelView {
+  return {
+    id: novel.id,
+    title: novel.title,
+    href: getNovelHref(novel),
+    authorName: novel.author.displayName || "Unknown writer",
+    summary: novel.summary,
+    coverSrc: resolveNovelCoverSrc({
+      novelId: novel.id,
+      coverUrl: novel.coverUrl,
+      coverStorageKey: novel.coverStorageKey,
+    }),
+    genre: novel.genre || null,
+    status: novel.status || null,
+    chaptersCount: novel.chaptersCount,
+    rating: novel.rating,
+  }
+}
+
+async function loadHomeHeroCatalog(): Promise<HomeHeroCatalog> {
+  try {
+    const [popularCatalog, rankingCatalog, translationCatalog, newVoicesCatalog] =
+      await Promise.all([
+        fetchLibraryCatalog({ sortBy: "popular", pageSize: 6 }),
+        fetchLibraryCatalog({ sortBy: "rating", pageSize: 5 }),
+        fetchLibraryCatalog({
+          sortBy: "rating",
+          workType: "TRANSLATION",
+          pageSize: 5,
+        }),
+        fetchLibraryCatalog({
+          sortBy: "recent",
+          collection: "new-voices",
+          pageSize: 5,
+        }),
+      ])
+
+    return {
+      featuredNovels: popularCatalog.novels.slice(0, 6).map(toHeroNovelView),
+      rankings: {
+        novels: rankingCatalog.novels.slice(0, 5).map(toHeroNovelView),
+        translations: translationCatalog.novels.slice(0, 5).map(toHeroNovelView),
+        newVoices: newVoicesCatalog.novels.slice(0, 5).map(toHeroNovelView),
+      },
+    }
+  } catch (error) {
+    console.error("[home] failed to load hero catalog", error)
+    return {
+      featuredNovels: [],
+      rankings: {
+        novels: [],
+        translations: [],
+        newVoices: [],
+      },
+    }
+  }
+}
+
+export async function HeroSection() {
+  const catalog = await loadHomeHeroCatalog()
+
   return (
-    <section className="relative w-full">
-      <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32 lg:px-8 lg:py-40">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm uppercase tracking-widest text-muted-foreground">
-            For Writers & Readers
-          </p>
-          <h1 className="mt-6 font-serif text-4xl leading-tight tracking-tight text-foreground sm:text-5xl md:text-6xl lg:text-7xl text-balance">
-            Where Stories Come to Life
-          </h1>
-          <p className="mt-6 text-lg leading-relaxed text-muted-foreground sm:text-xl text-pretty">
-            A minimalist platform designed for the craft of writing. 
-            Write your novel, share your stories, and discover new voices 
-            in a distraction-free environment.
-          </p>
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Button size="lg" asChild className="w-full sm:w-auto">
-              <Link href="/studio">
-                Start Writing
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button variant="outline" size="lg" asChild className="w-full sm:w-auto">
-              <Link href="/discover">Explore Stories</Link>
-            </Button>
-          </div>
-        </div>
-      </div>
-    </section>
+    <HomeHeroClient
+      featuredNovels={catalog.featuredNovels}
+      rankings={catalog.rankings}
+      genreShortcuts={genreShortcuts}
+      discoverHref="/discover"
+      libraryHref="/library?sort=popular"
+      rankingHrefs={{
+        novels: "/library?sort=rating",
+        translations: "/library?sort=rating&workType=TRANSLATION",
+        newVoices: "/library?collection=new-voices&sort=recent",
+      }}
+    />
   )
 }

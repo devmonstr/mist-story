@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client"
 import { prisma } from "../client"
+import { normalizeNovelGenreSlug } from "@myth/shared"
 import type { CatalogSortBy } from "@myth/shared"
 
 export type PublicCatalogNovelFilters = {
@@ -79,9 +80,11 @@ export function buildPublishedNovelWhere(
   }
 
   if (options.includeGenre !== false && filters.genre?.trim()) {
+    const genre = normalizeNovelGenreSlug(filters.genre) ?? filters.genre.trim()
+
     and.push({
       genre: {
-        equals: filters.genre.trim(),
+        equals: genre,
         mode: "insensitive" as const,
       },
     })
@@ -240,7 +243,9 @@ function buildPublishedNovelWhereSql(filters: PublicCatalogNovelFilters = {}) {
   }
 
   if (filters.genre?.trim()) {
-    clauses.push(Prisma.sql`n."genre" ILIKE ${filters.genre.trim()}`)
+    clauses.push(
+      Prisma.sql`n."genre" ILIKE ${normalizeNovelGenreSlug(filters.genre) ?? filters.genre.trim()}`
+    )
   }
 
   if (filters.workType && filters.workType !== "all") {
@@ -807,8 +812,6 @@ type LibraryCatalogCursorQueryInput = {
   direction?: "next" | "prev" | null
   collection?: CatalogCollection | null
 }
-
-type LibraryCatalogCursorRow = LibraryCollectionNovelRow
 
 function buildLibraryCatalogCursorWhereSql(
   sortBy: CatalogSortBy,

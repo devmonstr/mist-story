@@ -1,8 +1,22 @@
 import { z } from "zod"
+import { normalizeNovelGenreSlug } from "./genres"
 
 export const novelStatusSchema = z.enum(["Ongoing", "Completed", "Hiatus"])
 export const novelVisibilitySchema = z.enum(["PUBLISHED", "HIDDEN"])
 export const novelWorkTypeSchema = z.enum(["ORIGINAL", "TRANSLATION"])
+export const novelGenreInputSchema = z.string().trim().min(1).transform((value, context) => {
+  const slug = normalizeNovelGenreSlug(value)
+
+  if (!slug) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Invalid genre",
+    })
+    return z.NEVER
+  }
+
+  return slug
+})
 
 export const novelCoverUploadSchema = z.object({
   dataUrl: z.string().min(1),
@@ -45,7 +59,7 @@ export const novelSchema = z.object({
 export const createNovelInputSchema = z.object({
   title: z.string().min(1).max(200),
   summary: z.string().max(2000).default(""),
-  genre: z.string().min(1),
+  genre: novelGenreInputSchema,
   workType: novelWorkTypeSchema.default("ORIGINAL"),
   subgenres: z.array(z.string()).default([]),
   tags: z.array(z.string()).default([]),

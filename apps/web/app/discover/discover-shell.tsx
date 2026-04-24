@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { getNovelGenreLabel } from "@myth/shared"
 import type { DiscoverResponse } from "@myth/shared"
 import {
   pageContentContainerClassName,
@@ -74,7 +75,7 @@ export function DiscoverShell({ children, activeFilters }: DiscoverShellProps) {
               ) : null}
               {activeFilters?.genre?.trim() ? (
                 <span className="rounded-full bg-muted px-3 py-1 text-foreground">
-                  Genre: {activeFilters.genre.trim()}
+                  Genre: {getNovelGenreLabel(activeFilters.genre)}
                 </span>
               ) : null}
               {activeFilters?.workType && activeFilters.workType !== "all" ? (

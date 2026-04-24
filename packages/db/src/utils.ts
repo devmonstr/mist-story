@@ -12,6 +12,7 @@ import type {
   ChapterVersionDto,
   NovelDto,
 } from "@myth/shared"
+import { getNovelGenreLabel } from "@myth/shared"
 
 export function slugify(value: string) {
   return value
@@ -167,7 +168,7 @@ export function serializeNovel(novel: Novel): NovelDto {
     slug: novel.slug,
     title: novel.title,
     summary: novel.summary,
-    genre: novel.genre,
+    genre: getNovelGenreLabel(novel.genre),
     workType: novel.workType,
     subgenres: novel.subgenres,
     tags: novel.tags,

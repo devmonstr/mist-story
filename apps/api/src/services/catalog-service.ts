@@ -14,7 +14,6 @@ import {
   hexToNpub,
   listLibraryCatalogNovelsByCursor,
   listLibraryCollectionFacetCounts,
-  listLibraryCollectionNovels,
   listLibraryCatalogFacetCounts,
   listLibraryCatalogNovels,
   listPublicNovelChaptersPage,
@@ -35,6 +34,7 @@ import type {
   PublicNovelReaderResponse,
   PublicNovelViewerStateDto,
 } from "@myth/shared"
+import { getNovelGenreLabel, normalizeNovelGenreSlug } from "@myth/shared"
 import {
   decodeLibraryCatalogCursor,
   encodeLibraryCatalogCursor,
@@ -59,6 +59,22 @@ function countWordsFromHtml(html: string) {
   }
 
   return plainText.split(/\s+/).filter(Boolean).length
+}
+
+function normalizeGenreFilter(value: string | null | undefined) {
+  if (!value?.trim()) {
+    return null
+  }
+
+  return normalizeNovelGenreSlug(value) ?? value.trim()
+}
+
+function buildGenreFacet(value: string, count: number) {
+  return {
+    value: normalizeNovelGenreSlug(value) ?? value,
+    label: getNovelGenreLabel(value),
+    count,
+  }
 }
 
 function resolveAuthorDisplayName(author: {
@@ -183,7 +199,7 @@ function buildPublicCatalogFilters(input: {
 
   return {
     q: input.query?.trim() || undefined,
-    genre: input.genre?.trim() || undefined,
+    genre: normalizeGenreFilter(input.genre) ?? undefined,
     workType: input.workType ?? "all",
     status: input.status ?? "all",
     collection: input.collection ?? "all",
@@ -191,37 +207,6 @@ function buildPublicCatalogFilters(input: {
     scope: "novel",
     page: input.page,
     pageSize: input.pageSize,
-  }
-}
-
-function buildCatalogFacetCounts(
-  novels: Awaited<ReturnType<typeof listLibraryCatalogNovels>>
-) {
-  const genreCounts = new Map<string, number>()
-  const workTypeCounts = new Map<"ORIGINAL" | "TRANSLATION", number>()
-  const statusCounts = new Map<"Ongoing" | "Completed" | "Hiatus", number>()
-
-  for (const novel of novels) {
-    genreCounts.set(novel.genre, (genreCounts.get(novel.genre) ?? 0) + 1)
-    workTypeCounts.set(novel.workType, (workTypeCounts.get(novel.workType) ?? 0) + 1)
-    statusCounts.set(novel.status, (statusCounts.get(novel.status) ?? 0) + 1)
-  }
-
-  return {
-    total: novels.length,
-    genres: [...genreCounts.entries()]
-      .map(([value, count]) => ({ value, label: value, count }))
-      .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label)),
-    workTypes: [...workTypeCounts.entries()]
-      .map(([value, count]) => ({
-        value,
-        label: value === "TRANSLATION" ? "Translation" : "Original",
-        count,
-      }))
-      .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label)),
-    statuses: [...statusCounts.entries()]
-      .map(([value, count]) => ({ value, label: value, count }))
-      .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label)),
   }
 }
 
@@ -389,7 +374,7 @@ function buildNovelDetailDto(input: {
     slug: input.novel.slug,
     title: input.novel.title,
     summary: input.novel.summary,
-    genre: input.novel.genre,
+    genre: getNovelGenreLabel(input.novel.genre),
     workType: input.novel.workType,
     subgenres: input.novel.subgenres,
     tags: input.novel.tags,
@@ -457,7 +442,7 @@ async function listLibraryCatalogUncached(input: {
 }): Promise<LibraryCatalogResponse> {
   const normalizedQuery = input.query?.trim() ?? ""
   const sortBy = input.sortBy ?? "recent"
-  const genre = input.genre?.trim() ? input.genre.trim() : null
+  const genre = normalizeGenreFilter(input.genre)
   const workType = input.workType ?? null
   const status = input.status ?? null
   const collection = input.collection ?? null
@@ -503,7 +488,10 @@ async function listLibraryCatalogUncached(input: {
       }),
     ])
 
-    facetCounts = collectionFacets
+    facetCounts = {
+      ...collectionFacets,
+      genres: collectionFacets.genres.map((item) => buildGenreFacet(item.value, item.count)),
+    }
     catalogNovels = collectionPage.items
     totalItems = collectionTotal
     hasNextPage =
@@ -526,11 +514,9 @@ async function listLibraryCatalogUncached(input: {
 
     facetCounts = {
       total: aggregateFacetCounts.total,
-      genres: aggregateFacetCounts.genres.map((item) => ({
-        value: item.genre,
-        label: item.genre,
-        count: item._count._all,
-      })),
+      genres: aggregateFacetCounts.genres.map((item) =>
+        buildGenreFacet(item.genre, item._count._all)
+      ),
       workTypes: aggregateFacetCounts.workTypes.map((item) => ({
         value: item.workType,
         label: item.workType === "TRANSLATION" ? "Translation" : "Original",
@@ -647,7 +633,7 @@ async function listLibraryCatalogUncached(input: {
       slug: novel.slug,
       title: novel.title,
       summary: novel.summary,
-      genre: novel.genre,
+      genre: getNovelGenreLabel(novel.genre),
       workType: novel.workType,
       status: novel.status,
       visibility: novel.visibility,
@@ -692,7 +678,7 @@ export async function listLibraryCatalog(input: {
       pageSize: input.pageSize ?? 18,
       cursor: input.cursor ?? null,
       direction: input.direction ?? null,
-      genre: input.genre?.trim() || null,
+      genre: normalizeGenreFilter(input.genre),
       workType: input.workType ?? null,
       status: input.status ?? null,
       collection: input.collection ?? null,

@@ -13,6 +13,7 @@ import {
   deleteReadingProgressForUserAndNovel,
   clearReadingProgressForUser,
 } from "@myth/db"
+import { getNovelGenreLabel } from "@myth/shared"
 import type {
   BookmarkState,
   MyLibraryContinueReadingDto,
@@ -59,7 +60,7 @@ export async function getMyLibrary(userId: string): Promise<MyLibraryResponse> {
       slug: bookmark.novel.slug,
       title: bookmark.novel.title,
       authorDisplayName: bookmark.novel.authorDisplayName,
-      genre: bookmark.novel.genre,
+      genre: getNovelGenreLabel(bookmark.novel.genre),
       summary: bookmark.novel.summary,
       coverUrl: bookmark.novel.coverUrl,
       coverStorageKey: bookmark.novel.coverStorageKey ?? null,
@@ -77,7 +78,7 @@ export async function getMyLibrary(userId: string): Promise<MyLibraryResponse> {
     slug: entry.novel.slug,
     title: entry.novel.title,
     authorDisplayName: entry.novel.authorDisplayName,
-    genre: entry.novel.genre,
+    genre: getNovelGenreLabel(entry.novel.genre),
     summary: entry.novel.summary,
     coverUrl: entry.novel.coverUrl,
     coverStorageKey: entry.novel.coverStorageKey ?? null,

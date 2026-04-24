@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto"
 import { Prisma } from "@prisma/client"
+import { getNovelGenreLabel } from "@myth/shared"
 import { ensureCatalogSearchInfrastructure } from "../catalog-search"
 import { prisma } from "../client"
 
@@ -7,33 +8,67 @@ const SAMPLE_AUTHOR_HANDLE_PREFIX = "sample_author_"
 const SAMPLE_NOVEL_SLUG_PREFIX = "sample-story-"
 
 const GENRES = [
-  "Fantasy",
-  "Romance",
-  "Science Fiction",
-  "Mystery",
-  "Thriller",
-  "Historical Fiction",
-  "Horror",
-  "Adventure",
-  "Drama",
-  "Literary Fiction",
-  "Comedy",
-  "Slice of Life",
+  "action",
+  "adventure",
+  "comedy",
+  "drama",
+  "fantasy",
+  "romance",
+  "sci-fi",
+  "horror",
+  "mystery",
+  "thriller",
+  "supernatural",
+  "historical",
+  "slice-of-life",
+  "sports",
+  "psychological",
+  "martial-arts",
+  "school-life",
+  "wuxia",
+  "xianxia",
+  "xuanhuan",
+  "cultivation",
+  "isekai",
+  "shounen",
+  "shoujo",
+  "seinen",
+  "josei",
+  "bl",
+  "gl",
+  "mature",
 ] as const
 
 const SUBGENRES_BY_GENRE: Record<(typeof GENRES)[number], string[]> = {
-  Fantasy: ["epic fantasy", "magic academy", "sword and sorcery", "portal fantasy"],
-  Romance: ["slow burn", "enemies to lovers", "second chance", "heartwarming"],
-  "Science Fiction": ["space opera", "cyberpunk", "time travel", "post-apocalyptic"],
-  Mystery: ["detective", "cozy mystery", "whodunit", "locked room"],
-  Thriller: ["psychological", "crime", "political", "survival"],
-  "Historical Fiction": ["royal court", "war drama", "period mystery", "family saga"],
-  Horror: ["supernatural", "folk horror", "haunted house", "body horror"],
-  Adventure: ["treasure hunt", "coming of age", "expedition", "high seas"],
-  Drama: ["family drama", "coming of age", "workplace", "small town"],
-  "Literary Fiction": ["character study", "introspective", "urban life", "generational"],
-  Comedy: ["rom-com", "satire", "fish out of water", "ensemble cast"],
-  "Slice of Life": ["healing", "school life", "friendship", "daily life"],
+  action: ["mercenary", "survival", "street fight", "high stakes"],
+  adventure: ["treasure hunt", "coming of age", "expedition", "high seas"],
+  comedy: ["rom-com", "satire", "fish out of water", "ensemble cast"],
+  drama: ["family drama", "coming of age", "workplace", "small town"],
+  fantasy: ["epic fantasy", "magic academy", "sword and sorcery", "portal fantasy"],
+  romance: ["slow burn", "enemies to lovers", "second chance", "heartwarming"],
+  "sci-fi": ["space opera", "cyberpunk", "time travel", "post-apocalyptic"],
+  horror: ["supernatural", "folk horror", "haunted house", "body horror"],
+  mystery: ["detective", "cozy mystery", "whodunit", "locked room"],
+  thriller: ["psychological", "crime", "political", "survival"],
+  supernatural: ["ghost story", "urban legend", "curses", "spirit world"],
+  historical: ["royal court", "war drama", "period mystery", "family saga"],
+  "slice-of-life": ["healing", "school life", "friendship", "daily life"],
+  sports: ["tournament", "underdog", "rivalry", "teamwork"],
+  psychological: ["mind games", "trauma", "identity", "obsession"],
+  "martial-arts": ["dojo rivalry", "tournament", "training arc", "master disciple"],
+  "school-life": ["classroom", "club activities", "youth", "campus romance"],
+  wuxia: ["jianghu", "sword sect", "honor", "wandering hero"],
+  xianxia: ["immortals", "dao heart", "heavenly tribulation", "spiritual roots"],
+  xuanhuan: ["ancient clans", "beast souls", "mystic realms", "bloodlines"],
+  cultivation: ["qi refining", "breakthrough", "alchemy", "sect competition"],
+  isekai: ["rebirth", "summoned hero", "game world", "cheat skill"],
+  shounen: ["friendship", "training arc", "rivalry", "big dreams"],
+  shoujo: ["first love", "friendship", "self-discovery", "emotional growth"],
+  seinen: ["politics", "moral conflict", "survival", "adult life"],
+  josei: ["career", "adult romance", "family", "healing"],
+  bl: ["slow burn", "roommates", "reunion", "mutual healing"],
+  gl: ["first love", "rivals", "slice of life", "mutual healing"],
+  mature: ["dark fantasy", "crime", "political intrigue", "high-stakes conflict"],
 }
 
 const TITLE_PREFIXES = [
@@ -224,7 +259,7 @@ function buildSummary(input: {
   subgenres: string[]
 }) {
   const modeLabel = input.workType === "TRANSLATION" ? "translated serial" : "original serial"
-  return `${input.title} is a ${modeLabel} in ${input.genre.toLowerCase()} with ${input.subgenres.join(", ")} elements, crafted as benchmark content for large-scale catalog and search testing.`
+  return `${input.title} is a ${modeLabel} in ${getNovelGenreLabel(input.genre).toLowerCase()} with ${input.subgenres.join(", ")} elements, crafted as benchmark content for large-scale catalog and search testing.`
 }
 
 function buildChapterHtml(input: {
@@ -240,7 +275,7 @@ function buildChapterHtml(input: {
 
   return [
     `<h1>${input.chapterTitle}</h1>`,
-    `<p>${input.novelTitle} continues in chapter ${input.chapterNumber}, bringing a ${input.genre.toLowerCase()} turn that keeps the cast moving toward the next revelation.</p>`,
+    `<p>${input.novelTitle} continues in chapter ${input.chapterNumber}, bringing a ${getNovelGenreLabel(input.genre).toLowerCase()} turn that keeps the cast moving toward the next revelation.</p>`,
     `<p>${intro}</p>`,
     `<p>${middle}</p>`,
     `<p>${outro}</p>`,
@@ -362,7 +397,7 @@ async function main() {
         workType,
         subgenres,
         tags: [
-          genre.toLowerCase().replaceAll(" ", "-"),
+          genre,
           subgenres[0].replaceAll(" ", "-"),
           workType === "TRANSLATION" ? "translated" : "original",
           "benchmark",
@@ -396,7 +431,7 @@ async function main() {
           chapterNumber,
           rng,
         })
-        const previewText = `${title} chapter ${chapterNumber} follows a ${genre.toLowerCase()} turn with ${pick(SUBGENRES_BY_GENRE[genre], rng)} tension and benchmark-friendly prose.`
+        const previewText = `${title} chapter ${chapterNumber} follows a ${getNovelGenreLabel(genre).toLowerCase()} turn with ${pick(SUBGENRES_BY_GENRE[genre], rng)} tension and benchmark-friendly prose.`
 
         chapters.push({
           id: chapterId,

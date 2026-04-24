@@ -23,6 +23,7 @@ import {
   unfollowUser,
   upsertUserByPubkey,
 } from "@myth/db"
+import { getNovelGenreLabel } from "@myth/shared"
 import {
   enqueueNotificationDispatch,
   enqueuePublicCatalogMetricsRefresh,
@@ -247,7 +248,7 @@ export async function getProfilePage(
       slug: novel.slug,
       title: novel.title,
       summary: novel.summary,
-      genre: novel.genre,
+      genre: getNovelGenreLabel(novel.genre),
       coverUrl: novel.coverUrl,
       coverStorageKey: novel.coverStorageKey ?? null,
       chaptersCount: novel.chaptersCount,

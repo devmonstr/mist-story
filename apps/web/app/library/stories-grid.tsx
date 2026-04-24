@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { NovelCard } from "@/components/novel/novel-card"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, BookOpen, RefreshCcw } from "lucide-react"
+import { getNovelGenreLabel } from "@myth/shared"
 import { resolveNovelCoverSrc } from "@/lib/novel-cover"
 import { useLibraryCatalogContext } from "./library-catalog-context"
 import {
@@ -182,7 +183,7 @@ export function StoriesGrid() {
         </p>
         {catalog?.filters.genre ? (
           <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-            {catalog.filters.genre}
+            {getNovelGenreLabel(catalog.filters.genre)}
           </span>
         ) : catalog?.filters.collection ? (
           <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">

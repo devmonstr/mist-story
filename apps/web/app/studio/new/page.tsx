@@ -36,25 +36,11 @@ import {
 } from "@/components/novel/novel-cover-image-field"
 import { useRequireAuth } from "@/hooks/use-require-auth"
 import { createNovel } from "@/lib/api"
+import { NOVEL_GENRES } from "@myth/shared"
 import {
   buildNovelInputFromForm,
   type StudioNovelFormData,
 } from "@/lib/studio"
-
-const GENRES = [
-  "Fantasy",
-  "Science Fiction",
-  "Romance",
-  "Mystery",
-  "Thriller",
-  "Horror",
-  "Historical Fiction",
-  "Literary Fiction",
-  "Adventure",
-  "Drama",
-  "Comedy",
-  "Other",
-]
 
 const STATUS_OPTIONS = [
   { value: "draft", label: "Draft (Private)" },
@@ -73,6 +59,7 @@ export default function NewNovelPage() {
     title: "",
     description: "",
     genre: "",
+    legacyGenreLabel: null,
     status: "draft",
     workType: "ORIGINAL",
     tags: [],
@@ -272,15 +259,17 @@ export default function NewNovelPage() {
                     </Label>
                     <Select
                       value={formData.genre}
-                      onValueChange={(value) => updateField("genre", value)}
+                      onValueChange={(value) =>
+                        updateField("genre", value as StudioNovelFormData["genre"])
+                      }
                     >
                       <SelectTrigger className={errors.genre ? "rounded-none border-destructive" : "rounded-none"}>
                         <SelectValue placeholder="Select a genre" />
                       </SelectTrigger>
                       <SelectContent>
-                        {GENRES.map((genre) => (
-                          <SelectItem key={genre} value={genre.toLowerCase()}>
-                            {genre}
+                        {NOVEL_GENRES.map((genre) => (
+                          <SelectItem key={genre.slug} value={genre.slug}>
+                            {genre.label}
                           </SelectItem>
                         ))}
                       </SelectContent>

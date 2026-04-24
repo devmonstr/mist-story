@@ -1,9 +1,11 @@
 import type {
   ChapterDto,
   CreateNovelInput,
+  NovelGenreSlug,
   NovelDto,
   StudioChapterListResponse,
 } from "@myth/shared"
+import { normalizeNovelGenreSlug } from "@myth/shared"
 import { resolveNovelCoverSrc } from "./novel-cover"
 
 export interface StudioNovelCard {
@@ -21,7 +23,8 @@ export interface StudioNovelCard {
 export interface StudioNovelFormData {
   title: string
   description: string
-  genre: string
+  genre: NovelGenreSlug | ""
+  legacyGenreLabel: string | null
   status: "draft" | "publishing"
   workType: "ORIGINAL" | "TRANSLATION"
   tags: string[]
@@ -75,10 +78,13 @@ export function mapNovelToCard(novel: NovelDto): StudioNovelCard {
 }
 
 export function mapNovelToFormData(novel: NovelDto): StudioNovelFormData {
+  const normalizedGenre = normalizeNovelGenreSlug(novel.genre)
+
   return {
     title: novel.title,
     description: novel.summary,
-    genre: novel.genre.toLowerCase(),
+    genre: normalizedGenre ?? "",
+    legacyGenreLabel: normalizedGenre ? null : novel.genre.trim() || null,
     status: novel.visibility === "HIDDEN" ? "draft" : "publishing",
     workType: novel.workType,
     tags: novel.tags,
@@ -101,11 +107,16 @@ export function buildNovelInputFromForm(
 ): CreateNovelInput {
   const visibility = formData.status === "draft" ? "HIDDEN" : "PUBLISHED"
   const status = formData.isComplete ? "Completed" : "Ongoing"
+  const genre = normalizeNovelGenreSlug(formData.genre)
+
+  if (!genre) {
+    throw new Error("Invalid genre")
+  }
 
   return {
     title: formData.title,
     summary: formData.description,
-    genre: formData.genre,
+    genre,
     workType: formData.workType,
     subgenres: [],
     tags: formData.tags,

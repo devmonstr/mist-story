@@ -8,6 +8,11 @@ import {
   searchPublishedNovelsWithCursor,
   searchPublishedNovelsWithPagination,
 } from "@myth/db"
+import {
+  getNovelGenreDescription,
+  getNovelGenreLabel,
+  normalizeNovelGenreSlug,
+} from "@myth/shared"
 import type {
   DiscoverCollectionDto,
   DiscoverGenreDto,
@@ -17,7 +22,6 @@ import type {
   SearchFilterType,
   SearchNovelResultDto,
   SearchResponse,
-  SearchResultItemDto,
   SearchSortBy,
 } from "@myth/shared"
 import {
@@ -36,19 +40,12 @@ function normalizeSearchQuery(query: string) {
   return query.replace(/\s+/g, " ").trim().slice(0, MAX_SEARCH_QUERY_LENGTH)
 }
 
-const GENRE_DESCRIPTIONS: Record<string, string> = {
-  Fantasy: "Epic adventures, magic, and otherworldly realms.",
-  Romance: "Love stories that touch the heart and inspire.",
-  "Mystery & Thriller": "Suspenseful tales that keep you guessing until the end.",
-  Mystery: "Suspenseful tales that keep you guessing until the end.",
-  Thriller: "Suspenseful tales that keep you guessing until the end.",
-  "Science Fiction": "Futuristic worlds and imaginative technology.",
-  "Historical Fiction": "Stories set in fascinating periods of history.",
-  "Literary Fiction": "Thoughtful narratives exploring the human condition.",
-}
+function normalizeGenreFilter(value: string | null | undefined) {
+  if (!value?.trim()) {
+    return null
+  }
 
-function buildGenreDescription(genre: string) {
-  return GENRE_DESCRIPTIONS[genre] ?? "Discover stories and voices in this genre."
+  return normalizeNovelGenreSlug(value) ?? value.trim()
 }
 
 function buildLibraryHref(input: {
@@ -104,7 +101,7 @@ function serializeCollectionPreviewNovels(
     title: novel.title,
     coverUrl: novel.coverUrl,
     coverStorageKey: novel.coverStorageKey ?? null,
-    genre: novel.genre,
+    genre: getNovelGenreLabel(novel.genre),
     authorName:
       novel.author.displayName?.trim() || novel.author.handle?.trim() || "Unknown author",
   }))
@@ -125,7 +122,7 @@ function buildPublicCatalogFilters(input: {
 }): PublicCatalogQuery {
   return {
     q: input.query?.trim() || undefined,
-    genre: input.genre?.trim() || undefined,
+    genre: normalizeGenreFilter(input.genre) ?? undefined,
     workType: input.workType ?? "all",
     status: input.status ?? "all",
     collection: input.collection ?? "all",
@@ -147,8 +144,8 @@ function mapFacetCounts(facets: {
   return {
     total: facets.total,
     genres: facets.genres.map((item) => ({
-      value: item.genre,
-      label: item.genre,
+      value: normalizeNovelGenreSlug(item.genre) ?? item.genre,
+      label: getNovelGenreLabel(item.genre),
       count: item._count._all,
     })),
     workTypes: facets.workTypes.map((item) => ({
@@ -188,13 +185,15 @@ async function getDiscoverDataUncached(input: {
   ])
 
   const discoverGenres: DiscoverGenreDto[] = facetCounts.genres.slice(0, 6).map((genre) => ({
-    id: genre.genre.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-    title: genre.genre,
-    description: buildGenreDescription(genre.genre),
+    id:
+      normalizeNovelGenreSlug(genre.genre) ??
+      genre.genre.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    title: getNovelGenreLabel(genre.genre),
+    description: getNovelGenreDescription(genre.genre),
     storiesCount: genre._count._all,
     href: buildLibraryHref({
       query: input.query,
-      genre: genre.genre,
+      genre: normalizeNovelGenreSlug(genre.genre) ?? genre.genre,
       workType: input.workType,
       status: input.status,
       sort: "popular",
@@ -210,7 +209,7 @@ async function getDiscoverDataUncached(input: {
       curator: "Myth Story Editors",
       href: buildLibraryHref({
         query: input.query,
-        genre: input.genre,
+        genre: filters.genre,
         workType: input.workType,
         status: input.status,
         collection: "trending",
@@ -225,7 +224,7 @@ async function getDiscoverDataUncached(input: {
       curator: "Community",
       href: buildLibraryHref({
         query: input.query,
-        genre: input.genre,
+        genre: filters.genre,
         workType: input.workType,
         status: input.status,
         collection: "hidden-gems",
@@ -240,7 +239,7 @@ async function getDiscoverDataUncached(input: {
       curator: "Myth Story Team",
       href: buildLibraryHref({
         query: input.query,
-        genre: input.genre,
+        genre: filters.genre,
         workType: input.workType,
         status: input.status,
         collection: "editors-picks",
@@ -255,7 +254,7 @@ async function getDiscoverDataUncached(input: {
       curator: "Community",
       href: buildLibraryHref({
         query: input.query,
-        genre: input.genre,
+        genre: filters.genre,
         workType: input.workType,
         status: input.status,
         collection: "new-voices",
@@ -284,7 +283,7 @@ export async function getDiscoverData(input: {
     "discover",
     {
       query: input.query?.trim() || null,
-      genre: input.genre?.trim() || null,
+      genre: normalizeGenreFilter(input.genre),
       workType: input.workType ?? null,
       status: input.status ?? null,
       collection: input.collection ?? null,
@@ -378,7 +377,7 @@ async function searchCatalogUncached(input: {
       title: novel.title,
       authorName: novel.authorName,
       authorNpub: hexToNpub(novel.authorPubkey),
-      genre: novel.genre,
+      genre: getNovelGenreLabel(novel.genre),
       summary: novel.summary,
       readsCount: novel.readsCount,
       chaptersCount: novel.chaptersCount,
@@ -520,7 +519,7 @@ async function searchCatalogUncached(input: {
     title: novel.title,
     authorName: novel.authorName,
     authorNpub: hexToNpub(novel.authorPubkey),
-    genre: novel.genre,
+    genre: getNovelGenreLabel(novel.genre),
     summary: novel.summary,
     readsCount: novel.readsCount,
     chaptersCount: novel.chaptersCount,
@@ -612,7 +611,7 @@ export async function searchCatalog(input: {
       pageSize: input.pageSize ?? 20,
       cursor: input.cursor ?? null,
       direction: input.direction ?? null,
-      genre: input.genre?.trim() || null,
+      genre: normalizeGenreFilter(input.genre),
       workType: input.workType ?? null,
       status: input.status ?? null,
     },

@@ -8,11 +8,11 @@ import {
 } from "@myth/db"
 import { enqueuePublicCatalogMetricsRefresh } from "@myth/queue"
 import { createRedisClient } from "@myth/redis"
+import { getNovelGenreLabel } from "@myth/shared"
 import type {
   AdminNovelListQuery,
   AdminNovelListResponse,
   AdminNovelSummary,
-  AdminRoleFlags,
   AdminStudioResponse,
   AdminUserListQuery,
   AdminUserListResponse,
@@ -27,7 +27,18 @@ import { env } from "../config/env"
 
 const redis = createRedisClient(env.REDIS_URL)
 
-type AdminUserRecord = Awaited<ReturnType<typeof listAdminUserRecords>>[number]
+type AdminUserRecord = {
+  id: string
+  pubkey: string
+  handle: string | null
+  displayName: string | null
+  avatarUrl: string | null
+  profileFetchedAt: Date | null
+  createdAt: Date
+  isReader: boolean
+  isWriter: boolean
+  isAdmin: boolean
+}
 
 function buildPagination(page: number, pageSize: number, totalItems: number) {
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
@@ -125,32 +136,13 @@ function buildAdminNovelSummary(novel: {
     authorDisplayName: novel.authorDisplayName,
     visibility: novel.visibility,
     status: novel.status,
-    genre: novel.genre,
+    genre: getNovelGenreLabel(novel.genre),
     chaptersCount: novel.chaptersCount,
     rating: novel.rating.toNumber(),
     ratingsCount: novel.ratingsCount,
     updatedAt: novel.updatedAt.toISOString(),
     publishedAt: novel.publishedAt?.toISOString() ?? null,
   }
-}
-
-async function listAdminUserRecords(take = 12) {
-  return prisma.user.findMany({
-    orderBy: [{ isAdmin: "desc" }, { createdAt: "desc" }],
-    take,
-    select: {
-      id: true,
-      pubkey: true,
-      handle: true,
-      displayName: true,
-      avatarUrl: true,
-      profileFetchedAt: true,
-      createdAt: true,
-      isReader: true,
-      isWriter: true,
-      isAdmin: true,
-    },
-  })
 }
 
 async function getAdminUserCounts(userIds: string[]) {

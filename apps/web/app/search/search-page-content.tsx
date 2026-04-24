@@ -9,6 +9,7 @@ import type {
   SearchFilterType,
   SearchSortBy,
 } from "@myth/shared"
+import { normalizeNovelGenreSlug } from "@myth/shared"
 import { NovelCard } from "@/components/novel/novel-card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -285,7 +286,8 @@ export function SearchPageContent() {
   const sortBy = (searchParams.get("sort") as SearchSortBy) || "relevance"
   const cursor = searchParams.get("cursor") || ""
   const direction = searchParams.get("direction") as CursorDirection
-  const genre = searchParams.get("genre") || ""
+  const rawGenre = searchParams.get("genre")
+  const genre = rawGenre ? normalizeNovelGenreSlug(rawGenre) ?? rawGenre : ""
   const workType = normalizeWorkType(searchParams.get("workType"))
   const status = normalizeStatus(searchParams.get("status"))
   const [queryInput, setQueryInput] = useState(urlQuery)

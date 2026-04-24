@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { normalizeNovelGenreSlug } from "@myth/shared"
 import type { CatalogSortBy } from "@myth/shared"
 
 type WorkTypeFilter = "ORIGINAL" | "TRANSLATION" | null
@@ -79,6 +80,14 @@ function normalizeCursorDirection(value: string | null): CursorDirection {
   return value === "next" || value === "prev" ? value : null
 }
 
+function normalizeGenre(value: string | null) {
+  if (!value?.trim()) {
+    return null
+  }
+
+  return normalizeNovelGenreSlug(value) ?? value.trim()
+}
+
 export function LibraryCatalogProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -91,7 +100,7 @@ export function LibraryCatalogProvider({ children }: { children: ReactNode }) {
   const [direction, setDirection] = useState<CursorDirection>(
     normalizeCursorDirection(searchParams.get("direction"))
   )
-  const [genre, setGenre] = useState<string | null>(searchParams.get("genre") || null)
+  const [genre, setGenre] = useState<string | null>(normalizeGenre(searchParams.get("genre")))
   const [workType, setWorkType] = useState<WorkTypeFilter>(
     normalizeWorkType(searchParams.get("workType"))
   )
@@ -111,7 +120,7 @@ export function LibraryCatalogProvider({ children }: { children: ReactNode }) {
     const nextSortBy = normalizeSortBy(searchParams.get("sort"))
     const nextCursor = normalizeCursor(searchParams.get("cursor"))
     const nextDirection = normalizeCursorDirection(searchParams.get("direction"))
-    const nextGenre = searchParams.get("genre") || null
+    const nextGenre = normalizeGenre(searchParams.get("genre"))
     const nextWorkType = normalizeWorkType(searchParams.get("workType"))
     const nextStatus = normalizeStatus(searchParams.get("status"))
     const nextCollection = normalizeCollection(searchParams.get("collection"))

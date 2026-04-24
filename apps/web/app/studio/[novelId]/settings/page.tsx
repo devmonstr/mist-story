@@ -31,26 +31,12 @@ import {
 } from "@/components/novel/novel-cover-image-field"
 import { useRequireAuth } from "@/hooks/use-require-auth"
 import { fetchNovel, updateNovel } from "@/lib/api"
+import { NOVEL_GENRES } from "@myth/shared"
 import {
   buildNovelInputFromForm,
   mapNovelToFormData,
   type StudioNovelFormData,
 } from "@/lib/studio"
-
-const GENRES = [
-  "Fantasy",
-  "Science Fiction",
-  "Romance",
-  "Mystery",
-  "Thriller",
-  "Horror",
-  "Historical Fiction",
-  "Literary Fiction",
-  "Adventure",
-  "Drama",
-  "Comedy",
-  "Other",
-]
 
 const STATUS_OPTIONS = [
   { value: "draft", label: "Draft (Private)" },
@@ -74,6 +60,7 @@ export default function NovelSettingsPage({
     title: "",
     description: "",
     genre: "",
+    legacyGenreLabel: null,
     status: "draft",
     workType: "ORIGINAL",
     tags: [],
@@ -89,6 +76,7 @@ export default function NovelSettingsPage({
   const [isLoaded, setIsLoaded] = useState(false)
   const [coverError, setCoverError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Partial<Record<keyof StudioNovelFormData, string>>>({})
 
   useEffect(() => {
     if (!user) return
@@ -111,7 +99,35 @@ export default function NovelSettingsPage({
     field: K,
     value: StudioNovelFormData[K]
   ) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+      ...(field === "genre" ? { legacyGenreLabel: null } : {}),
+    }))
+
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: undefined }))
+    }
+  }
+
+  const validateForm = () => {
+    const nextErrors: Partial<Record<keyof StudioNovelFormData, string>> = {}
+
+    if (!formData.title.trim()) nextErrors.title = "Title is required"
+    if (formData.title.length > 200) {
+      nextErrors.title = "Title must be less than 200 characters"
+    }
+    if (!formData.genre.trim()) {
+      nextErrors.genre = formData.legacyGenreLabel
+        ? `Please choose a new supported genre for this legacy value (${formData.legacyGenreLabel}).`
+        : "Please select a genre"
+    }
+    if (formData.description.length > 2000) {
+      nextErrors.description = "Description must be less than 2000 characters"
+    }
+
+    setErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
   }
 
   const handleCoverImageChange = (coverImage: NovelCoverImageSelection | null) => {
@@ -123,6 +139,7 @@ export default function NovelSettingsPage({
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault()
+    if (!validateForm()) return
 
     try {
       setIsSubmitting(true)
@@ -188,7 +205,9 @@ export default function NovelSettingsPage({
                     id="title"
                     value={formData.title}
                     onChange={(e) => updateField("title", e.target.value)}
+                    className={errors.title ? "border-destructive" : undefined}
                   />
+                  {errors.title ? <p className="text-xs text-destructive">{errors.title}</p> : null}
                 </div>
 
                 <div className="space-y-2">
@@ -198,7 +217,11 @@ export default function NovelSettingsPage({
                     value={formData.description}
                     onChange={(e) => updateField("description", e.target.value)}
                     rows={5}
+                    className={errors.description ? "border-destructive" : undefined}
                   />
+                  {errors.description ? (
+                    <p className="text-xs text-destructive">{errors.description}</p>
+                  ) : null}
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -206,19 +229,30 @@ export default function NovelSettingsPage({
                     <Label>Genre</Label>
                     <Select
                       value={formData.genre}
-                      onValueChange={(value) => updateField("genre", value)}
+                      onValueChange={(value) =>
+                        updateField("genre", value as StudioNovelFormData["genre"])
+                      }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className={errors.genre ? "border-destructive" : undefined}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {GENRES.map((genre) => (
-                          <SelectItem key={genre} value={genre.toLowerCase()}>
-                            {genre}
+                        {NOVEL_GENRES.map((genre) => (
+                          <SelectItem key={genre.slug} value={genre.slug}>
+                            {genre.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    {formData.legacyGenreLabel ? (
+                      <p className="text-xs text-amber-600">
+                        This novel currently uses an unsupported legacy genre:
+                        {" "}
+                        {formData.legacyGenreLabel}. Please choose one of the supported genres
+                        before saving.
+                      </p>
+                    ) : null}
+                    {errors.genre ? <p className="text-xs text-destructive">{errors.genre}</p> : null}
                   </div>
 
                   <div className="space-y-2">
@@ -380,4 +414,3 @@ export default function NovelSettingsPage({
     </div>
   )
 }
-

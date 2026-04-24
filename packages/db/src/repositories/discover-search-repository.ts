@@ -131,33 +131,6 @@ function buildAuthorSearchDocumentSql() {
   `
 }
 
-function buildNovelSearchWhereSql(filters: PublicCatalogNovelFilters, query: string) {
-  const clauses: Prisma.Sql[] = [Prisma.sql`n."visibility" = 'PUBLISHED'`]
-
-  if (filters.genre?.trim()) {
-    clauses.push(Prisma.sql`lower(n."genre") = lower(${filters.genre.trim()})`)
-  }
-
-  if (filters.workType && filters.workType !== "all") {
-    clauses.push(Prisma.sql`n."workType"::text = ${filters.workType}`)
-  }
-
-  if (filters.status && filters.status !== "all") {
-    clauses.push(Prisma.sql`n."status"::text = ${filters.status}`)
-  }
-
-  const searchDocument = buildNovelSearchDocumentSql()
-  clauses.push(Prisma.sql`
-    (
-      ${searchDocument} @@ websearch_to_tsquery('simple', ${query})
-      OR coalesce(n."title", '') % ${query}
-      OR coalesce(n."authorDisplayName", '') % ${query}
-    )
-  `)
-
-  return Prisma.sql`WHERE ${Prisma.join(clauses, " AND ")}`
-}
-
 function buildAuthorSearchWhereSql(query: string) {
   const searchDocument = buildAuthorSearchDocumentSql()
 

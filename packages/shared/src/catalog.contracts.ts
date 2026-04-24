@@ -4,6 +4,7 @@ import {
   novelVisibilitySchema,
   novelWorkTypeSchema,
 } from "./novel.contracts"
+import { normalizeNovelGenreSlug } from "./genres"
 
 export const catalogSortBySchema = z.enum([
   "relevance",
@@ -15,7 +16,12 @@ export const catalogSortBySchema = z.enum([
 
 export const publicCatalogScopeSchema = z.enum(["all", "novel", "author"])
 export const publicCatalogSortBySchema = z.enum(["relevance", "popular", "recent"])
-export const publicCatalogGenreFilterSchema = z.string().trim().min(1).optional()
+export const publicCatalogGenreFilterSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .transform((value) => normalizeNovelGenreSlug(value) ?? value)
+  .optional()
 export const publicCatalogWorkTypeFilterSchema = z.enum([
   "all",
   "ORIGINAL",

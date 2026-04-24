@@ -10,6 +10,7 @@ import {
 } from "@/components/page-heading"
 import { Search } from "lucide-react"
 import type { ReactNode } from "react"
+import { getNovelGenreLabel } from "@myth/shared"
 import { useLibraryCatalogContext } from "./library-catalog-context"
 
 interface LibraryShellProps {
@@ -113,7 +114,7 @@ export function LibraryShell({ children }: LibraryShellProps) {
           {genre ? (
             <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <span className="rounded-full bg-muted px-3 py-1 text-foreground">
-                Genre: {genre}
+                Genre: {getNovelGenreLabel(genre)}
               </span>
               <Button
                 type="button"
