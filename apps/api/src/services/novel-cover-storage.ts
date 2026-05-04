@@ -1,11 +1,12 @@
-import { randomUUID } from "node:crypto"
-import { extname } from "node:path"
 import {
-  DeleteObjectCommand,
-  GetObjectCommand,
-  PutObjectCommand,
-  S3Client,
-} from "@aws-sdk/client-s3"
+  createR2MediaConfig,
+  deleteMediaObject,
+  getMediaObjectOrNull,
+  MediaImageProcessingError,
+  MediaImageTooLargeError,
+  uploadManagedNovelCover,
+  type R2MediaConfig,
+} from "@myth/media"
 import type { CreateNovelInput, UpdateNovelInput } from "@myth/shared"
 import { env } from "../config/env"
 import { HttpError } from "../utils/http-error"
@@ -14,39 +15,7 @@ const MAX_COVER_FILE_SIZE_BYTES = 5 * 1024 * 1024
 const ALLOWED_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
 const COVER_UPLOAD_TIMEOUT_MS = 15_000
 
-let r2Client: S3Client | null = null
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null
-    ? (value as Record<string, unknown>)
-    : null
-}
-
-function isMissingR2ObjectError(error: unknown) {
-  const record = asRecord(error)
-  if (!record) {
-    return false
-  }
-
-  const code = record.Code
-  if (code === "NoSuchKey" || code === "NotFound") {
-    return true
-  }
-
-  const name = record.name
-  if (name === "NoSuchKey" || name === "NotFound") {
-    return true
-  }
-
-  const metadata = asRecord(record.$metadata)
-  return metadata?.httpStatusCode === 404
-}
-
-function getR2Client() {
-  if (r2Client) {
-    return r2Client
-  }
-
+function getNovelCoverMediaConfig(): R2MediaConfig {
   const publicBaseUrl = env.R2_ENDPOINT ?? env.R2_PUBLIC_BASE_URL
 
   if (
@@ -59,29 +28,13 @@ function getR2Client() {
     throw new HttpError(500, "Cloudflare R2 is not configured for cover uploads")
   }
 
-  r2Client = new S3Client({
-    region: "auto",
-    endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId: env.R2_ACCESS_KEY_ID,
-      secretAccessKey: env.R2_SECRET_ACCESS_KEY,
-    },
-  })
-
-  return r2Client
-}
-
-function getBucketName() {
-  const publicBaseUrl = env.R2_ENDPOINT ?? env.R2_PUBLIC_BASE_URL
-
-  if (!env.R2_BUCKET_NAME || !publicBaseUrl) {
-    throw new HttpError(500, "Cloudflare R2 is not configured for cover uploads")
-  }
-
-  return {
+  return createR2MediaConfig({
+    accountId: env.R2_ACCOUNT_ID,
+    accessKeyId: env.R2_ACCESS_KEY_ID,
+    secretAccessKey: env.R2_SECRET_ACCESS_KEY,
     bucketName: env.R2_BUCKET_NAME,
-    publicBaseUrl: publicBaseUrl.replace(/\/$/, ""),
-  }
+    publicBaseUrl,
+  })
 }
 
 function parseDataUrl(dataUrl: string) {
@@ -94,18 +47,6 @@ function parseDataUrl(dataUrl: string) {
     mimeType: match[1],
     buffer: Buffer.from(match[2], "base64"),
   }
-}
-
-function resolveExtension(fileName: string, mimeType: string) {
-  const fromName = extname(fileName).toLowerCase()
-  if (fromName) {
-    return fromName
-  }
-
-  if (mimeType === "image/jpeg") return ".jpg"
-  if (mimeType === "image/png") return ".png"
-  if (mimeType === "image/webp") return ".webp"
-  return ""
 }
 
 function normalizeUpload(input: CreateNovelInput | UpdateNovelInput) {
@@ -151,29 +92,33 @@ export async function uploadNovelCoverAsset(input: {
     return null
   }
 
-  const { bucketName, publicBaseUrl } = getBucketName()
-  const client = getR2Client()
-  const key = `novel-covers/${input.userId}/${input.novelId ?? "draft"}/${randomUUID()}${resolveExtension(
-    upload.fileName,
-    upload.mimeType
-  )}`
+  const config = getNovelCoverMediaConfig()
   const abortController = new AbortController()
   const timeout = setTimeout(() => abortController.abort(), COVER_UPLOAD_TIMEOUT_MS)
+  let uploadedCover: Awaited<ReturnType<typeof uploadManagedNovelCover>>
 
   try {
-    await client.send(
-      new PutObjectCommand({
-        Bucket: bucketName,
-        Key: key,
-        Body: upload.buffer,
-        ContentType: upload.mimeType,
-        CacheControl: "public, max-age=31536000, immutable",
-      }),
+    uploadedCover = await uploadManagedNovelCover(
+      config,
+      {
+        userId: input.userId,
+        novelId: input.novelId,
+        buffer: upload.buffer,
+        maxFileSizeBytes: MAX_COVER_FILE_SIZE_BYTES,
+      },
       { abortSignal: abortController.signal }
     )
   } catch (error) {
     if (isAbortError(error)) {
       throw new HttpError(504, "Cover upload timed out. Please try again.")
+    }
+
+    if (error instanceof MediaImageTooLargeError) {
+      throw new HttpError(400, "Optimized cover image is still larger than 5MB")
+    }
+
+    if (error instanceof MediaImageProcessingError) {
+      throw new HttpError(400, "Cover image could not be processed")
     }
 
     throw error
@@ -182,11 +127,11 @@ export async function uploadNovelCoverAsset(input: {
   }
 
   return {
-    coverUrl: `${publicBaseUrl}/${key}`,
-    coverStorageKey: key,
-    coverMimeType: upload.mimeType,
+    coverUrl: uploadedCover.url,
+    coverStorageKey: uploadedCover.key,
+    coverMimeType: uploadedCover.mimeType,
     coverOriginalName: upload.fileName,
-    coverFileSizeBytes: upload.fileSizeBytes,
+    coverFileSizeBytes: uploadedCover.fileSizeBytes,
   }
 }
 
@@ -196,35 +141,14 @@ export async function deleteNovelCoverAsset(coverStorageKey: string | null | und
   }
 
   try {
-    const { bucketName } = getBucketName()
-    const client = getR2Client()
-    await client.send(
-      new DeleteObjectCommand({
-        Bucket: bucketName,
-        Key: coverStorageKey,
-      })
-    )
+    const config = getNovelCoverMediaConfig()
+    await deleteMediaObject(config, coverStorageKey)
   } catch (error) {
     console.error("[novel-cover] failed to delete old cover asset", error)
   }
 }
 
 export async function getNovelCoverAsset(coverStorageKey: string) {
-  const { bucketName } = getBucketName()
-  const client = getR2Client()
-
-  try {
-    return await client.send(
-      new GetObjectCommand({
-        Bucket: bucketName,
-        Key: coverStorageKey,
-      })
-    )
-  } catch (error) {
-    if (isMissingR2ObjectError(error)) {
-      return null
-    }
-
-    throw error
-  }
+  const config = getNovelCoverMediaConfig()
+  return getMediaObjectOrNull(config, coverStorageKey)
 }

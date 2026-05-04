@@ -3,7 +3,6 @@ import {
   createNovelForAuthor,
   findNovelByIdOrSlug,
   listNovelsForAuthor,
-  listPublishedNovels,
   serializeNovel,
   updateNovelForAuthor,
 } from "@myth/db"
@@ -67,23 +66,14 @@ function runNovelSideEffect(label: string, task: () => Promise<unknown>) {
   }
 }
 
-export async function listNovels(currentUserId?: string) {
-  const novels = currentUserId
-    ? await listNovelsForAuthor(currentUserId)
-    : await listPublishedNovels()
-
+export async function listStudioNovels(userId: string) {
+  const novels = await listNovelsForAuthor(userId)
   return novels.map(serializeNovel)
 }
 
-export async function getNovel(
-  identifier: string,
-  currentUserId?: string
-) {
+export async function getStudioNovel(userId: string, identifier: string) {
   const novel = await findNovelByIdOrSlug(identifier)
-  if (!novel) {
-    throw new HttpError(404, "Novel not found")
-  }
-  if (novel.visibility !== "PUBLISHED" && novel.authorId !== currentUserId) {
+  if (!novel || novel.authorId !== userId) {
     throw new HttpError(404, "Novel not found")
   }
 
@@ -198,7 +188,7 @@ export async function createNovel(userId: string, input: CreateNovelInput) {
     })
   )
   runNovelSideEffect("invalidate public catalog cache", () =>
-    invalidatePublicCacheScopes("discover", "library", "search")
+    invalidatePublicCacheScopes("home", "discover", "library", "search")
   )
 
   return serializeNovel(created)
@@ -306,7 +296,7 @@ export async function updateNovel(
     })
   )
   runNovelSideEffect("invalidate public catalog cache", () =>
-    invalidatePublicCacheScopes("discover", "library", "search")
+    invalidatePublicCacheScopes("home", "discover", "library", "search")
   )
 
   return serializeNovel(updated)

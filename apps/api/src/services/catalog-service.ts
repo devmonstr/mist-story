@@ -84,6 +84,14 @@ function resolveAuthorDisplayName(author: {
   return author.displayName?.trim() || author.handle?.trim() || "Unknown author"
 }
 
+function resolvePublicNovelCoverUrl(novel: {
+  id: string
+  coverUrl: string
+  coverStorageKey: string | null
+}) {
+  return novel.coverStorageKey ? `/api/v1/novels/${novel.id}/cover` : novel.coverUrl
+}
+
 function sortCatalogNovels(
   novels: Awaited<ReturnType<typeof listLibraryCatalogNovels>>,
   sortBy: CatalogSortBy | PublicCatalogSortBy,
@@ -384,8 +392,8 @@ function buildNovelDetailDto(input: {
     visibility: input.novel.visibility,
     contentWarning: input.novel.contentWarning,
     updateNote: input.novel.updateNote,
-    coverUrl: input.novel.coverUrl,
-    coverStorageKey: input.novel.coverStorageKey ?? null,
+    coverUrl: resolvePublicNovelCoverUrl(input.novel),
+    coverStorageKey: null,
     chaptersCount: input.publishedChapterCount,
     readsCount: input.novel._count.readingProgress,
     bookmarksCount: input.novel._count.bookmarks,
@@ -637,8 +645,8 @@ async function listLibraryCatalogUncached(input: {
       workType: novel.workType,
       status: novel.status,
       visibility: novel.visibility,
-      coverUrl: novel.coverUrl,
-      coverStorageKey: novel.coverStorageKey ?? null,
+      coverUrl: resolvePublicNovelCoverUrl(novel),
+      coverStorageKey: null,
       author: {
         id: novel.author.id,
         npub: hexToNpub(novel.author.pubkey),

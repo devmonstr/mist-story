@@ -31,8 +31,6 @@ export type HomeHeroNovelView = {
   rating: number
 }
 
-export type HomeHeroRankingKey = "novels" | "translations" | "newVoices"
-
 export type HomeHeroGenreIcon =
   | "sparkles"
   | "sword"
@@ -47,20 +45,21 @@ export type HomeHeroGenreShortcutView = {
   icon: HomeHeroGenreIcon
 }
 
+export type HomeHeroRankingShelfView = {
+  id: string
+  label: string
+  href: string
+  description?: string
+  novels: HomeHeroNovelView[]
+}
+
 export type HomeHeroClientProps = {
   featuredNovels: HomeHeroNovelView[]
-  rankings: Record<HomeHeroRankingKey, HomeHeroNovelView[]>
+  rankingShelves: HomeHeroRankingShelfView[]
   genreShortcuts: HomeHeroGenreShortcutView[]
   discoverHref?: string
   libraryHref?: string
-  rankingHrefs?: Record<HomeHeroRankingKey, string>
 }
-
-const rankingTabs: Array<{ key: HomeHeroRankingKey; label: string }> = [
-  { key: "novels", label: "Novels" },
-  { key: "translations", label: "Translations" },
-  { key: "newVoices", label: "New Voices" },
-]
 
 const genreIcons = {
   sparkles: Sparkles,
@@ -119,24 +118,24 @@ function RankingCover({
 
 export function HomeHeroClient({
   featuredNovels,
-  rankings,
+  rankingShelves,
   genreShortcuts,
   discoverHref = "/discover",
   libraryHref = "/library",
-  rankingHrefs = {
-    novels: "/library?sort=rating",
-    translations: "/library?sort=rating&workType=TRANSLATION",
-    newVoices: "/library?collection=new-voices&sort=recent",
-  },
 }: HomeHeroClientProps) {
   const [featuredIndex, setFeaturedIndex] = useState(0)
-  const [activeRanking, setActiveRanking] =
-    useState<HomeHeroRankingKey>("novels")
+  const [activeRankingShelfId, setActiveRankingShelfId] = useState(
+    rankingShelves[0]?.id ?? "",
+  )
 
   const featured =
     featuredNovels[clampFeaturedIndex(featuredIndex, featuredNovels.length)] ??
     null
-  const activeRankings = rankings[activeRanking] ?? []
+  const activeRankingShelf =
+    rankingShelves.find((shelf) => shelf.id === activeRankingShelfId) ??
+    rankingShelves[0] ??
+    null
+  const activeRankings = activeRankingShelf?.novels ?? []
   const hasFeaturedCarousel = featuredNovels.length > 1
 
   function showPreviousFeatured() {
@@ -315,34 +314,50 @@ export function HomeHeroClient({
             <div className="flex items-center gap-2">
               <Crown className="h-4 w-4 text-foreground" />
               <h2 className="font-serif text-xl text-foreground">
-                Top Rankings
+                Reader Pulse
               </h2>
             </div>
-            <Link
-              href={rankingHrefs[activeRanking]}
-              className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              View all
-            </Link>
+            {activeRankingShelf ? (
+              <Link
+                href={activeRankingShelf.href}
+                className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                View all
+              </Link>
+            ) : null}
           </div>
 
-          <div className="mt-6 grid grid-cols-3 border-b border-border text-center text-xs font-medium text-muted-foreground">
-            {rankingTabs.map((tab) => (
+          <div
+            className={`mt-6 grid border-b border-border text-center text-xs font-medium text-muted-foreground ${
+              rankingShelves.length <= 1
+                ? "grid-cols-1"
+                : rankingShelves.length === 2
+                  ? "grid-cols-2"
+                  : "grid-cols-3"
+            }`}
+          >
+            {rankingShelves.map((shelf) => (
               <button
-                key={tab.key}
+                key={shelf.id}
                 type="button"
                 className={`pb-3 transition-colors hover:text-foreground ${
-                  tab.key === activeRanking
+                  shelf.id === activeRankingShelf?.id
                     ? "border-b border-foreground text-foreground"
                     : ""
                 }`}
-                aria-pressed={tab.key === activeRanking}
-                onClick={() => setActiveRanking(tab.key)}
+                aria-pressed={shelf.id === activeRankingShelf?.id}
+                onClick={() => setActiveRankingShelfId(shelf.id)}
               >
-                {tab.label}
+                {shelf.label}
               </button>
             ))}
           </div>
+
+          {activeRankingShelf?.description ? (
+            <p className="mt-4 text-sm leading-6 text-muted-foreground">
+              {activeRankingShelf.description}
+            </p>
+          ) : null}
 
           <div className="mt-5 space-y-4">
             {activeRankings.length > 0 ? (
@@ -372,8 +387,8 @@ export function HomeHeroClient({
               ))
             ) : (
               <div className="border border-dashed border-border bg-background/50 p-4 text-sm leading-6 text-muted-foreground">
-                No ranked stories yet. Published novels will appear here
-                automatically.
+                Ranking data is still warming up. Published stories will appear
+                here automatically.
               </div>
             )}
           </div>

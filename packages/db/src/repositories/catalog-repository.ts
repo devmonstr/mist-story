@@ -289,7 +289,11 @@ function buildLibraryCollectionBaseCte(filters: PublicCatalogNovelFilters = {}) 
         COALESCE(metric."readsCount", 0)::int AS "readsCount",
         COALESCE(metric."bookmarksCount", 0)::int AS "bookmarksCount",
         COALESCE(metric."authorPublishedNovelsCount", 0)::int AS "authorPublishedNovelsCount",
-        COALESCE(metric."trendingScore", 0)::double precision AS "trendingScore"
+        COALESCE(metric."hotScore", 0)::double precision AS "hotScore",
+        COALESCE(metric."freshnessScore", 0)::double precision AS "freshnessScore",
+        COALESCE(metric."trendingScore", 0)::double precision AS "trendingScore",
+        COALESCE(metric."qualityScore", 0)::double precision AS "qualityScore",
+        COALESCE(metric."hiddenGemScore", 0)::double precision AS "hiddenGemScore"
       FROM "Novel" n
       JOIN "User" a ON a.id = n."authorId"
       LEFT JOIN "PublicNovelMetric" metric ON metric."novelId" = n.id
@@ -326,6 +330,7 @@ function buildLibraryCollectionOrderBySql(collection: CatalogCollection) {
   if (collection === "hidden-gems") {
     return Prisma.sql`
       ORDER BY
+        base."hiddenGemScore" DESC,
         base.rating DESC,
         base."bookmarksCount" DESC,
         base."readsCount" DESC,
@@ -337,6 +342,7 @@ function buildLibraryCollectionOrderBySql(collection: CatalogCollection) {
   if (collection === "editors-picks") {
     return Prisma.sql`
       ORDER BY
+        base."qualityScore" DESC,
         base.rating DESC,
         base."ratingsCount" DESC,
         base."readsCount" DESC,
@@ -455,9 +461,151 @@ function createEmptyDiscoverCollectionSnapshot(): DiscoverCollectionSnapshot {
   }
 }
 
+function canUseGlobalRankings(filters: PublicCatalogNovelFilters = {}) {
+  return !filters.query?.trim() &&
+    !filters.genre?.trim() &&
+    (!filters.workType || filters.workType === "all") &&
+    (!filters.status || filters.status === "all")
+}
+
+async function listRankedDiscoverCollectionsSnapshot(
+  filters: PublicCatalogNovelFilters = {}
+): Promise<DiscoverCollectionSnapshot | null> {
+  if (!canUseGlobalRankings(filters)) {
+    return null
+  }
+
+  const rows = await prisma.$queryRaw<
+    Array<{
+      collectionId: CatalogCollection
+      totalCount: number
+      rowNumber: number
+      id: string
+      slug: string
+      title: string
+      summary: string
+      genre: string
+      workType: "ORIGINAL" | "TRANSLATION"
+      status: "Ongoing" | "Completed" | "Hiatus"
+      visibility: "PUBLISHED" | "HIDDEN"
+      coverUrl: string
+      coverStorageKey: string | null
+      chaptersCount: number
+      rating: number
+      ratingsCount: number
+      publishedAt: Date | null
+      updatedAt: Date
+      authorDisplayName: string | null
+      authorId: string
+      authorPubkey: string
+      authorName: string | null
+      authorHandle: string | null
+      authorAvatarUrl: string | null
+      readsCount: number
+      bookmarksCount: number
+    }>
+  >(Prisma.sql`
+    WITH ranked AS (
+      SELECT
+        CASE ranking."collection"
+          WHEN 'TRENDING' THEN 'trending'
+          WHEN 'HIDDEN_GEMS' THEN 'hidden-gems'
+          WHEN 'EDITORS_PICKS' THEN 'editors-picks'
+          WHEN 'NEW_VOICES' THEN 'new-voices'
+        END AS "collectionId",
+        COUNT(*) OVER (PARTITION BY ranking."collection")::int AS "totalCount",
+        ROW_NUMBER() OVER (
+          PARTITION BY ranking."collection"
+          ORDER BY ranking.rank ASC, ranking.score DESC, ranking."novelId" DESC
+        )::int AS "rowNumber",
+        n.id,
+        n.slug,
+        n."title",
+        n."summary",
+        n."genre",
+        n."workType",
+        n."status",
+        n."visibility",
+        n."coverUrl",
+        n."coverStorageKey",
+        n."chaptersCount",
+        n.rating::double precision AS rating,
+        n."ratingsCount",
+        n."publishedAt",
+        n."updatedAt",
+        n."authorDisplayName",
+        n."authorId",
+        a."pubkey" AS "authorPubkey",
+        a."displayName" AS "authorName",
+        a.handle AS "authorHandle",
+        a."avatarUrl" AS "authorAvatarUrl",
+        COALESCE(metric."readsCount", 0)::int AS "readsCount",
+        COALESCE(metric."bookmarksCount", 0)::int AS "bookmarksCount"
+      FROM "PublicCatalogRanking" ranking
+      JOIN "Novel" n ON n.id = ranking."novelId"
+      JOIN "User" a ON a.id = n."authorId"
+      LEFT JOIN "PublicNovelMetric" metric ON metric."novelId" = n.id
+      WHERE ranking."contextKey" = 'global'
+        AND ranking."collection" IN ('TRENDING', 'HIDDEN_GEMS', 'EDITORS_PICKS', 'NEW_VOICES')
+        AND n."visibility" = 'PUBLISHED'
+    )
+    SELECT *
+    FROM ranked
+    WHERE "collectionId" IS NOT NULL
+      AND "rowNumber" <= 4
+    ORDER BY "collectionId" ASC, "rowNumber" ASC
+  `)
+
+  if (rows.length === 0) {
+    return null
+  }
+
+  const snapshot = createEmptyDiscoverCollectionSnapshot()
+  for (const row of rows) {
+    snapshot[row.collectionId].total = Math.max(
+      snapshot[row.collectionId].total,
+      row.totalCount
+    )
+    snapshot[row.collectionId].novels.push(
+      mapLibraryCollectionNovelRow({
+        id: row.id,
+        slug: row.slug,
+        title: row.title,
+        summary: row.summary ?? "",
+        genre: row.genre,
+        workType: row.workType,
+        status: row.status,
+        visibility: row.visibility,
+        coverUrl: row.coverUrl ?? "",
+        coverStorageKey: row.coverStorageKey ?? null,
+        chaptersCount: row.chaptersCount,
+        rating: row.rating,
+        ratingsCount: row.ratingsCount,
+        publishedAt: row.publishedAt ?? null,
+        updatedAt: row.updatedAt,
+        authorDisplayName: row.authorDisplayName ?? null,
+        authorId: row.authorId,
+        authorPubkey: row.authorPubkey,
+        authorName: row.authorName ?? null,
+        authorHandle: row.authorHandle ?? null,
+        authorAvatarUrl: row.authorAvatarUrl ?? null,
+        readsCount: row.readsCount,
+        bookmarksCount: row.bookmarksCount,
+      })
+    )
+  }
+
+  return snapshot
+}
+
 export async function listDiscoverCollectionsSnapshot(
   filters: PublicCatalogNovelFilters = {}
 ): Promise<DiscoverCollectionSnapshot> {
+  const rankedSnapshot = await listRankedDiscoverCollectionsSnapshot(filters)
+  if (rankedSnapshot) {
+    return rankedSnapshot
+  }
+
   const baseSql = buildLibraryCollectionBaseCte(filters)
 
   const [countRows, previewRows] = await Promise.all([
@@ -532,7 +680,7 @@ export async function listDiscoverCollectionsSnapshot(
             base."ratingsCount" DESC,
             coalesce(base."publishedAt", base."updatedAt") DESC,
             base.id DESC
-          LIMIT 3
+          LIMIT 4
         ) ordered
       ) ranked
 
@@ -551,12 +699,13 @@ export async function listDiscoverCollectionsSnapshot(
           FROM catalog_base base
           WHERE base."readsCount" <= 25
           ORDER BY
+            base."hiddenGemScore" DESC,
             base.rating DESC,
             base."bookmarksCount" DESC,
             base."readsCount" DESC,
             coalesce(base."publishedAt", base."updatedAt") DESC,
             base.id DESC
-          LIMIT 3
+          LIMIT 4
         ) ordered
       ) ranked
 
@@ -574,12 +723,13 @@ export async function listDiscoverCollectionsSnapshot(
             base.*
           FROM catalog_base base
           ORDER BY
+            base."qualityScore" DESC,
             base.rating DESC,
             base."ratingsCount" DESC,
             base."readsCount" DESC,
             coalesce(base."publishedAt", base."updatedAt") DESC,
             base.id DESC
-          LIMIT 3
+          LIMIT 4
         ) ordered
       ) ranked
 
@@ -598,9 +748,11 @@ export async function listDiscoverCollectionsSnapshot(
           FROM catalog_base base
           WHERE base."authorPublishedNovelsCount" <= 1
           ORDER BY
+            base."freshnessScore" DESC,
+            base."qualityScore" DESC,
             coalesce(base."publishedAt", base."updatedAt") DESC,
             base.id DESC
-          LIMIT 3
+          LIMIT 4
         ) ordered
       ) ranked
     ) collection_previews

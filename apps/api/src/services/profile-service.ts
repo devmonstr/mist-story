@@ -68,6 +68,14 @@ function buildPagination(page: number, pageSize: number, totalItems: number) {
   }
 }
 
+function resolvePublicNovelCoverUrl(novel: {
+  id: string
+  coverUrl: string
+  coverStorageKey: string | null
+}) {
+  return novel.coverStorageKey ? `/api/v1/novels/${novel.id}/cover` : novel.coverUrl
+}
+
 function serializeProfileSummary(user: {
   id: string
   pubkey: string
@@ -211,11 +219,6 @@ async function buildMyProfileResponse(userId: string): Promise<MyProfileResponse
 
   const user = await ensureUserProfileHydrated(existingUser)
   const stats = await getProfileSiteStats(user.id)
-  await enqueuePublicCatalogMetricsRefresh(redis, {
-    scope: "author",
-    authorId: user.id,
-    reason: "follow-added",
-  })
 
   return {
     profile: serializeProfileSummary(user),
@@ -249,8 +252,8 @@ export async function getProfilePage(
       title: novel.title,
       summary: novel.summary,
       genre: getNovelGenreLabel(novel.genre),
-      coverUrl: novel.coverUrl,
-      coverStorageKey: novel.coverStorageKey ?? null,
+      coverUrl: resolvePublicNovelCoverUrl(novel),
+      coverStorageKey: null,
       chaptersCount: novel.chaptersCount,
       rating: decimalToNumber(novel.rating),
       ratingsCount: novel.ratingsCount,
@@ -320,6 +323,11 @@ export async function followProfile(
   }
 
   await followUser(viewerUserId, user.id)
+  await enqueuePublicCatalogMetricsRefresh(redis, {
+    scope: "author",
+    authorId: user.id,
+    reason: "follow-added",
+  })
   const actorUser = await findUserById(viewerUserId)
 
   const followPreferences = await getNotificationPreferencesForUser(user.id, [

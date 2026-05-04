@@ -24,10 +24,18 @@ export const discoverCollectionSchema = z.object({
       id: z.string(),
       slug: z.string(),
       title: z.string(),
+      summary: z.string(),
       coverUrl: z.string(),
       coverStorageKey: z.string().nullable(),
       genre: z.string(),
       authorName: z.string(),
+      workType: z.enum(["ORIGINAL", "TRANSLATION"]),
+      status: z.enum(["Ongoing", "Completed", "Hiatus"]),
+      chaptersCount: z.number().int().nonnegative(),
+      readsCount: z.number().int().nonnegative(),
+      bookmarksCount: z.number().int().nonnegative(),
+      rating: z.number(),
+      ratingsCount: z.number().int().nonnegative(),
     })
   ),
 })

@@ -9,6 +9,7 @@ import { authRouter } from "./routes/auth"
 import { adminRouter } from "./routes/admin"
 import { chaptersRouter } from "./routes/chapters"
 import { discoverRouter } from "./routes/discover"
+import { homeRouter } from "./routes/home"
 import { libraryRouter } from "./routes/library"
 import { meRouter } from "./routes/me"
 import { novelsRouter } from "./routes/novels"
@@ -36,6 +37,7 @@ export function createApp() {
   app.use("/api/v1/auth", authRouter)
   app.use("/api/v1/admin", adminRouter)
   app.use("/api/v1/discover", discoverRouter)
+  app.use("/api/v1/home", homeRouter)
   app.use("/api/v1/library", libraryRouter)
   app.use("/api/v1/me", meRouter)
   app.use("/api/v1/me/settings", settingsRouter)

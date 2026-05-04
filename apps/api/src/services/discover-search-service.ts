@@ -81,29 +81,55 @@ function buildLibraryHref(input: {
   return queryString ? `/library?${queryString}` : "/library"
 }
 
+function resolvePublicNovelCoverUrl(novel: {
+  id: string
+  coverUrl: string
+  coverStorageKey: string | null
+}) {
+  return novel.coverStorageKey ? `/api/v1/novels/${novel.id}/cover` : novel.coverUrl
+}
+
 function serializeCollectionPreviewNovels(
   novels: Array<{
     id: string
     slug: string
     title: string
+    summary: string
     coverUrl: string
     coverStorageKey: string | null
     genre: string
+    workType: "ORIGINAL" | "TRANSLATION"
+    status: "Ongoing" | "Completed" | "Hiatus"
+    chaptersCount: number
+    rating: number
+    ratingsCount: number
     author: {
       displayName: string | null
       handle: string | null
     }
+    _count: {
+      readingProgress: number
+      bookmarks: number
+    }
   }>
 ) {
-  return novels.slice(0, 3).map((novel) => ({
+  return novels.slice(0, 4).map((novel) => ({
     id: novel.id,
     slug: novel.slug,
     title: novel.title,
-    coverUrl: novel.coverUrl,
-    coverStorageKey: novel.coverStorageKey ?? null,
+    summary: novel.summary,
+    coverUrl: resolvePublicNovelCoverUrl(novel),
+    coverStorageKey: null,
     genre: getNovelGenreLabel(novel.genre),
     authorName:
       novel.author.displayName?.trim() || novel.author.handle?.trim() || "Unknown author",
+    workType: novel.workType,
+    status: novel.status,
+    chaptersCount: novel.chaptersCount,
+    readsCount: novel._count.readingProgress,
+    bookmarksCount: novel._count.bookmarks,
+    rating: Number(novel.rating),
+    ratingsCount: novel.ratingsCount,
   }))
 }
 
@@ -184,7 +210,7 @@ async function getDiscoverDataUncached(input: {
     listDiscoverCollectionsSnapshot(filters),
   ])
 
-  const discoverGenres: DiscoverGenreDto[] = facetCounts.genres.slice(0, 6).map((genre) => ({
+  const discoverGenres: DiscoverGenreDto[] = facetCounts.genres.slice(0, 10).map((genre) => ({
     id:
       normalizeNovelGenreSlug(genre.genre) ??
       genre.genre.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
@@ -381,8 +407,8 @@ async function searchCatalogUncached(input: {
       summary: novel.summary,
       readsCount: novel.readsCount,
       chaptersCount: novel.chaptersCount,
-      coverUrl: novel.coverUrl,
-      coverStorageKey: novel.coverStorageKey,
+      coverUrl: resolvePublicNovelCoverUrl(novel),
+      coverStorageKey: null,
     }))
     const firstNovel = novels.items[0]
     const lastNovel = novels.items[novels.items.length - 1]
@@ -523,8 +549,8 @@ async function searchCatalogUncached(input: {
     summary: novel.summary,
     readsCount: novel.readsCount,
     chaptersCount: novel.chaptersCount,
-    coverUrl: novel.coverUrl,
-    coverStorageKey: novel.coverStorageKey,
+    coverUrl: resolvePublicNovelCoverUrl(novel),
+    coverStorageKey: null,
   }))
 
   const authorResults: SearchAuthorResultDto[] = authors.items.map((author) => ({

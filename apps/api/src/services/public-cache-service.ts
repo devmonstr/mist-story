@@ -6,6 +6,7 @@ const redis = createRedisClient(env.REDIS_URL)
 
 export const PUBLIC_CACHE_TTLS = {
   discover: 60,
+  home: 90,
   library: 45,
   search: 30,
 } as const

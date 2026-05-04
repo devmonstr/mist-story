@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --env-file=../../.env.local --watch src/server.ts",
+    "dev": "cd ../.. && bun --env-file=.env.local --watch apps/api/src/server.ts",
     "build": "bun --bun tsc -p tsconfig.json --noEmit",
     "start": "bun --env-file=../../.env.local src/server.ts",
     "lint": "bun --bun eslint src --ext .ts",

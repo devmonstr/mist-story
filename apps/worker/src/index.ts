@@ -1,14 +1,19 @@
 import { Worker } from "bullmq"
+import { ensurePublicCatalogMetricsInfrastructure } from "@myth/db"
 import {
-  ensurePublicCatalogMetricsInfrastructure,
-  refreshPublicCatalogMetrics,
-} from "@myth/db"
-import { queueNames } from "@myth/queue"
+  publicCatalogSchedulerIds,
+  queueNames,
+  upsertPublicCatalogActivityRollupSchedule,
+  upsertPublicCatalogMetricsRefreshSchedule,
+  upsertPublicCatalogRankingsRefreshSchedule,
+} from "@myth/queue"
 import { createBullMQConnection } from "@myth/redis"
 import type {
   ChapterPublishJobPayload,
   NotificationDispatchJobPayload,
+  PublicCatalogActivityRollupJobPayload,
   PublicCatalogMetricsRefreshJobPayload,
+  PublicCatalogRankingsRefreshJobPayload,
   ProfileImageOptimizeJobPayload,
   ProfileSyncJobPayload,
 } from "@myth/shared"
@@ -17,16 +22,55 @@ import { processChapterPublishJob } from "./processors/chapter-publish"
 import { processProfileImageOptimizeJob } from "./processors/profile-image-optimize"
 import { processNotificationDispatchJob } from "./processors/notification-dispatch"
 import { processProfileSyncJob } from "./processors/profile-sync"
+import { processPublicCatalogActivityRollupJob } from "./processors/public-catalog-activity-rollup"
 import { processPublicCatalogMetricsRefreshJob } from "./processors/public-catalog-metrics-refresh"
+import { processPublicCatalogRankingsRefreshJob } from "./processors/public-catalog-rankings-refresh"
 
 await ensurePublicCatalogMetricsInfrastructure()
-await refreshPublicCatalogMetrics({ scope: "all" })
 
 const chapterPublishConnection = createBullMQConnection(env.REDIS_URL)
 const notificationConnection = createBullMQConnection(env.REDIS_URL)
 const profileSyncConnection = createBullMQConnection(env.REDIS_URL)
 const profileImageOptimizeConnection = createBullMQConnection(env.REDIS_URL)
+const publicCatalogActivityRollupConnection = createBullMQConnection(env.REDIS_URL)
 const publicCatalogMetricsConnection = createBullMQConnection(env.REDIS_URL)
+const publicCatalogRankingsConnection = createBullMQConnection(env.REDIS_URL)
+const publicCatalogScheduleConnection = createBullMQConnection(env.REDIS_URL)
+
+await Promise.all([
+  upsertPublicCatalogActivityRollupSchedule(publicCatalogScheduleConnection, {
+    schedulerId: publicCatalogSchedulerIds.activityRollupEveryFiveMinutes,
+    every: 5 * 60 * 1000,
+    payload: {
+      scope: "all",
+      reason: "scheduled-activity-rollup",
+    },
+  }),
+  upsertPublicCatalogMetricsRefreshSchedule(publicCatalogScheduleConnection, {
+    schedulerId: publicCatalogSchedulerIds.metricsRefreshEveryTenMinutes,
+    every: 10 * 60 * 1000,
+    payload: {
+      scope: "all",
+      reason: "scheduled-metrics-refresh",
+    },
+  }),
+  upsertPublicCatalogRankingsRefreshSchedule(publicCatalogScheduleConnection, {
+    schedulerId: publicCatalogSchedulerIds.rankingsRefreshEveryFifteenMinutes,
+    every: 15 * 60 * 1000,
+    payload: {
+      scope: "all",
+      reason: "scheduled-rankings-refresh",
+    },
+  }),
+  upsertPublicCatalogActivityRollupSchedule(publicCatalogScheduleConnection, {
+    schedulerId: publicCatalogSchedulerIds.fullReconcileDaily,
+    every: 24 * 60 * 60 * 1000,
+    payload: {
+      scope: "all",
+      reason: "scheduled-full-reconcile",
+    },
+  }),
+])
 
 const chapterPublishWorker = new Worker<ChapterPublishJobPayload>(
   queueNames.chapterPublish,
@@ -52,10 +96,22 @@ const profileImageOptimizeWorker = new Worker<ProfileImageOptimizeJobPayload>(
   { connection: profileImageOptimizeConnection as never }
 )
 
+const publicCatalogActivityRollupWorker = new Worker<PublicCatalogActivityRollupJobPayload>(
+  queueNames.publicCatalogActivityRollup,
+  async (job) => processPublicCatalogActivityRollupJob(job.data),
+  { connection: publicCatalogActivityRollupConnection as never }
+)
+
 const publicCatalogMetricsWorker = new Worker<PublicCatalogMetricsRefreshJobPayload>(
   queueNames.publicCatalogMetricsRefresh,
   async (job) => processPublicCatalogMetricsRefreshJob(job.data),
   { connection: publicCatalogMetricsConnection as never }
+)
+
+const publicCatalogRankingsWorker = new Worker<PublicCatalogRankingsRefreshJobPayload>(
+  queueNames.publicCatalogRankingsRefresh,
+  async (job) => processPublicCatalogRankingsRefreshJob(job.data),
+  { connection: publicCatalogRankingsConnection as never }
 )
 
 chapterPublishWorker.on("completed", (job) => {
@@ -78,7 +134,15 @@ profileImageOptimizeWorker.on("failed", (job, error) => {
   console.error(`[worker] failed ${job?.name}:${job?.id}`, error)
 })
 
+publicCatalogActivityRollupWorker.on("failed", (job, error) => {
+  console.error(`[worker] failed ${job?.name}:${job?.id}`, error)
+})
+
 publicCatalogMetricsWorker.on("failed", (job, error) => {
+  console.error(`[worker] failed ${job?.name}:${job?.id}`, error)
+})
+
+publicCatalogRankingsWorker.on("failed", (job, error) => {
   console.error(`[worker] failed ${job?.name}:${job?.id}`, error)
 })
 

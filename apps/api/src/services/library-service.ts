@@ -12,6 +12,7 @@ import {
   findReadingProgressForUserAndNovel,
   deleteReadingProgressForUserAndNovel,
   clearReadingProgressForUser,
+  recordNovelActivityEvent,
 } from "@myth/db"
 import { getNovelGenreLabel } from "@myth/shared"
 import type {
@@ -31,6 +32,12 @@ import { env } from "../config/env"
 import { HttpError } from "../utils/http-error"
 
 const redis = createRedisClient(env.REDIS_URL)
+
+function runLibrarySideEffect(label: string, task: () => Promise<unknown>) {
+  task().catch((error) => {
+    console.error(`[library] ${label} failed`, error)
+  })
+}
 
 function calculateProgressPercent(chapterNumber: number, totalChapters: number) {
   if (totalChapters <= 0) {
@@ -148,6 +155,15 @@ export async function addBookmark(
 
   const existingBookmark = await findNovelBookmarkForUser(userId, novel.id)
   const bookmark = await upsertNovelBookmarkForUser(userId, novel.id)
+  if (!existingBookmark) {
+    runLibrarySideEffect("record bookmark add activity", () =>
+      recordNovelActivityEvent({
+        novelId: novel.id,
+        userId,
+        eventType: "BOOKMARK_ADD",
+      })
+    )
+  }
   await enqueuePublicCatalogMetricsRefresh(redis, {
     scope: "novel",
     novelId: novel.id,
@@ -186,6 +202,13 @@ export async function removeBookmark(
   }
 
   await deleteNovelBookmarkForUser(userId, novel.id)
+  runLibrarySideEffect("record bookmark remove activity", () =>
+    recordNovelActivityEvent({
+      novelId: novel.id,
+      userId,
+      eventType: "BOOKMARK_REMOVE",
+    })
+  )
   await enqueuePublicCatalogMetricsRefresh(redis, {
     scope: "novel",
     novelId: novel.id,
@@ -239,6 +262,17 @@ export async function saveReadingProgress(
     chapterId,
     chapterNumber,
   })
+  runLibrarySideEffect("record reading activity", () =>
+    recordNovelActivityEvent({
+      novelId: novel.id,
+      userId,
+      chapterId,
+      eventType: chapterId ? "CHAPTER_READ" : "READ",
+      metadata: {
+        chapterNumber,
+      },
+    })
+  )
   await enqueuePublicCatalogMetricsRefresh(redis, {
     scope: "novel",
     novelId: novel.id,

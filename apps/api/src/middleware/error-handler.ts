@@ -9,6 +9,15 @@ export function errorHandler(
 ) {
   void next
 
+  if (
+    "type" in error &&
+    (error as { type?: string }).type === "entity.too.large"
+  ) {
+    return response.status(413).json({
+      error: "Upload payload is too large. Please choose a smaller cover image.",
+    })
+  }
+
   if (error instanceof HttpError) {
     return response.status(error.statusCode).json({
       error: error.message,

@@ -2,7 +2,9 @@ import { Queue } from "bullmq"
 import type {
   ChapterPublishJobPayload,
   NotificationDispatchJobPayload,
+  PublicCatalogActivityRollupJobPayload,
   PublicCatalogMetricsRefreshJobPayload,
+  PublicCatalogRankingsRefreshJobPayload,
   ProfileImageOptimizeJobPayload,
   ProfileSyncJobPayload,
 } from "@myth/shared"
@@ -12,7 +14,16 @@ export const queueNames = {
   notificationDispatch: "notification-dispatch",
   profileSync: "profile-sync",
   profileImageOptimize: "profile-image-optimize",
+  publicCatalogActivityRollup: "public-catalog-activity-rollup",
   publicCatalogMetricsRefresh: "public-catalog-metrics-refresh",
+  publicCatalogRankingsRefresh: "public-catalog-rankings-refresh",
+} as const
+
+export const publicCatalogSchedulerIds = {
+  activityRollupEveryFiveMinutes: "public-catalog-activity-rollup-every-5-minutes",
+  metricsRefreshEveryTenMinutes: "public-catalog-metrics-refresh-every-10-minutes",
+  rankingsRefreshEveryFifteenMinutes: "public-catalog-rankings-refresh-every-15-minutes",
+  fullReconcileDaily: "public-catalog-full-reconcile-daily",
 } as const
 
 export function createChapterPublishQueue(connection: unknown) {
@@ -53,6 +64,16 @@ export function createProfileImageOptimizeQueue(connection: unknown) {
   })
 }
 
+export function createPublicCatalogActivityRollupQueue(connection: unknown) {
+  return new Queue<
+    PublicCatalogActivityRollupJobPayload,
+    unknown,
+    typeof queueNames.publicCatalogActivityRollup
+  >(queueNames.publicCatalogActivityRollup, {
+    connection: connection as never,
+  })
+}
+
 export function createPublicCatalogMetricsRefreshQueue(connection: unknown) {
   return new Queue<
     PublicCatalogMetricsRefreshJobPayload,
@@ -63,8 +84,57 @@ export function createPublicCatalogMetricsRefreshQueue(connection: unknown) {
   })
 }
 
+export function createPublicCatalogRankingsRefreshQueue(connection: unknown) {
+  return new Queue<
+    PublicCatalogRankingsRefreshJobPayload,
+    unknown,
+    typeof queueNames.publicCatalogRankingsRefresh
+  >(queueNames.publicCatalogRankingsRefresh, {
+    connection: connection as never,
+  })
+}
+
 function toBullMqSafeJobId(value: string) {
   return value.replaceAll(":", "-")
+}
+
+function createPublicCatalogJobId(payload: {
+  scope: "all" | "novel" | "author"
+  novelId?: string
+  authorId?: string
+}) {
+  if (payload.scope === "novel" && payload.novelId) {
+    return toBullMqSafeJobId(`novel-${payload.novelId}`)
+  }
+
+  if (payload.scope === "author" && payload.authorId) {
+    return toBullMqSafeJobId(`author-${payload.authorId}`)
+  }
+
+  return "all"
+}
+
+async function upsertRepeatableJob<TPayload, TName extends string>(
+  queue: Queue<TPayload, unknown, TName>,
+  schedulerId: string,
+  every: number,
+  jobName: TName,
+  payload: TPayload
+) {
+  const schedulerQueue = queue as Queue<TPayload, unknown, string>
+
+  return schedulerQueue.upsertJobScheduler(
+    schedulerId as never,
+    { every },
+    {
+      name: jobName as never,
+      data: payload as never,
+      opts: {
+        removeOnComplete: true,
+        removeOnFail: 50,
+      },
+    }
+  )
 }
 
 export async function enqueueChapterPublish(
@@ -105,21 +175,92 @@ export async function enqueueProfileImageOptimize(
   })
 }
 
+export async function enqueuePublicCatalogActivityRollup(
+  connection: unknown,
+  payload: PublicCatalogActivityRollupJobPayload
+) {
+  const queue = createPublicCatalogActivityRollupQueue(connection)
+  return queue.add(queueNames.publicCatalogActivityRollup, payload, {
+    jobId: createPublicCatalogJobId(payload),
+    removeOnComplete: true,
+    removeOnFail: 50,
+  })
+}
+
 export async function enqueuePublicCatalogMetricsRefresh(
   connection: unknown,
   payload: PublicCatalogMetricsRefreshJobPayload
 ) {
   const queue = createPublicCatalogMetricsRefreshQueue(connection)
-  const jobId =
-    payload.scope === "novel" && payload.novelId
-      ? toBullMqSafeJobId(`novel-${payload.novelId}`)
-      : payload.scope === "author" && payload.authorId
-        ? toBullMqSafeJobId(`author-${payload.authorId}`)
-        : "all"
-
   return queue.add(queueNames.publicCatalogMetricsRefresh, payload, {
-    jobId,
+    jobId: createPublicCatalogJobId(payload),
     removeOnComplete: true,
     removeOnFail: 50,
   })
+}
+
+export async function enqueuePublicCatalogRankingsRefresh(
+  connection: unknown,
+  payload: PublicCatalogRankingsRefreshJobPayload
+) {
+  const queue = createPublicCatalogRankingsRefreshQueue(connection)
+  return queue.add(queueNames.publicCatalogRankingsRefresh, payload, {
+    jobId: createPublicCatalogJobId(payload),
+    removeOnComplete: true,
+    removeOnFail: 50,
+  })
+}
+
+export async function upsertPublicCatalogActivityRollupSchedule(
+  connection: unknown,
+  input: {
+    schedulerId: string
+    every: number
+    payload: PublicCatalogActivityRollupJobPayload
+  }
+) {
+  const queue = createPublicCatalogActivityRollupQueue(connection)
+  return upsertRepeatableJob(
+    queue,
+    input.schedulerId,
+    input.every,
+    queueNames.publicCatalogActivityRollup,
+    input.payload
+  )
+}
+
+export async function upsertPublicCatalogMetricsRefreshSchedule(
+  connection: unknown,
+  input: {
+    schedulerId: string
+    every: number
+    payload: PublicCatalogMetricsRefreshJobPayload
+  }
+) {
+  const queue = createPublicCatalogMetricsRefreshQueue(connection)
+  return upsertRepeatableJob(
+    queue,
+    input.schedulerId,
+    input.every,
+    queueNames.publicCatalogMetricsRefresh,
+    input.payload
+  )
+}
+
+export async function upsertPublicCatalogRankingsRefreshSchedule(
+  connection: unknown,
+  input: {
+    schedulerId: string
+    every: number
+    payload: PublicCatalogRankingsRefreshJobPayload
+  }
+) {
+  const queue = createPublicCatalogRankingsRefreshQueue(connection)
+  return upsertRepeatableJob(
+    queue,
+    input.schedulerId,
+    input.every,
+    queueNames.publicCatalogRankingsRefresh,
+    input.payload
+  )
 }

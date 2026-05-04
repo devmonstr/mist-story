@@ -23,21 +23,26 @@ function parsePositiveInt(value: unknown, fallback: number) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
 }
 
-chaptersRouter.get("/novels/:novelId/chapters", async (request, response, next) => {
-  try {
-    const payload = await listChapters(
-      String(request.params.novelId),
-      response.locals.user?.id as string | undefined,
-      {
-        chapterPage: parsePositiveInt(request.query.chapterPage, 1),
-        all: String(request.query.all ?? "").toLowerCase() === "true",
-      }
-    )
-    return response.json(payload)
-  } catch (error) {
-    return next(error)
+chaptersRouter.get(
+  "/novels/:novelId/chapters",
+  requireAuth,
+  async (request, response, next) => {
+    try {
+      response.setHeader("Cache-Control", "private, no-store")
+      const payload = await listChapters(
+        String(request.params.novelId),
+        response.locals.user.id as string,
+        {
+          chapterPage: parsePositiveInt(request.query.chapterPage, 1),
+          all: String(request.query.all ?? "").toLowerCase() === "true",
+        }
+      )
+      return response.json(payload)
+    } catch (error) {
+      return next(error)
+    }
   }
-})
+)
 
 chaptersRouter.post(
   "/novels/:novelId/chapters",

@@ -71,6 +71,20 @@ const COVER_IMAGE_VIEWPORT_WIDTH = 240
 const COVER_IMAGE_VIEWPORT_HEIGHT = 360
 const COVER_IMAGE_OUTPUT_WIDTH = 1200
 const COVER_IMAGE_OUTPUT_HEIGHT = 1800
+const COVER_IMAGE_OUTPUT_FORMATS = [
+  {
+    mimeType: "image/webp",
+    extension: ".webp",
+    qualities: [0.86, 0.78, 0.7, 0.62],
+  },
+  {
+    mimeType: "image/jpeg",
+    extension: ".jpg",
+    qualities: [0.9, 0.82, 0.74, 0.66],
+  },
+] as const
+
+type CoverImageOutputFormat = (typeof COVER_IMAGE_OUTPUT_FORMATS)[number]
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
@@ -140,6 +154,29 @@ function readFileAsDataUrl(file: File) {
   return readBlobAsDataUrl(file)
 }
 
+function renderCanvasToBlob(canvas: HTMLCanvasElement, mimeType: string, quality: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (candidate) => {
+        if (!candidate) {
+          reject(new Error("Failed to render the cropped image"))
+          return
+        }
+
+        resolve(candidate)
+      },
+      mimeType,
+      quality
+    )
+  })
+}
+
+function replaceFileExtension(fileName: string, extension: string) {
+  const trimmedName = fileName.trim() || "cover"
+  const withoutExtension = trimmedName.replace(/\.[^.\\/]+$/, "")
+  return `${withoutExtension || "cover"}${extension}`
+}
+
 function loadImageFromDataUrl(dataUrl: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new window.Image()
@@ -178,6 +215,8 @@ async function renderCroppedCoverImage(
   }
 
   const sourceImage = await loadImageFromDataUrl(image.sourceDataUrl)
+  context.fillStyle = "#ffffff"
+  context.fillRect(0, 0, COVER_IMAGE_OUTPUT_WIDTH, COVER_IMAGE_OUTPUT_HEIGHT)
   context.drawImage(
     sourceImage,
     sourceX,
@@ -190,25 +229,33 @@ async function renderCroppedCoverImage(
     COVER_IMAGE_OUTPUT_HEIGHT,
   )
 
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (nextBlob) => {
-        if (!nextBlob) {
-          reject(new Error("Failed to render the cropped image"))
-          return
-        }
+  let blob: Blob | null = null
+  let outputFormat: CoverImageOutputFormat | null = null
 
-        resolve(nextBlob)
-      },
-      image.mimeType,
-      image.mimeType === "image/png" ? undefined : 0.92,
-    )
-  })
+  outputFormatLoop:
+  for (const format of COVER_IMAGE_OUTPUT_FORMATS) {
+    for (const quality of format.qualities) {
+      const nextBlob = await renderCanvasToBlob(canvas, format.mimeType, quality)
+      if (nextBlob.type && nextBlob.type !== format.mimeType) {
+        continue
+      }
+
+      blob = nextBlob
+      outputFormat = format
+      if (nextBlob.size <= MAX_COVER_FILE_SIZE_BYTES) {
+        break outputFormatLoop
+      }
+    }
+  }
+
+  if (!blob || !outputFormat || blob.size > MAX_COVER_FILE_SIZE_BYTES) {
+    throw new Error("Cropped cover image is too large. Try a simpler image or a tighter crop.")
+  }
 
   return {
     dataUrl: await readBlobAsDataUrl(blob),
-    fileName: image.fileName,
-    mimeType: blob.type || image.mimeType,
+    fileName: replaceFileExtension(image.fileName, outputFormat.extension),
+    mimeType: blob.type || outputFormat.mimeType,
     fileSizeBytes: blob.size,
   }
 }

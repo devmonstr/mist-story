@@ -25,6 +25,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "../services/notification-service"
+import { listStudioNovels } from "../services/novel-service"
 import {
   getMyProfile,
   refreshMyProfile,
@@ -33,6 +34,16 @@ import {
 } from "../services/profile-service"
 
 export const meRouter = Router()
+
+meRouter.get("/novels", requireAuth, async (_request, response, next) => {
+  try {
+    response.setHeader("Cache-Control", "private, no-store")
+    const payload = await listStudioNovels(response.locals.user.id as string)
+    return response.json(payload)
+  } catch (error) {
+    return next(error)
+  }
+})
 
 meRouter.get("/profile", requireAuth, async (_request, response, next) => {
   try {

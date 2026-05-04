@@ -1,4 +1,4 @@
-import { Router } from "express"
+import { Router, type Response } from "express"
 import {
   getPublicNovelChapter,
   getPublicNovelDetail,
@@ -7,6 +7,19 @@ import {
 
 export const libraryRouter = Router()
 
+function setPublicLibraryCacheHeader(response: Response) {
+  response.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
+}
+
+function setViewerAwareLibraryCacheHeader(response: Response) {
+  response.setHeader(
+    "Cache-Control",
+    response.locals.user
+      ? "private, no-store"
+      : "public, max-age=60, stale-while-revalidate=300"
+  )
+}
+
 function parsePositiveInt(value: unknown, fallback: number) {
   const parsed = Number.parseInt(typeof value === "string" ? value : "", 10)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
@@ -14,6 +27,7 @@ function parsePositiveInt(value: unknown, fallback: number) {
 
 libraryRouter.get("/", async (request, response, next) => {
   try {
+    setPublicLibraryCacheHeader(response)
     const cursorDirection =
       request.query.direction === "next" || request.query.direction === "prev"
         ? request.query.direction
@@ -60,6 +74,7 @@ libraryRouter.get("/", async (request, response, next) => {
 
 libraryRouter.get("/:novelId", async (request, response, next) => {
   try {
+    setViewerAwareLibraryCacheHeader(response)
     const payload = await getPublicNovelDetail(
       String(request.params.novelId),
       response.locals.user?.id as string | undefined,
@@ -73,6 +88,7 @@ libraryRouter.get("/:novelId", async (request, response, next) => {
 
 libraryRouter.get("/:novelId/chapters/:chapterNumber", async (request, response, next) => {
   try {
+    setViewerAwareLibraryCacheHeader(response)
     const chapterNumber = Number.parseInt(String(request.params.chapterNumber), 10)
     if (Number.isNaN(chapterNumber) || chapterNumber < 1) {
       return response.status(400).json({ error: "Invalid chapter number" })

@@ -101,9 +101,70 @@ export type CreateApiKeyResponse = {
   token: string
 }
 
+export type HomeStatsDto = {
+  publishedStories: number
+  genresCount: number
+  activeWriters: number
+}
+
+export type HomeGenreDto = {
+  id: string
+  title: string
+  description: string
+  storiesCount: number
+  href: string
+}
+
+export type HomeNovelAuthorDto = {
+  id: string
+  npub: string
+  displayName: string
+  avatarUrl: string | null
+}
+
+export type HomeNovelDto = {
+  id: string
+  slug: string
+  title: string
+  summary: string
+  genre: string | null
+  workType: "ORIGINAL" | "TRANSLATION"
+  status: "Ongoing" | "Completed" | "Hiatus" | null
+  visibility: "PUBLISHED" | "HIDDEN"
+  coverUrl: string
+  coverStorageKey: string | null
+  author: HomeNovelAuthorDto
+  chaptersCount: number
+  readsCount: number
+  bookmarksCount: number
+  rating: number
+  ratingsCount: number
+  publishedAt: string | null
+  updatedAt: string
+}
+
+export type HomeShelfDto = {
+  id: string
+  title: string
+  description: string
+  href: string
+  novels: HomeNovelDto[]
+}
+
+export type HomeResponse = {
+  generatedAt: string
+  stats: HomeStatsDto
+  hero: {
+    featuredNovel: HomeNovelDto | null
+    href: string
+  }
+  shelves: HomeShelfDto[]
+  genres: HomeGenreDto[]
+}
+
 function getApiBaseUrl() {
   if (typeof window !== "undefined") {
-    return ""
+    return process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || ""
   }
 
   return (
@@ -513,7 +574,7 @@ export function clearReadingProgress() {
 }
 
 export function fetchStudioNovels() {
-  return apiFetch<NovelDto[]>("/api/v1/novels")
+  return apiFetch<NovelDto[]>("/api/v1/me/novels")
 }
 
 export function fetchLibraryCatalog(input?: {
@@ -566,6 +627,10 @@ export function fetchLibraryCatalog(input?: {
     : "/api/v1/library"
 
   return apiFetch<LibraryCatalogResponse>(path)
+}
+
+export function fetchHomeData() {
+  return apiFetch<HomeResponse>("/api/v1/home")
 }
 
 export function fetchDiscoverData(input?: {

@@ -483,6 +483,6 @@ export async function updateAdminNovelVisibility(
     authorId: updated.authorId,
     reason: "admin-visibility-updated",
   })
-  await invalidatePublicCacheScopes("discover", "library", "search")
+  await invalidatePublicCacheScopes("home", "discover", "library", "search")
   return buildAdminNovelSummary(updated)
 }

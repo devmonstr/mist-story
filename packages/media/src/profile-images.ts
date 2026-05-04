@@ -1,23 +1,14 @@
 import { randomUUID } from "node:crypto"
 import { extname } from "node:path"
-import {
-  DeleteObjectCommand,
-  DeleteObjectsCommand,
-  GetObjectCommand,
-  ListObjectsV2Command,
-  PutObjectCommand,
-  S3Client,
-} from "@aws-sdk/client-s3"
 import type { ProfileImageAssetType } from "@myth/shared"
-import sharp from "sharp"
-
-export type R2MediaConfig = {
-  accountId: string
-  accessKeyId: string
-  secretAccessKey: string
-  bucketName: string
-  publicBaseUrl: string
-}
+import { normalizeImageToWebp } from "./image-processing"
+import {
+  deleteMediaObject,
+  getPublicMediaUrl,
+  putMediaObject,
+  readMediaObjectBuffer,
+  type R2MediaConfig,
+} from "./r2"
 
 export type ManagedProfileImageUploadInput = {
   userId: string
@@ -41,41 +32,6 @@ export type ProfileImageOptimizationInput = {
 }
 
 const PUBLIC_ALIAS_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=86400"
-
-const clients = new Map<string, S3Client>()
-
-function getClientCacheKey(config: R2MediaConfig) {
-  return [
-    config.accountId,
-    config.accessKeyId,
-    config.bucketName,
-    config.publicBaseUrl,
-  ].join(":")
-}
-
-function getR2Client(config: R2MediaConfig) {
-  const cacheKey = getClientCacheKey(config)
-  const existing = clients.get(cacheKey)
-  if (existing) {
-    return existing
-  }
-
-  const client = new S3Client({
-    region: "auto",
-    endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId: config.accessKeyId,
-      secretAccessKey: config.secretAccessKey,
-    },
-  })
-
-  clients.set(cacheKey, client)
-  return client
-}
-
-function normalizeBaseUrl(publicBaseUrl: string) {
-  return publicBaseUrl.replace(/\/$/, "")
-}
 
 function resolveExtension(fileName: string, mimeType: string) {
   const fromName = extname(fileName).toLowerCase()
@@ -115,45 +71,11 @@ function buildProfileImageKeys(input: {
   }
 }
 
-async function readObjectBuffer(config: R2MediaConfig, key: string) {
-  const client = getR2Client(config)
-  const response = await client.send(
-    new GetObjectCommand({
-      Bucket: config.bucketName,
-      Key: key,
-    })
-  )
-
-  if (!response.Body) {
-    throw new Error(`Object body is empty for key "${key}"`)
-  }
-
-  const bytes = await response.Body.transformToByteArray()
-  return Buffer.from(bytes)
-}
-
-export function createR2MediaConfig(input: {
-  accountId: string
-  accessKeyId: string
-  secretAccessKey: string
-  bucketName: string
-  publicBaseUrl: string
-}): R2MediaConfig {
-  return {
-    accountId: input.accountId,
-    accessKeyId: input.accessKeyId,
-    secretAccessKey: input.secretAccessKey,
-    bucketName: input.bucketName,
-    publicBaseUrl: normalizeBaseUrl(input.publicBaseUrl),
-  }
-}
-
 export async function uploadManagedProfileImage(
   config: R2MediaConfig,
   input: ManagedProfileImageUploadInput
 ): Promise<ManagedProfileImageUploadResult> {
   const assetId = randomUUID()
-  const client = getR2Client(config)
   const { sourceKey, publicKey } = buildProfileImageKeys({
     userId: input.userId,
     assetType: input.assetType,
@@ -163,31 +85,25 @@ export async function uploadManagedProfileImage(
   })
 
   await Promise.all([
-    client.send(
-      new PutObjectCommand({
-        Bucket: config.bucketName,
-        Key: sourceKey,
-        Body: input.buffer,
-        ContentType: input.mimeType,
-        CacheControl: "private, no-store",
-      })
-    ),
-    client.send(
-      new PutObjectCommand({
-        Bucket: config.bucketName,
-        Key: publicKey,
-        Body: input.buffer,
-        ContentType: input.mimeType,
-        CacheControl: PUBLIC_ALIAS_CACHE_CONTROL,
-      })
-    ),
+    putMediaObject(config, {
+      key: sourceKey,
+      body: input.buffer,
+      contentType: input.mimeType,
+      cacheControl: "private, no-store",
+    }),
+    putMediaObject(config, {
+      key: publicKey,
+      body: input.buffer,
+      contentType: input.mimeType,
+      cacheControl: PUBLIC_ALIAS_CACHE_CONTROL,
+    }),
   ])
 
   return {
     assetId,
     sourceKey,
     publicKey,
-    url: `${config.publicBaseUrl}/${publicKey}`,
+    url: getPublicMediaUrl(config, publicKey),
   }
 }
 
@@ -195,32 +111,21 @@ export async function optimizeProfileImageToWebp(
   config: R2MediaConfig,
   input: ProfileImageOptimizationInput
 ) {
-  const sourceBuffer = await readObjectBuffer(config, input.sourceKey)
+  const sourceBuffer = await readMediaObjectBuffer(config, input.sourceKey)
   const quality = input.assetType === "avatar" ? 82 : 80
-  const outputBuffer = await sharp(sourceBuffer)
-    .rotate()
-    .webp({
-      quality,
-    })
-    .toBuffer()
+  const output = await normalizeImageToWebp({
+    buffer: sourceBuffer,
+    quality,
+  })
 
-  const client = getR2Client(config)
-  await client.send(
-    new PutObjectCommand({
-      Bucket: config.bucketName,
-      Key: input.publicKey,
-      Body: outputBuffer,
-      ContentType: "image/webp",
-      CacheControl: PUBLIC_ALIAS_CACHE_CONTROL,
-    })
-  )
+  await putMediaObject(config, {
+    key: input.publicKey,
+    body: output.buffer,
+    contentType: output.mimeType,
+    cacheControl: PUBLIC_ALIAS_CACHE_CONTROL,
+  })
 
-  await client.send(
-    new DeleteObjectCommand({
-      Bucket: config.bucketName,
-      Key: input.sourceKey,
-    })
-  )
+  await deleteMediaObject(config, input.sourceKey)
 }
 
 export function deriveManagedProfileImagePrefixFromUrl(
@@ -231,7 +136,7 @@ export function deriveManagedProfileImagePrefixFromUrl(
     return null
   }
 
-  const baseUrl = normalizeBaseUrl(config.publicBaseUrl)
+  const baseUrl = config.publicBaseUrl.replace(/\/$/, "")
   if (!url.startsWith(`${baseUrl}/`)) {
     return null
   }
@@ -245,49 +150,4 @@ export function deriveManagedProfileImagePrefixFromUrl(
   }
 
   return key.slice(0, -"/public".length)
-}
-
-export async function deleteObjectsByPrefix(
-  config: R2MediaConfig,
-  prefix: string
-) {
-  const client = getR2Client(config)
-  let continuationToken: string | undefined
-
-  do {
-    const listed = await client.send(
-      new ListObjectsV2Command({
-        Bucket: config.bucketName,
-        Prefix: prefix.endsWith("/") ? prefix : `${prefix}/`,
-        ContinuationToken: continuationToken,
-      })
-    )
-
-    const objects =
-      listed.Contents?.flatMap((item) =>
-        item.Key
-          ? [
-              {
-                Key: item.Key,
-              },
-            ]
-          : []
-      ) ?? []
-
-    if (objects.length > 0) {
-      await client.send(
-        new DeleteObjectsCommand({
-          Bucket: config.bucketName,
-          Delete: {
-            Objects: objects,
-            Quiet: true,
-          },
-        })
-      )
-    }
-
-    continuationToken = listed.IsTruncated
-      ? listed.NextContinuationToken
-      : undefined
-  } while (continuationToken)
 }

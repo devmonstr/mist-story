@@ -50,6 +50,10 @@ model User {
   novelBookmarks              NovelBookmark[]
   novelRatings                NovelRating[]
   readingProgress             ReadingProgress[]
+  publicMetric                PublicAuthorMetric?
+  authoredActivityEvents      NovelActivityEvent[]          @relation("NovelActivityEventAuthor")
+  novelActivityDaily          NovelActivityDaily[]          @relation("NovelActivityDailyAuthor")
+  authorActivityDaily         AuthorActivityDaily[]         @relation("AuthorActivityDailyAuthor")
   isReader                    Boolean                       @default(true)
   isWriter                    Boolean                       @default(true)
   isAdmin                     Boolean                       @default(false)
@@ -57,7 +61,11 @@ model User {
   updatedAt                   DateTime                      @updatedAt
 
   @@index([displayName])
+  @@index([displayName(ops: raw("gin_trgm_ops"))], type: Gin, map: "User_displayName_trgm_idx")
   @@index([handle])
+  @@index([handle(ops: raw("gin_trgm_ops"))], type: Gin, map: "User_handle_trgm_idx")
+  @@index([about(ops: raw("gin_trgm_ops"))], type: Gin, map: "User_about_trgm_idx")
+  @@index([nip05(ops: raw("gin_trgm_ops"))], type: Gin, map: "User_nip05_trgm_idx")
 }
 
 enum AuthAuditAction {
@@ -282,15 +290,189 @@ model Novel {
   bookmarks         NovelBookmark[]
   ratings           NovelRating[]
   readingProgress   ReadingProgress[]
+  publicMetric      PublicNovelMetric?
+  activityEvents    NovelActivityEvent[]
+  dailyActivity     NovelActivityDaily[]
+  publicRankings    PublicCatalogRanking[]
 
   @@index([authorId])
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "Novel_title_trgm_idx")
+  @@index([summary(ops: raw("gin_trgm_ops"))], type: Gin, map: "Novel_summary_trgm_idx")
+  @@index([authorDisplayName(ops: raw("gin_trgm_ops"))], type: Gin, map: "Novel_authorDisplayName_trgm_idx")
+  @@index([genre(ops: raw("gin_trgm_ops"))], type: Gin, map: "Novel_genre_trgm_idx")
+  @@index([tags], type: Gin, map: "Novel_tags_gin_idx")
+  @@index([subgenres], type: Gin, map: "Novel_subgenres_gin_idx")
   @@index([visibility, status])
   @@index([visibility, genre])
   @@index([visibility, workType])
   @@index([visibility, publishedAt])
+  @@index([visibility, publishedAt(sort: Desc), id(sort: Desc)], map: "Novel_visibility_publishedAt_id_idx")
+  @@index([visibility, genre, publishedAt(sort: Desc), id(sort: Desc)], map: "Novel_visibility_genre_publishedAt_id_idx")
+  @@index([visibility, workType, publishedAt(sort: Desc), id(sort: Desc)], map: "Novel_visibility_workType_publishedAt_id_idx")
+  @@index([visibility, status, publishedAt(sort: Desc), id(sort: Desc)], map: "Novel_visibility_status_publishedAt_id_idx")
   @@index([visibility, updatedAt])
   @@index([visibility, ratingsCount])
   @@index([visibility, authorDisplayName])
+}
+
+model PublicNovelMetric {
+  novelId                    String   @id
+  readsCount                 Int      @default(0)
+  reads7d                    Int      @default(0)
+  reads30d                   Int      @default(0)
+  uniqueReaders7d            Int      @default(0)
+  uniqueReaders30d           Int      @default(0)
+  bookmarksCount             Int      @default(0)
+  bookmarks7d                Int      @default(0)
+  bookmarks30d               Int      @default(0)
+  ratings7d                  Int      @default(0)
+  ratings30d                 Int      @default(0)
+  authorPublishedNovelsCount Int      @default(0)
+  hotScore                   Float    @default(0)
+  momentumScore              Float    @default(0)
+  freshnessScore             Float    @default(0)
+  trendingScore              Float    @default(0)
+  qualityScore               Float    @default(0)
+  hiddenGemScore             Float    @default(0)
+  updatedAt                  DateTime @default(now())
+  novel                      Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([trendingScore(sort: Desc)])
+  @@index([qualityScore(sort: Desc)])
+  @@index([hiddenGemScore(sort: Desc)])
+  @@index([readsCount(sort: Desc)])
+  @@index([bookmarksCount(sort: Desc)])
+}
+
+model PublicAuthorMetric {
+  authorId             String   @id
+  followersCount       Int      @default(0)
+  followers7d          Int      @default(0)
+  followers30d         Int      @default(0)
+  publishedNovelsCount Int      @default(0)
+  reads7d              Int      @default(0)
+  reads30d             Int      @default(0)
+  bookmarks7d          Int      @default(0)
+  bookmarks30d         Int      @default(0)
+  ratings7d            Int      @default(0)
+  ratings30d           Int      @default(0)
+  momentumScore        Float    @default(0)
+  qualityScore         Float    @default(0)
+  updatedAt            DateTime @default(now())
+  author               User     @relation(fields: [authorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([followersCount(sort: Desc)])
+  @@index([qualityScore(sort: Desc)])
+}
+
+enum NovelActivityEventType {
+  READ
+  CHAPTER_READ
+  BOOKMARK_ADD
+  BOOKMARK_REMOVE
+  RATING_ADD
+  RATING_UPDATE
+  COMMENT_ADD
+  PURCHASE
+}
+
+enum PublicCatalogRankingCollection {
+  TRENDING
+  NEW_RELEASES
+  HIDDEN_GEMS
+  EDITORS_PICKS
+  NEW_VOICES
+  TOP_RATED
+  TRANSLATIONS
+  GENRE
+}
+
+model NovelActivityEvent {
+  id         String                 @id @default(cuid())
+  novelId    String
+  authorId   String
+  userId     String?
+  chapterId  String?
+  eventType  NovelActivityEventType
+  eventValue Int?
+  metadata   Json?
+  occurredAt DateTime               @default(now())
+  createdAt  DateTime               @default(now())
+  novel      Novel                  @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  author     User                   @relation("NovelActivityEventAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  chapter    Chapter?               @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+
+  @@index([novelId, occurredAt])
+  @@index([authorId, occurredAt])
+  @@index([eventType, occurredAt])
+  @@index([novelId, eventType, occurredAt])
+}
+
+model NovelActivityDaily {
+  novelId           String
+  day               DateTime @db.Date
+  authorId          String
+  readsCount        Int      @default(0)
+  uniqueReadersCount Int     @default(0)
+  chapterReadsCount Int      @default(0)
+  bookmarksAddedCount Int    @default(0)
+  bookmarksRemovedCount Int  @default(0)
+  ratingsAddedCount Int      @default(0)
+  ratingValueTotal  Int      @default(0)
+  commentsCount     Int      @default(0)
+  purchasesCount    Int      @default(0)
+  updatedAt         DateTime @updatedAt
+  novel             Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  author            User     @relation("NovelActivityDailyAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@id([novelId, day])
+  @@index([authorId, day])
+  @@index([day])
+}
+
+model AuthorActivityDaily {
+  authorId          String
+  day               DateTime @db.Date
+  readsCount        Int      @default(0)
+  uniqueReadersCount Int     @default(0)
+  chapterReadsCount Int      @default(0)
+  bookmarksAddedCount Int    @default(0)
+  bookmarksRemovedCount Int  @default(0)
+  ratingsAddedCount Int      @default(0)
+  ratingValueTotal  Int      @default(0)
+  commentsCount     Int      @default(0)
+  purchasesCount    Int      @default(0)
+  followsAddedCount Int      @default(0)
+  followsRemovedCount Int    @default(0)
+  updatedAt         DateTime @updatedAt
+  author            User     @relation("AuthorActivityDailyAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@id([authorId, day])
+  @@index([day])
+}
+
+model PublicCatalogRanking {
+  collection     PublicCatalogRankingCollection
+  contextKey     String
+  genre          String?
+  workType       NovelWorkType?
+  status         NovelStatus?
+  novelId        String
+  rank           Int
+  score          Float    @default(0)
+  qualityScore   Float    @default(0)
+  momentumScore  Float    @default(0)
+  trendingScore  Float    @default(0)
+  scoreVersion   String   @default("public-catalog-v1")
+  computedAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  novel          Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@id([collection, contextKey, novelId])
+  @@unique([collection, contextKey, rank], map: "PublicCatalogRanking_collection_contextKey_rank_key")
+  @@index([collection, contextKey, rank])
+  @@index([collection, contextKey, score(sort: Desc)])
 }
 
 model Chapter {
@@ -317,6 +499,7 @@ model Chapter {
   orderItems               OrderItem[]
   entitlements             Entitlement[]
   readingProgress          ReadingProgress[]
+  activityEvents           NovelActivityEvent[]
   versions                 ChapterVersion[]  @relation("ChapterVersions")
   latestVersion            ChapterVersion?   @relation("ChapterLatestVersion", fields: [latestVersionId], references: [id])
   latestPublishedVersion   ChapterVersion?   @relation("ChapterLatestPublishedVersion", fields: [latestPublishedVersionId], references: [id])

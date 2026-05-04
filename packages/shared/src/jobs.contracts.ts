@@ -30,6 +30,20 @@ export const publicCatalogMetricsRefreshJobPayloadSchema = z.object({
   reason: z.string().min(1).optional(),
 })
 
+export const publicCatalogActivityRollupJobPayloadSchema = z.object({
+  scope: z.enum(["all", "novel", "author"]).default("all"),
+  novelId: z.string().min(1).optional(),
+  authorId: z.string().min(1).optional(),
+  reason: z.string().min(1).optional(),
+})
+
+export const publicCatalogRankingsRefreshJobPayloadSchema = z.object({
+  scope: z.enum(["all", "novel", "author"]).default("all"),
+  novelId: z.string().min(1).optional(),
+  authorId: z.string().min(1).optional(),
+  reason: z.string().min(1).optional(),
+})
+
 export type ChapterPublishJobPayload = z.infer<typeof chapterPublishJobPayloadSchema>
 export type NotificationDispatchJobPayload = z.infer<typeof notificationDispatchJobPayloadSchema>
 export type ProfileSyncJobPayload = z.infer<typeof profileSyncJobPayloadSchema>
@@ -38,4 +52,10 @@ export type ProfileImageOptimizeJobPayload = z.infer<
 >
 export type PublicCatalogMetricsRefreshJobPayload = z.infer<
   typeof publicCatalogMetricsRefreshJobPayloadSchema
+>
+export type PublicCatalogActivityRollupJobPayload = z.infer<
+  typeof publicCatalogActivityRollupJobPayloadSchema
+>
+export type PublicCatalogRankingsRefreshJobPayload = z.infer<
+  typeof publicCatalogRankingsRefreshJobPayloadSchema
 >

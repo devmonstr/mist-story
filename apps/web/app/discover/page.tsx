@@ -57,7 +57,7 @@ export default async function DiscoverPage({
     <div className="flex min-h-screen flex-col">
       <Navbar />
       <main className="flex-1">
-        <DiscoverShell activeFilters={data.activeFilters}>
+        <DiscoverShell activeFilters={data.activeFilters} facets={data.facets}>
           <CategoriesGrid categories={data.genres} />
           <CollectionsGrid collections={data.collections} />
         </DiscoverShell>

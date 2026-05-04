@@ -1,35 +1,24 @@
-import type { LibraryCatalogNovelDto } from "@myth/shared"
-import { HomeHeroClient, type HomeHeroNovelView } from "@/components/home-hero-client"
-import { fetchLibraryCatalog } from "@/lib/api"
+import {
+  HomeHeroClient,
+  type HomeHeroNovelView,
+  type HomeHeroRankingShelfView,
+} from "@/components/home-hero-client"
+import type { HomeGenreDto, HomeNovelDto, HomeShelfDto } from "@/lib/api"
 import { resolveNovelCoverSrc } from "@/lib/novel-cover"
 
-type HomeHeroCatalog = {
-  featuredNovels: HomeHeroNovelView[]
-  rankings: {
-    novels: HomeHeroNovelView[]
-    translations: HomeHeroNovelView[]
-    newVoices: HomeHeroNovelView[]
-  }
+const genreShortcutIcons = ["sparkles", "sword", "heart", "search"] as const
+
+type HeroSectionProps = {
+  featuredNovel: HomeNovelDto | null
+  rankingShelves: HomeShelfDto[]
+  genres: HomeGenreDto[]
 }
 
-const genreShortcuts = [
-  { label: "Fantasy", href: "/library?genre=fantasy", icon: "sparkles" as const },
-  { label: "Action", href: "/library?genre=action", icon: "sword" as const },
-  { label: "Romance", href: "/library?genre=romance", icon: "heart" as const },
-  { label: "Mystery", href: "/library?genre=mystery", icon: "search" as const },
-  {
-    label: "Trending",
-    href: "/library?collection=trending&sort=popular",
-    icon: "flame" as const,
-  },
-  { label: "More", href: "/discover", icon: "grid" as const },
-]
-
-function getNovelHref(novel: LibraryCatalogNovelDto) {
+function getNovelHref(novel: Pick<HomeNovelDto, "id" | "slug">) {
   return `/novel/${novel.slug || novel.id}`
 }
 
-function toHeroNovelView(novel: LibraryCatalogNovelDto): HomeHeroNovelView {
+function toHeroNovelView(novel: HomeNovelDto): HomeHeroNovelView {
   return {
     id: novel.id,
     title: novel.title,
@@ -48,60 +37,46 @@ function toHeroNovelView(novel: LibraryCatalogNovelDto): HomeHeroNovelView {
   }
 }
 
-async function loadHomeHeroCatalog(): Promise<HomeHeroCatalog> {
-  try {
-    const [popularCatalog, rankingCatalog, translationCatalog, newVoicesCatalog] =
-      await Promise.all([
-        fetchLibraryCatalog({ sortBy: "popular", pageSize: 6 }),
-        fetchLibraryCatalog({ sortBy: "rating", pageSize: 5 }),
-        fetchLibraryCatalog({
-          sortBy: "rating",
-          workType: "TRANSLATION",
-          pageSize: 5,
-        }),
-        fetchLibraryCatalog({
-          sortBy: "recent",
-          collection: "new-voices",
-          pageSize: 5,
-        }),
-      ])
-
-    return {
-      featuredNovels: popularCatalog.novels.slice(0, 6).map(toHeroNovelView),
-      rankings: {
-        novels: rankingCatalog.novels.slice(0, 5).map(toHeroNovelView),
-        translations: translationCatalog.novels.slice(0, 5).map(toHeroNovelView),
-        newVoices: newVoicesCatalog.novels.slice(0, 5).map(toHeroNovelView),
-      },
-    }
-  } catch (error) {
-    console.error("[home] failed to load hero catalog", error)
-    return {
-      featuredNovels: [],
-      rankings: {
-        novels: [],
-        translations: [],
-        newVoices: [],
-      },
-    }
-  }
+function toGenreShortcuts(genres: HomeGenreDto[]) {
+  return [
+    ...genres.slice(0, 4).map((genre, index) => ({
+      label: genre.title,
+      href: genre.href,
+      icon: genreShortcutIcons[index % genreShortcutIcons.length],
+    })),
+    {
+      label: "Trending",
+      href: "/library?collection=trending&sort=popular",
+      icon: "flame" as const,
+    },
+    { label: "More", href: "/discover", icon: "grid" as const },
+  ]
 }
 
-export async function HeroSection() {
-  const catalog = await loadHomeHeroCatalog()
+function toRankingShelves(shelves: HomeShelfDto[]): HomeHeroRankingShelfView[] {
+  return shelves.slice(0, 3).map((shelf) => ({
+    id: shelf.id,
+    label: shelf.title,
+    href: shelf.href,
+    description: shelf.description,
+    novels: shelf.novels.slice(0, 5).map(toHeroNovelView),
+  }))
+}
+
+export function HeroSection({
+  featuredNovel,
+  rankingShelves,
+  genres,
+}: HeroSectionProps) {
+  const featuredNovels = featuredNovel ? [toHeroNovelView(featuredNovel)] : []
 
   return (
     <HomeHeroClient
-      featuredNovels={catalog.featuredNovels}
-      rankings={catalog.rankings}
-      genreShortcuts={genreShortcuts}
+      featuredNovels={featuredNovels}
+      rankingShelves={toRankingShelves(rankingShelves)}
+      genreShortcuts={toGenreShortcuts(genres)}
       discoverHref="/discover"
       libraryHref="/library?sort=popular"
-      rankingHrefs={{
-        novels: "/library?sort=rating",
-        translations: "/library?sort=rating&workType=TRANSLATION",
-        newVoices: "/library?collection=new-voices&sort=recent",
-      }}
     />
   )
 }
